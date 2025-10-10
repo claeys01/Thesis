@@ -22,7 +22,7 @@ padding=1
 kernel1 = (3, 3)
 kernel2 = (5, 5)
 kernel3 = (7, 7)
-kernel4 = (9, 9)]
+kernel4 = (9, 9)
 
 conv_layers = Chain(
     Conv(kernel1, C => C_next, relu; pad=(1, 1)),        # (386, 130, 2) -> (386, 130, 32)
