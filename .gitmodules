@@ -1,0 +1,6 @@
+[submodule "deps/WaterLily"]
+	path = deps/WaterLily
+	url = https://github.com/claeys01/Thesis_WaterLily.jl.git
+[submodule "deps/BiotSavartBCs"]
+	path = deps/BiotSavartBCs
+	url = https://github.com/claeys01/BiotSavartBCs.jl.git
