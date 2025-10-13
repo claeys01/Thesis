@@ -17,7 +17,16 @@ function RHS(flow::Flow{N};λ=WaterLily.quick,udf=nothing,kwargs...) where N
     return RHS
 end
 
-function downsample_RHS_data!(RHS_data; tmin=50, tmax=75, n_samples=50)
+function downsample_RHS_data!(RHS_data; tmin=-1, tmax=-1, n_samples=-1)
+    if n_samples == -1
+        n_samples = length(RHS_data["time"])
+    end
+    if tmin == -1
+        tmin = RHS_data["time"][1]
+    end
+    if tmax == -1
+        tmax = RHS_data["time"][end]
+    end 
     # Select indices corresponding to time tmin to tmax
     time_indices = findall(t -> t ≥ tmin && t ≤ tmax, RHS_data["time"])
     selected_indices = time_indices
