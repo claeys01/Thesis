@@ -4,6 +4,3 @@
 [submodule "deps/BiotSavartBCs"]
 	path = deps/BiotSavartBCs
 	url = https://github.com/claeys01/BiotSavartBCs.jl.git
-[submodule "deps/AutoEncoderToolkit"]
-	path = deps/AutoEncoderToolkit
-	url = https://github.com/mrazomej/AutoEncoderToolkit.jl.git
