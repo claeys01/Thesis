@@ -12,7 +12,7 @@ function grad(field::AbstractArray)
     return grad
 end
 
-function RHS(flow::Flow{N};λ=WaterLily.quick,udf=nothing,kwargs...) where N
+function RHS(flow::Flow{N};λ=WaterLily.quick,kwargs...) where N
     RHS = WaterLily.conv_diff!(flow.f,flow.u⁰,flow.σ,λ;ν=flow.ν,perdir=flow.perdir) - grad(flow.p)
     return RHS
 end
