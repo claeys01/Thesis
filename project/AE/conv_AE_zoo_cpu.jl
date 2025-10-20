@@ -9,6 +9,8 @@ using Statistics
 using ProgressMeter: Progress, next!
 using MLUtils: DataLoader
 using Zygote
+using Plots
+using DrWatson: struct2dict
 
 
 includet("../utils/NetTracer.jl")  # or include() if not using Revise
@@ -17,7 +19,7 @@ using .NetTrace
 
 
 function get_data(batch_size, path; tmin=-1, tmax=-1, n_samples=500)
-    @load "/home/matth/Thesis/data/RHS_shedding_data_arr.jld2" RHS_data
+    @load path RHS_data
     downsample_RHS_data!(RHS_data; tmin=tmin, tmax=tmax, n_samples=n_samples, clip_bc=true)
     X = cat(RHS_data["RHS"]...; dims=4)   # now X has shape (H,W,C,N)
     X = Float32.(X)
@@ -33,11 +35,11 @@ end
 
 Flux.@layer Encoder
 
-
-Encoder(in_channels::Int, latent_dim::Int; C_next::Int=4, input_size::Tuple{Int,Int}=(384,128)) = begin
+Encoder(input_size::Tuple{Int,Int, Int}, latent_dim::Int; C_next::Int=4) = begin
+    H, W, C = input_size
 
     convpart = Chain(
-        Conv((3,3), in_channels => C_next,   identity; pad=1, stride=1), relu,
+        Conv((3,3), C => C_next,   identity; pad=1, stride=1), relu,
         MaxPool((2,2)),
         Conv((3,3), C_next      => 2C_next,  identity; pad=1, stride=1), relu,
         MaxPool((2,2)),
@@ -47,9 +49,7 @@ Encoder(in_channels::Int, latent_dim::Int; C_next::Int=4, input_size::Tuple{Int,
         MaxPool((2,2)),
         Flux.flatten
     )
-    # infer flattened size with a CPU dummy (avoids GPU/CPU device issues)
-    H, W = input_size
-    dummy = zeros(Float32, H, W, in_channels, 1)
+    dummy = zeros(Float32, H, W, C, 1)
     flat = convpart(dummy)
     dense_in = size(flat, 1)
     return Encoder(Chain(convpart, Dense(dense_in, latent_dim)))
@@ -74,22 +74,26 @@ end
 Flux.@layer Decoder
 
 
-Decoder(latent_dim::Int, out_channels::Int; C_next::Int=4, input_size::Tuple{Int,Int}=(384,128)) = begin
-    H, W = input_size
+Decoder(output_size::Tuple{Int,Int, Int}, latent_dim::Int; C_next::Int=4) = begin
+    H, W, C = output_size
     # after four 2x2 downsamples: h_out = H ÷ 16, w_out = W ÷ 16
-    h_out = div(H, 16)
-    w_out = div(W, 16)
+    if H % 16 != 0 || W % 16 != 0
+        throw(ArgumentError("Input of encoder needs to be deviseable by 16, please exclude ghost cells"))
+    end
+
+    h_lat = div(H, 16)
+    w_lat = div(W, 16)
     channels_mid = 8 * C_next
-    dense_len = h_out * w_out * channels_mid
+    dense_len = h_lat * w_lat * channels_mid
 
     return Decoder(Chain(
         Dense(latent_dim, dense_len),
-        x -> reshape(x, h_out, w_out, channels_mid, size(x, 2)),
+        x -> reshape(x, h_lat, w_lat, channels_mid, size(x, 2)),
         ConvTranspose((2, 2), 8*C_next => 4*C_next, relu; stride=(2, 2), pad=(0, 0)),
         ConvTranspose((2, 2), 4*C_next => 2*C_next, relu; stride=(2, 2), pad=(0, 0)),
         ConvTranspose((2, 2), 2*C_next => C_next,   relu; stride=(2, 2), pad=(0, 0)),
-        ConvTranspose((2, 2), C_next   => out_channels, relu; stride=(2, 2), pad=(0, 0)),
-        ConvTranspose((3, 3), out_channels => out_channels, identity; stride=(1, 1), pad=(1, 1))
+        ConvTranspose((2, 2), C_next   => C, relu; stride=(2, 2), pad=(0, 0)),
+        ConvTranspose((3, 3), C => C, identity; stride=(1, 1), pad=(1, 1))
     ))
 end
 
@@ -97,6 +101,28 @@ function reconstruct(enc::Encoder, dec::Decoder, x)
     z = enc(x)
     return dec(z)
 end
+
+function check_ae_dims(encoder, decoder, x; device=Flux.get_device("CPU"))
+    x_dev = x |> device
+    ŷ = reconstruct(encoder, decoder, x_dev)
+    return size(x_dev) == size(ŷ), size(x_dev), size(ŷ)
+end
+
+function run_dim_check(; kws...)
+    args = Args(; kws...)
+    device = args.use_gpu ? Flux.get_device() : Flux.get_device("CPU")
+    encoder = Flux.f32(Encoder(args.input_dim, args.latent_dim)) |> device
+    decoder = Flux.f32(Decoder(args.input_dim, args.latent_dim)) |> device
+    loader = get_data(1, args.data_path)
+    x = first(loader)
+    ok, xin, xout = check_ae_dims(encoder, decoder, x; device=device)
+    println("AE output matches input shapes? ", ok)
+    println("input size: ", xin)
+    println("output size: ", xout)
+    return ok
+end
+
+# run_dim_check()
 
 function divergence_field(u; mean=false, max=false)
     if ndims(u) == 4
@@ -135,7 +161,6 @@ end
 # losses
 recon_loss(ŷ, x) = mean(abs2, ŷ .- x)                # MSE
 div_loss_L2(u) = mean(abs2, divergence_field(u))     # L2 of divergence field
-mae_loss(ŷ,x) = mean(abs, ŷ .- x)                    # optional L1
 
 Zygote.@nograd divergence_field
 Zygote.@nograd div_loss_L2
@@ -158,18 +183,19 @@ function total_loss(encoder, decoder, x; λdiv=1)
 end
 
 Base.@kwdef mutable struct Args
-    η = 1e-3                # learning rate
-    λ = 1e-4                # regularization paramater
-    batch_size = 1        # batch size
-    sample_size = 10        # sampling size for output    
-    epochs = 2             # number of epochs
-    seed = 42                # random seed
-    use_gpu = false              # use GPU
-    input_dim = (386, 130, 2)        # flow field size
-    latent_dim = 64          # latent dimension
-    verbose_freq = 5       # logging for every verbose_freq iterations
-    tblogger = false        # log training with tensorboard
-    save_path = "output"    # results path
+    η = 1e-3                    # learning rate
+    λ = 1e-4                    # regularization paramater
+    batch_size = 100            # batch size
+    downsample = 1500           # amount of RHS used for training 
+    epochs = 20                 # number of epochs
+    seed = 42                   # random seed
+    use_gpu = false             # use GPU
+    input_dim = (128, 128, 2)   # flow field size
+    latent_dim = 64             # latent dimension
+    verbose_freq = 5            # logging for every verbose_freq iterations
+    tblogger = false            # log training with tensorboard
+    save_path = "data/models"        # results path
+    data_path = "data/RHS_biot_data_arr.jld2"
 end
 
 
@@ -188,15 +214,11 @@ function train(; kws...)
     @info "Training on $device"
 
     # load RHS data
-    loader = get_data(args.batch_size)
-
-    _, _, C = args.input_dim
+    loader = get_data(args.batch_size, args.data_path; n_samples=args.downsample)
 
     # initialize encoder and decoder
-    encoder = Flux.f32(Encoder(C, args.latent_dim)) |> device
-    decoder = Flux.f32(Decoder(args.latent_dim, C)) |> device
-
-    
+    encoder = Flux.f32(Encoder(args.input_dim, args.latent_dim)) |> device
+    decoder = Flux.f32(Decoder(args.input_dim, args.latent_dim)) |> device
 
     # define optimizer
     opt_enc = Flux.setup(AdamW(eta=args.η, lambda=args.λ), encoder)
@@ -204,11 +226,15 @@ function train(; kws...)
 
     !ispath(args.save_path) && mkpath(args.save_path)
 
+    # record losses
+    train_losses = Float32[]
+    rec_losses = Float32[]
+    div_losses = Float32[]
+    iters = Int[]
+    iter = 0
+
     # training
     @info "Start Training, total $(args.epochs) epochs"
-
-
-
 
     for epoch = 1:args.epochs
         @info "Epoch $(epoch)"
@@ -216,19 +242,50 @@ function train(; kws...)
         for (i, x) in enumerate(loader)
             x_dev = x |> device            
 
-            loss, (grad_enc, grad_dec) = Flux.withgradient(encoder, decoder) do enc, dec
+            # capture both total loss and components
+            loss_tuple, (grad_enc, grad_dec) = Flux.withgradient(encoder, decoder) do enc, dec
                 total_loss(enc, dec, x_dev)
             end
-            
-            # println(loss)
+            loss_total, (Lrec, L2div) = loss_tuple
 
             Flux.update!(opt_enc, encoder, grad_enc)
             Flux.update!(opt_dec, decoder, grad_dec)
+
+            # record
+            iter += 1
+            push!(iters, iter)
+            push!(train_losses, Float32(loss_total))
+            push!(rec_losses, Float32(Lrec))
+            push!(div_losses, Float32(L2div))
+
             # progress meter
-            next!(progress; showvalues=[(:loss, loss)]) 
+            next!(progress; showvalues=[(:loss, loss_total)]) 
         end
+    end
+
+    # plot and save loss evolution
+    try
+        p = plot(iters, train_losses, label="total", xlabel="Iteration", ylabel="Loss", title="Training loss", lw=2)
+        plot!(p, iters, rec_losses, label="reconstruction", lw=1, ls=:dash)
+        if any(!iszero, div_losses)
+            plot!(p, iters, div_losses, label="divergence", lw=1, ls=:dot)
+        end
+        png_path = joinpath(args.save_path, "loss_evolution.png")
+        savefig(p, png_path)
+        @info "Saved loss plot to $png_path"
+    catch e
+        @warn "Failed to save loss plot: $e"
+    end
+
+    # save model
+    let encoder = cpu(encoder), decoder = cpu(decoder), args=struct2dict(args)
+        filepath = joinpath(args[:save_path], "checkpoint.jld2") 
+        JLD2.save(filepath, "encoder", Flux.state(encoder),
+                            "decoder", Flux.state(decoder),
+                            "args", args)                            
+        @info "Model saved: $(filepath)"
     end
 end
 
-train()
+# train()
 
