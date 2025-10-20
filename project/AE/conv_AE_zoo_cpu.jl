@@ -7,7 +7,6 @@ using WaterLily
 using Random
 using Statistics
 using ProgressMeter: Progress, next!
-# using Todo
 using MLUtils: DataLoader
 using Zygote
 
@@ -17,7 +16,7 @@ includet("../custom.jl")
 using .NetTrace
 
 
-function get_data(batch_size; tmin=-1, tmax=-1, n_samples=500)
+function get_data(batch_size, path; tmin=-1, tmax=-1, n_samples=500)
     @load "/home/matth/Thesis/data/RHS_shedding_data_arr.jld2" RHS_data
     downsample_RHS_data!(RHS_data; tmin=tmin, tmax=tmax, n_samples=n_samples, clip_bc=true)
     X = cat(RHS_data["RHS"]...; dims=4)   # now X has shape (H,W,C,N)
@@ -34,33 +33,9 @@ end
 
 Flux.@layer Encoder
 
-# Encoder(in_channels::Int, latent_dim::Int; C_next::Int=4) = Encoder(Chain(
-#     Conv((3,3), in_channels => C_next, relu; pad=(1,1), stride=(1,1)),
-#     MaxPool((2,2)),
-#     Conv((3,3), C_next => 2*C_next, relu; pad=(1,1), stride=(1,1)),
-#     MaxPool((2,2)),
-#     Conv((3,3), 2*C_next => 4*C_next, relu; pad=(1,1), stride=(1,1)),
-#     MaxPool((2,2)),
-#     Conv((3,3), 4*C_next => 8*C_next, relu; pad=(1,1), stride=(1,1)),
-#     MaxPool((2,2)),
-#     Flux.flatten,
-#     Dense(6144, latent_dim)
-#     # x -> reshape(x, :, size(x, 4)),  # flatten not use parametric layers, optimiser does not like it
-#     # x -> Dense(size(x, 1), latent_dim)(x)  # Parametric Dense layer
-# ))
 
 Encoder(in_channels::Int, latent_dim::Int; C_next::Int=4, input_size::Tuple{Int,Int}=(384,128)) = begin
-    # convpart = Chain(
-    #     Conv((3,3), in_channels => C_next, relu; pad=(1,1), stride=(1,1)),
-    #     MaxPool((2,2)),
-    #     Conv((3,3), C_next => 2*C_next, relu; pad=(1,1), stride=(1,1)),
-    #     MaxPool((2,2)),
-    #     Conv((3,3), 2*C_next => 4*C_next, relu; pad=(1,1), stride=(1,1)),
-    #     MaxPool((2,2)),
-    #     Conv((3,3), 4*C_next => 8*C_next, relu; pad=(1,1), stride=(1,1)),
-    #     MaxPool((2,2)),
-    #     Flux.flatten
-    # )
+
     convpart = Chain(
         Conv((3,3), in_channels => C_next,   identity; pad=1, stride=1), relu,
         MaxPool((2,2)),
@@ -99,19 +74,6 @@ end
 Flux.@layer Decoder
 
 
-# Decoder(latent_dim::Int, out_channels::Int; C_next::Int=4) = Decoder(Chain(
-#     # z : (n_latent, T) -> (24*8*(8*C_next), T)
-#     # x -> Dense(latent_dim, 24 * 8 * (8 * C_next))(x),   # <<< explicit multiplication
-#     Dense(latent_dim, 6144),
-#     # -> (24, 8, 8*C_next, T)
-#     x -> reshape(x, 24, 8, 8*C_next, size(x, 2)),
-#     ConvTranspose((2, 2), 8*C_next => 4*C_next, relu; stride=(2, 2), pad=(0, 0)),
-#     ConvTranspose((2, 2), 4*C_next => 2*C_next, relu; stride=(2, 2), pad=(0, 0)),
-#     ConvTranspose((2, 2), 2*C_next => C_next,   relu; stride=(2, 2), pad=(0, 0)),
-#     ConvTranspose((2, 2), C_next   => out_channels,       relu; stride=(2, 2), pad=(0, 0)),
-#     ConvTranspose((3, 3), out_channels => out_channels, identity; stride=(1, 1), pad=(0, 0))
-# ))
-
 Decoder(latent_dim::Int, out_channels::Int; C_next::Int=4, input_size::Tuple{Int,Int}=(384,128)) = begin
     H, W = input_size
     # after four 2x2 downsamples: h_out = H ÷ 16, w_out = W ÷ 16
@@ -130,21 +92,6 @@ Decoder(latent_dim::Int, out_channels::Int; C_next::Int=4, input_size::Tuple{Int
         ConvTranspose((3, 3), out_channels => out_channels, identity; stride=(1, 1), pad=(1, 1))
     ))
 end
-todo"check architecture of decoder"
-
-# xdbg = first(get_data(1))                 # (H,W,C,1)
-# enc  = Encoder(2, 64)                     # or |> gpu, but keep x/model on same device
-# dec  = Decoder(64, 2)
-
-# println("=== ENCODER ===")
-# z, enc_rows = NetTrace.quick_overview(enc, xdbg; check_nan=true)
-
-# println("=== DECODER ===")
-# _, dec_rows = NetTrace.quick_overview(dec, z; check_nan=true)
-
-# # enc_rows / dec_rows are vectors of NamedTuples you can log or inspect
-# # e.g. see all expected conv output sizes:
-# map(r -> r.meta === nothing ? nothing : r.meta.out_hw, enc_rows)
 
 function reconstruct(enc::Encoder, dec::Decoder, x)
     z = enc(x)
@@ -269,17 +216,6 @@ function train(; kws...)
         for (i, x) in enumerate(loader)
             x_dev = x |> device            
 
-
-            # CUDA.@sync begin
-            #     @show typeof(x_dev) size(x_dev) eltype(x_dev)
-            #     @assert eltype(x_dev) == Float32
-            #     @assert ndims(x_dev) == 4  # (H,W,C,N)
-            # end
-            #     CUDA.allowscalar(false)
-            #     @show typeof(x_dev) eltype(x_dev) ndims(x_dev)  # CuArray{Float32,4}, 4
-            #     # @show typeof(encoder.layers[1].weight) eltype(encoder.layers[1].weight)
-            #     @assert isa(x_dev, CuArray) && eltype(x_dev) == Float32
-            #     # @assert eltype(encoder.layers[1].weight) == Float32
             loss, (grad_enc, grad_dec) = Flux.withgradient(encoder, decoder) do enc, dec
                 total_loss(enc, dec, x_dev)
             end
