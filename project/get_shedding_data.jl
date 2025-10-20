@@ -4,10 +4,11 @@ using Revise
 using JLD2
 
 includet("simulations/vortex_shedding.jl")
+includet("simulations/vortex_shedding_biot_savart.jl")
 includet("custom.jl")
 
 
-sim_shedding = circle_shedding(mem=Array)
+sim_shedding = circle_shedding_biot(mem=Array)
 t_end = 100.0
 
 function data_run(sim::AbstractSimulation, time_max; sample_instance=50, verbose=false)
@@ -30,4 +31,4 @@ end
 
 RHS_data = data_run(sim_shedding, t_end; verbose=true)
 
-@save "data/RHS_shedding_data_arr_temp.jld2" RHS_data
+@save "data/RHS_biot_data_arr.jld2" RHS_data

@@ -1,6 +1,8 @@
 using JLD2
+using WaterLily
+using Statistics
 
-@load "matth/data/RHS_shedding_data_arr.jld2" RHS_data
+@load "data/RHS_biot_data_arr.jld2" RHS_data
 
 # Select indices corresponding to time 50 to 75
 time_indices = findall(t -> t ≥ 50 && t ≤ 75, RHS_data["time"])
@@ -30,11 +32,19 @@ println("Randomly selected matrix at index $random_idx with size: ", size(random
 println("Matrix type: ", typeof(random_matrix))
 println("Matrix element type: ", eltype(random_matrix))
 println("matrix dimensions: ", size(random_matrix))
+println("Mean of random matrix: ", mean(random_matrix))
 
-vel_mag = sqrt.(sum(random_matrix .^ 2, dims=3))
-# Make a contour plot
-px = Plots.contourf(random_matrix[:,:,1]; title="x component of random RHS matrix", cmap=:viridis)
-py = Plots.contourf(random_matrix[:,:,2]; title="y component of random RHS matrix", cmap=:viridis)
-pmag = Plots.contourf(vel_mag[:,:,1]; title="Magnitude of random RHS matrix", cmap=:viridis)
+function RHS_stats(RHS)
+    return mean(RHS), std(RHS)
+end
+
+rand_u, (u_mean, u_std) = random_matrix[:,:,1], RHS_stats(random_matrix[:,:,1])
+rand_v, (v_mean, v_std) = random_matrix[:,:,2], RHS_stats(random_matrix[:,:,2])
+mag  = sqrt.(sum(random_matrix .^ 2, dims=3))
+(mag_mean, mag_std) = RHS_stats(mag) 
+
+px = flood(rand_u, border=:none, clims=(u_mean-u_std, u_mean+u_std))
+py = flood(rand_v, border=:none, clims=(v_mean-v_std, v_mean+v_std))
+pmag = flood(vel_mag[:,:,1], border=:none, clims=(mag_mean-mag_std, mag_mean+mag_std))
 
 plot(px, py, pmag, layout=(3, 1), size=(500, 750))
