@@ -17,7 +17,7 @@ function RHS(flow::Flow{N};λ=WaterLily.quick,kwargs...) where N
     return RHS
 end
 
-function downsample_RHS_data!(RHS_data; tmin=-1, tmax=-1, n_samples=-1)
+function downsample_RHS_data!(RHS_data; tmin=-1, tmax=-1, n_samples=-1, clip_bc=false)
     if n_samples == -1
         n_samples = length(RHS_data["time"])
     end
@@ -39,6 +39,16 @@ function downsample_RHS_data!(RHS_data; tmin=-1, tmax=-1, n_samples=-1)
     RHS_data["time"] = RHS_data["time"][final_indices]
     RHS_data["Δt"] = RHS_data["Δt"][final_indices]
     RHS_data["RHS"] = RHS_data["RHS"][final_indices]
+
+    if clip_bc
+        # Exclude outer cells (boundary) from each RHS entry
+        for i in 1:length(RHS_data["RHS"])
+            arr = RHS_data["RHS"][i]
+            # Assume arr is at least 2D; clip first and last index in each dimension
+            clipped_arr = arr[2:end-1, 2:end-1, :]
+            RHS_data["RHS"][i] = clipped_arr
+        end
+    end
 
     println("Downsampled to ", length(RHS_data["time"]), " time steps.")
     println("Input data size: ", size(RHS_data["RHS"][1]))
