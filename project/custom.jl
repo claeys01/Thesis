@@ -1,5 +1,6 @@
 using WaterLily
-import WaterLily: ∂, @loop
+import WaterLily: ∂, @loop, @inside
+using JLD2
 
 function grad(field::AbstractArray)
     T = eltype(field)
@@ -15,6 +16,11 @@ end
 function RHS(flow::Flow{N};λ=WaterLily.quick,kwargs...) where N
     RHS = WaterLily.conv_diff!(flow.f,flow.u⁰,flow.σ,λ;ν=flow.ν,perdir=flow.perdir) - grad(flow.p)
     return RHS
+end
+
+function remove_ghosts(snapshot::AbstractArray)
+        return snapshot[2:end-1, 2:end-1, :]
+    return out
 end
 
 function downsample_RHS_data!(RHS_data; tmin=-1, tmax=-1, n_samples=-1, clip_bc=false)
@@ -42,14 +48,48 @@ function downsample_RHS_data!(RHS_data; tmin=-1, tmax=-1, n_samples=-1, clip_bc=
 
     if clip_bc
         # Exclude outer cells (boundary) from each RHS entry
-        for i in 1:length(RHS_data["RHS"])
-            arr = RHS_data["RHS"][i]
-            # Assume arr is at least 2D; clip first and last index in each dimension
-            clipped_arr = arr[2:end-1, 2:end-1, :]
-            RHS_data["RHS"][i] = clipped_arr
+        for (i, RHS) in enumerate(RHS_data["RHS"])
+            RHS_data["RHS"][i] = remove_ghosts(RHS)
         end
     end
 
-    println("Downsampled to ", length(RHS_data["time"]), " time steps.")
-    println("Input data size: ", size(RHS_data["RHS"][1]))
+    @info "Downsampled to $(length(RHS_data["time"])) time steps."
+    @info "Input data size: $(size(RHS_data["RHS"][1]))"
+
+end
+
+function get_random_snapshots(path_or_RHS; n::Int=5, seed::Int=42,
+                              tmin=-1, tmax=-1, downsample=-1, clip_bc=true)
+    # load or accept RHS_data dict
+    RHS_data = if isa(path_or_RHS, AbstractString)
+        @load path_or_RHS RHS_data
+        RHS_data
+    elseif isa(path_or_RHS, Dict)
+        deepcopy(path_or_RHS)   # avoid mutating caller's dict
+    else
+        throw(ArgumentError("path_or_RHS must be a filename or a Dict as loaded from JLD2"))
+    end
+
+    # downsample / clip in-place on our copy
+    downsample_RHS_data!(RHS_data; tmin=tmin, tmax=tmax, n_samples=downsample, clip_bc=clip_bc)
+
+    # build 4-D array (H,W,C,N)
+    X = cat(RHS_data["RHS"]...; dims=4)
+    X = Float32.(X)
+    nsnaps = size(X, 4)
+
+    if nsnaps == 0
+        throw(ArgumentError("No snapshots available in RHS_data"))
+    end
+
+    if n > nsnaps
+        @warn "Requested $n snapshots but only $nsnaps available — returning all"
+        n = nsnaps
+    end
+
+    rng = MersenneTwister(seed)
+    inds = randperm(rng, nsnaps)[1:n]
+    snapshots = X[:, :, :, inds]   # (H,W,C,n)
+
+    return snapshots, collect(inds)
 end
