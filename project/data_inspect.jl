@@ -45,6 +45,6 @@ mag  = sqrt.(sum(random_matrix .^ 2, dims=3))
 
 px = flood(rand_u, border=:none, clims=(u_mean-u_std, u_mean+u_std))
 py = flood(rand_v, border=:none, clims=(v_mean-v_std, v_mean+v_std))
-pmag = flood(vel_mag[:,:,1], border=:none, clims=(mag_mean-mag_std, mag_mean+mag_std))
+pmag = flood(mag[:,:,1], border=:none, clims=(mag_mean-mag_std, mag_mean+mag_std))
 
 plot(px, py, pmag, layout=(3, 1), size=(500, 750))

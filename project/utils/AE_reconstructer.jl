@@ -9,7 +9,7 @@ includet("../custom.jl")
 
 
 
-function visualize_reconstructions(checkpoint_path; n::Int=2, seed::Int=42, device=Flux.get_device("CPU"), savepath=nothing)
+function visualize_reconstructions(checkpoint_path; n::Int=2, device=Flux.get_device("CPU"), savepath=nothing)
     # load checkpoint (expects keys "encoder", "decoder", "args")
     checkpoint = JLD2.load(checkpoint_path)
     encoder_state = checkpoint["encoder"]
@@ -26,36 +26,51 @@ function visualize_reconstructions(checkpoint_path; n::Int=2, seed::Int=42, devi
     @load args.data_path RHS_data
     snapshots, ids = get_random_snapshots(args.data_path;n=n, downsample=args.downsample)
 
-    H, W, C, nn = size(snapshots)
+    _, _, C, nn = size(snapshots)
+    println(size(snapshots))
     @info "Selected snapshot indices: $ids"
 
     # prepare plotting grid: each sample has C rows; two columns (input, recon)
     total_rows = nn * C
-    p = plot(layout=(total_rows, 2), size=(500, 750))
-
+    # p = plot(layout=(total_rows, 2), size=(500, 750))
+    plots = []
     for s in 1:nn
-        # keep batch dim so reconstruct accepts input (H,W,C,1)
+        # println(s)
         x = snapshots[:, :, :, s:s]            # (H,W,C,1)
-        x_dev = x
-        x̂ = reconstruct(enc, dec, x_dev) # (H,W,C,1)
-        x_cpu = cpu(x)
-
+        x̂ = reconstruct(enc, dec, x)
         for ch in 1:C
             row = (s-1)*C + ch
-            mat_in = dropdims(x_cpu[:, :, ch, 1], dims=())   # (H,W)
-            mat_out = dropdims(x̂[:, :, ch, 1], dims=())
+            println(row)
+            mat_in = x[:, :, ch, 1]
+            mat_out = x̂[:, :, ch, 1]
+            # println(size(mat_in), size(mat_out))
 
             μ = mean(mat_in)
             σ = std(mat_in)
             clim = (μ - σ, μ + σ)
 
-            img_in  = flood(mat_in,  border=:none, clims=clim)
-            img_out = flood(mat_out, border=:none, clims=clim)
+            # left plot (input): no colorbar
+            img_in = flood(mat_in;
+                border=:none, colorbar=false, framestyle=:none,
+                axis=nothing, ticks=false, clims=clim,
+                aspect_ratio=:equal)
 
-            plot!(p, img_in,  subplot=(row, 1), title="s$(ids[s]) ch$(ch) input")
-            plot!(p, img_out, subplot=(row, 2), title="s$(ids[s]) ch$(ch) recon")
+            # right plot (reconstructed): only here show colorbar
+            img_out = flood(mat_out;
+                border=:none, colorbar=false, framestyle=:none,
+                axis=nothing, ticks=false, clims=clim,
+                aspect_ratio=:equal)
+
+            push!(plots, img_in)
+            push!(plots, img_out)
         end
     end
+    # Global layout spacing controls (tight!)
+    p = plot(plots...;
+             layout=(nn*C, 2),
+             link=:none, legend=false,
+             size=(500, 750),
+             dpi=200, grid=false)
     if savepath !== nothing
         try
             mkpath(dirname(savepath))
@@ -64,7 +79,7 @@ function visualize_reconstructions(checkpoint_path; n::Int=2, seed::Int=42, devi
         end
         savefig(p, savepath)
     else
-        display(p)
+        # display(p)
     end
     return p
 end
