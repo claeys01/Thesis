@@ -50,6 +50,7 @@ function train(; kws...)
     train_losses = Float32[]
     rec_losses = Float32[]
     div_losses = Float32[]
+    div_diff_losses = Float32[]
     iters = Int[]
     iter = 0
 
@@ -64,9 +65,9 @@ function train(; kws...)
 
             # capture both total loss and components
             loss_tuple, (grad_enc, grad_dec) = Flux.withgradient(encoder, decoder) do enc, dec
-                total_loss(enc, dec, x_dev)
+                total_loss(enc, dec, x_dev; λdiv=args.λdiv, λdiff=args.λdiff)
             end
-            loss_total, (Lrec, L2div) = loss_tuple
+            loss_total, (Lrec, L2div, L2div_diff) = loss_tuple
 
             Flux.update!(opt_enc, encoder, grad_enc)
             Flux.update!(opt_dec, decoder, grad_dec)
@@ -77,9 +78,10 @@ function train(; kws...)
             push!(train_losses, Float32(loss_total))
             push!(rec_losses, Float32(Lrec))
             push!(div_losses, Float32(L2div))
+            push!(div_diff_losses, Float32(L2div_diff))
 
             # progress meter
-            next!(progress; showvalues=[(:loss, loss_total)]) 
+            next!(progress; showvalues=[(:loss, loss_total, (Lrec, L2div, L2div_diff))]) 
         end
     end
     # save model
@@ -111,8 +113,11 @@ function train(; kws...)
     try
         p = plot(iters, train_losses, label="total", xlabel="Iteration", ylabel="Loss", title="Training loss", lw=2)
         plot!(p, iters, rec_losses, label="reconstruction", lw=1, ls=:dash)
-        if any(!iszero, div_losses)
+        if args.λdiv != 0
             plot!(p, iters, div_losses, label="divergence", lw=1, ls=:dot)
+        end
+        if args.λdiff != 0
+            plot!(p, iters, div_diff_losses, label="divergence difference", lw=1, ls=:dashdot)
         end
         png_path = joinpath(save_folder, "loss_evolution.png")
         savefig(p, png_path)

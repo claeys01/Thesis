@@ -25,18 +25,33 @@ end
 
 Flux.@layer Encoder
 
-Encoder(input_size::Tuple{Int,Int, Int}, latent_dim::Int; C_next::Int=4) = begin
+# Encoder(input_size::Tuple{Int,Int, Int}, latent_dim::Int; C_next::Int=4, padding=1, stride=1) = begin
+#     H, W, C = input_size
+
+#     convpart = Chain(
+#         Conv((3,3), C           => C_next,   identity; pad=padding, stride=stride), relu,
+#         MaxPool((2,2)),
+#         Conv((3,3), C_next      => 2C_next,  identity; pad=padding, stride=stride), relu,
+#         MaxPool((2,2)),
+#         Conv((3,3), 2C_next     => 4C_next,  identity; pad=padding, stride=stride), relu,
+#         MaxPool((2,2)),
+#         Conv((3,3), 4C_next     => 8C_next,  identity; pad=padding, stride=stride), relu,
+#         MaxPool((2,2)),
+#         Flux.flatten
+#     )
+#     dummy = zeros(Float32, H, W, C, 1)
+#     flat = convpart(dummy)
+#     dense_in = size(flat, 1)
+#     return Encoder(Chain(convpart, Dense(dense_in, latent_dim)))
+# end
+Encoder(input_size::Tuple{Int,Int, Int}, latent_dim::Int; C_next::Int=4, padding=1, stride=2) = begin
     H, W, C = input_size
 
     convpart = Chain(
-        Conv((3,3), C => C_next,   identity; pad=1, stride=1), relu,
-        MaxPool((2,2)),
-        Conv((3,3), C_next      => 2C_next,  identity; pad=1, stride=1), relu,
-        MaxPool((2,2)),
-        Conv((3,3), 2C_next     => 4C_next,  identity; pad=1, stride=1), relu,
-        MaxPool((2,2)),
-        Conv((3,3), 4C_next     => 8C_next,  identity; pad=1, stride=1), relu,
-        MaxPool((2,2)),
+        Conv((3,3), C           => C_next,   identity; pad=padding, stride=stride), relu,
+        Conv((3,3), C_next      => 2C_next,  identity; pad=padding, stride=stride), relu,
+        Conv((3,3), 2C_next     => 4C_next,  identity; pad=padding, stride=stride), relu,
+        Conv((3,3), 4C_next     => 8C_next,  identity; pad=padding, stride=stride), relu,
         Flux.flatten
     )
     dummy = zeros(Float32, H, W, C, 1)
@@ -67,9 +82,9 @@ Flux.@layer Decoder
 Decoder(output_size::Tuple{Int,Int, Int}, latent_dim::Int; C_next::Int=4) = begin
     H, W, C = output_size
     # after four 2x2 downsamples: h_out = H ÷ 16, w_out = W ÷ 16
-    if H % 16 != 0 || W % 16 != 0
-        throw(ArgumentError("Input of encoder needs to be deviseable by 16, please exclude ghost cells"))
-    end
+    # if H % 16 != 0 || W % 16 != 0
+        # throw(ArgumentError("Input of encoder needs to be deviseable by 16, please exclude ghost cells"))
+    # end
 
     h_lat = div(H, 16)
     w_lat = div(W, 16)
@@ -151,15 +166,19 @@ end
 # losses
 recon_loss(ŷ, x) = mean(abs2, ŷ .- x)                # MSE
 div_loss_L2(u) = mean(abs2, divergence_field(u))     # L2 of divergence field
+div_diff_loss(ŷ, x) = mean(abs2, divergence_field(ŷ) .- divergence_field(x))
 
-Zygote.@nograd divergence_field
-Zygote.@nograd div_loss_L2
+# Zygote.@nograd divergence_field
+# Zygote.@nograd div_loss_L2
+# Zygote.@nograd div_diff_loss
+
 
 # combined total loss (ŷ = decoder(z) or ae(x))
-function total_loss(encoder, decoder, x; λdiv=0)
+function total_loss(encoder, decoder, x; λdiv=0, λdiff=0)
     ŷ = reconstruct(encoder, decoder, x)
     Lrec = recon_loss(ŷ, x)
     L2div = zero(eltype(Lrec))
+    L2div_diff = zero(eltype(Lrec))
     if λdiv != 0
         try
             # If divergence computation fails on GPU we skip it (avoid CPU/GPU mix)
@@ -169,22 +188,31 @@ function total_loss(encoder, decoder, x; λdiv=0)
             L2div = zero(eltype(Lrec))
         end
     end
-    return Lrec + λdiv * L2div, (Lrec, L2div)
+    if λdiff != 0
+        try 
+            L2div_diff = div_diff_loss(ŷ, x)
+        catch e
+            @warn "div_loss_L2 failed (likely GPU/CPU mismatch). skipping divergence loss: $e"
+            L2div_diff = zero(eltype(Lrec))
+        end
+    end
+    return Lrec + λdiv * L2div + λdiff * L2div_diff, (Lrec, L2div, L2div_diff)
 end
 
 Base.@kwdef mutable struct Args
-    η = 1e-3                    # learning rate
+    η = 2e-3                    # learning rate
     λ = 1e-4                    # regularization paramater
-    batch_size = 32            # batch size
+    λdiv = 0                    # divergence loss weight
+    λdiff = 0                   # divergence difference weight
+    batch_size = 32             # batch size
     downsample = 1500           # amount of RHS used for training 
-    epochs = 100                 # number of epochs
+    epochs = 300                # number of epochs
     seed = 42                   # random seed
-    n_reconstruct = 2        # sampling size for output    
+    n_reconstruct = 2           # sampling size for output    
     use_gpu = false             # use GPU
     input_dim = (128, 128, 2)   # flow field size
     latent_dim = 64             # latent dimension
     verbose_freq = 5            # logging for every verbose_freq iterations
-    tblogger = false            # log training with tensorboard
     save_path = "data/models"        # results path
     data_path = "data/RHS_biot_data_arr.jld2"
 end

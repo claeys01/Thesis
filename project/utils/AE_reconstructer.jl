@@ -30,14 +30,13 @@ function visualize_reconstructions(checkpoint_path; n::Int=2, device=Flux.get_de
     @info "Selected snapshot indices for reconstruction: $ids"
 
     # prepare plotting grid: each sample has C rows; two columns (input, recon)
-    total_rows = nn * C
-    # p = plot(layout=(total_rows, 2), size=(500, 750))
     plots = []
     dirs = ["x" , "y"]
     for s in 1:nn
         # println(s)
         x = snapshots[:, :, :, s:s]            # (H,W,C,1)
         x̂ = reconstruct(enc, dec, x)
+
         for ch in 1:C
             mat_in = x[:, :, ch, 1]
             mat_out = x̂[:, :, ch, 1]
