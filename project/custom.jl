@@ -23,7 +23,7 @@ function remove_ghosts(snapshot::AbstractArray)
     return out
 end
 
-function downsample_RHS_data!(RHS_data; tmin=-1, tmax=-1, n_samples=-1, clip_bc=false)
+function downsample_RHS_data!(RHS_data; tmin=-1, tmax=-1, n_samples=-1, clip_bc=false, verbose=true)
     if n_samples == -1
         n_samples = length(RHS_data["time"])
     end
@@ -52,14 +52,15 @@ function downsample_RHS_data!(RHS_data; tmin=-1, tmax=-1, n_samples=-1, clip_bc=
             RHS_data["RHS"][i] = remove_ghosts(RHS)
         end
     end
-
-    @info "Downsampled to $(length(RHS_data["time"])) time steps."
-    @info "Input data size: $(size(RHS_data["RHS"][1]))"
+    if verbose
+        @info "Downsampled to $(length(RHS_data["time"])) time steps."
+        @info "Input data size: $(size(RHS_data["RHS"][1]))"
+    end
 
 end
 
 function get_random_snapshots(path_or_RHS; n::Int=5, seed::Int=42,
-                              tmin=-1, tmax=-1, downsample=-1, clip_bc=true)
+                              tmin=-1, tmax=-1, downsample=-1, clip_bc=true, verbose=false)
     # load or accept RHS_data dict
     RHS_data = if isa(path_or_RHS, AbstractString)
         @load path_or_RHS RHS_data
@@ -71,7 +72,7 @@ function get_random_snapshots(path_or_RHS; n::Int=5, seed::Int=42,
     end
 
     # downsample / clip in-place on our copy
-    downsample_RHS_data!(RHS_data; tmin=tmin, tmax=tmax, n_samples=downsample, clip_bc=clip_bc)
+    downsample_RHS_data!(RHS_data; tmin=tmin, tmax=tmax, n_samples=downsample, clip_bc=clip_bc, verbose=verbose)
 
     # build 4-D array (H,W,C,N)
     X = cat(RHS_data["RHS"]...; dims=4)

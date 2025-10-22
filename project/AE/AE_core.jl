@@ -1,21 +1,11 @@
-using JLD2
-using CUDA
 using Flux
 using Flux: glorot_uniform, Conv, ConvTranspose, Dense, Chain, relu, MaxPool
-using Optimisers: AdamW
 using WaterLily
 using Random
 using Statistics
 using ProgressMeter: Progress, next!
 using MLUtils: DataLoader
 using Zygote
-using Plots
-using DrWatson: struct2dict
-
-
-includet("../utils/NetTracer.jl")  # or include() if not using Revise
-includet("../custom.jl")
-using .NetTrace
 
 
 function get_data(batch_size, path; tmin=-1, tmax=-1, n_samples=500)
@@ -166,7 +156,7 @@ Zygote.@nograd divergence_field
 Zygote.@nograd div_loss_L2
 
 # combined total loss (ŷ = decoder(z) or ae(x))
-function total_loss(encoder, decoder, x; λdiv=1)
+function total_loss(encoder, decoder, x; λdiv=0)
     ŷ = reconstruct(encoder, decoder, x)
     Lrec = recon_loss(ŷ, x)
     L2div = zero(eltype(Lrec))
@@ -185,10 +175,11 @@ end
 Base.@kwdef mutable struct Args
     η = 1e-3                    # learning rate
     λ = 1e-4                    # regularization paramater
-    batch_size = 100            # batch size
+    batch_size = 32            # batch size
     downsample = 1500           # amount of RHS used for training 
-    epochs = 20                 # number of epochs
+    epochs = 100                 # number of epochs
     seed = 42                   # random seed
+    n_reconstruct = 2        # sampling size for output    
     use_gpu = false             # use GPU
     input_dim = (128, 128, 2)   # flow field size
     latent_dim = 64             # latent dimension
@@ -197,95 +188,3 @@ Base.@kwdef mutable struct Args
     save_path = "data/models"        # results path
     data_path = "data/RHS_biot_data_arr.jld2"
 end
-
-
-function train(; kws...)
-
-    # load hyperparamters
-    args = Args(; kws...)
-    args.seed > 0 && Random.seed!(args.seed)
-
-    if args.use_gpu
-        device = Flux.get_device()
-    else
-        device = Flux.get_device("CPU")
-    end
-
-    @info "Training on $device"
-
-    # load RHS data
-    loader = get_data(args.batch_size, args.data_path; n_samples=args.downsample)
-
-    # initialize encoder and decoder
-    encoder = Flux.f32(Encoder(args.input_dim, args.latent_dim)) |> device
-    decoder = Flux.f32(Decoder(args.input_dim, args.latent_dim)) |> device
-
-    # define optimizer
-    opt_enc = Flux.setup(AdamW(eta=args.η, lambda=args.λ), encoder)
-    opt_dec = Flux.setup(AdamW(eta=args.η, lambda=args.λ), decoder)
-
-    !ispath(args.save_path) && mkpath(args.save_path)
-
-    # record losses
-    train_losses = Float32[]
-    rec_losses = Float32[]
-    div_losses = Float32[]
-    iters = Int[]
-    iter = 0
-
-    # training
-    @info "Start Training, total $(args.epochs) epochs"
-
-    for epoch = 1:args.epochs
-        @info "Epoch $(epoch)"
-        progress = Progress(length(loader))
-        for (i, x) in enumerate(loader)
-            x_dev = x |> device            
-
-            # capture both total loss and components
-            loss_tuple, (grad_enc, grad_dec) = Flux.withgradient(encoder, decoder) do enc, dec
-                total_loss(enc, dec, x_dev)
-            end
-            loss_total, (Lrec, L2div) = loss_tuple
-
-            Flux.update!(opt_enc, encoder, grad_enc)
-            Flux.update!(opt_dec, decoder, grad_dec)
-
-            # record
-            iter += 1
-            push!(iters, iter)
-            push!(train_losses, Float32(loss_total))
-            push!(rec_losses, Float32(Lrec))
-            push!(div_losses, Float32(L2div))
-
-            # progress meter
-            next!(progress; showvalues=[(:loss, loss_total)]) 
-        end
-    end
-
-    # plot and save loss evolution
-    try
-        p = plot(iters, train_losses, label="total", xlabel="Iteration", ylabel="Loss", title="Training loss", lw=2)
-        plot!(p, iters, rec_losses, label="reconstruction", lw=1, ls=:dash)
-        if any(!iszero, div_losses)
-            plot!(p, iters, div_losses, label="divergence", lw=1, ls=:dot)
-        end
-        png_path = joinpath(args.save_path, "loss_evolution.png")
-        savefig(p, png_path)
-        @info "Saved loss plot to $png_path"
-    catch e
-        @warn "Failed to save loss plot: $e"
-    end
-
-    # save model
-    let encoder = cpu(encoder), decoder = cpu(decoder), args=struct2dict(args)
-        filepath = joinpath(args[:save_path], "checkpoint.jld2") 
-        JLD2.save(filepath, "encoder", Flux.state(encoder),
-                            "decoder", Flux.state(decoder),
-                            "args", args)                            
-        @info "Model saved: $(filepath)"
-    end
-end
-
-# train()
-
