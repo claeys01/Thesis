@@ -200,11 +200,11 @@ function total_loss(encoder, decoder, x; λdiv=0, λdiff=0)
 end
 
 Base.@kwdef mutable struct Args
-    η = 2e-3                    # learning rate
-    λ = 1e-4                    # regularization paramater
+    η = 1e-4                    # learning rate
+    λ = 1e-5                    # regularization paramater
     λdiv = 0                    # divergence loss weight
     λdiff = 0                   # divergence difference weight
-    batch_size = 32             # batch size
+    batch_size = 100             # batch size
     downsample = 1500           # amount of RHS used for training 
     epochs = 300                # number of epochs
     seed = 42                   # random seed
