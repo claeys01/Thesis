@@ -16,6 +16,7 @@ using DrWatson: struct2dict
 includet("../custom.jl")
 includet("AE_core.jl")
 includet("../utils/AE_reconstructer.jl")
+includet("../utils/AE_normalizer.jl")
 
 
 
