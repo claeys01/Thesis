@@ -6,6 +6,7 @@ using MLUtils: DataLoader
 
 includet("../AE/AE_core.jl")
 includet("../custom.jl")
+includet("../utils/AE_normalizer.jl")
 
 
 
@@ -25,9 +26,10 @@ function visualize_reconstructions(checkpoint_path::Union{String,Nothing}=nothin
         checkpoint = JLD2.load(checkpoint_path)
         encoder_state = checkpoint["encoder"]
         decoder_state = checkpoint["decoder"]
+        normalizer = checkpoint["normalizer"]
         args = Args(; checkpoint["args"]...)
 
-        enc = Encoder(args.input_dim, args.latent_dim; C_next=args.C_conv)
+        enc = Encoder(args.input_dim, args.latent_dim; C_next=args.C_conv, padding=args.padding, stride=args.stride)
         dec = Decoder(args.input_dim, args.latent_dim; C_next=args.C_conv)
         Flux.loadmodel!(enc, encoder_state)
         Flux.loadmodel!(dec, decoder_state)
@@ -39,8 +41,11 @@ function visualize_reconstructions(checkpoint_path::Union{String,Nothing}=nothin
         if args === nothing
             error("args must be provided when not loading from a checkpoint (needed for data_path, downsample, seed, ...).")
         end
+        args = Args(; checkpoint["args"]...)
+        normalizer = checkpoint["normalizer"]
         enc = encoder
         dec = decoder
+
     end
 
     # optional seeding
@@ -56,8 +61,16 @@ function visualize_reconstructions(checkpoint_path::Union{String,Nothing}=nothin
     plots = []
     dirs = ["x" , "y"]
     for s in 1:nn
-        x = snapshots[:, :, :, s:s]            # (H,W,C,1)
-        x̂ = reconstruct(enc, dec, x)
+
+        if args.normalize
+            x_norm, _ = normalize_batch(snapshots[:, :, :, s:s], normalizer=normalizer)
+            x̂_norm = reconstruct(enc, dec, x_norm)
+            x̂ = denormalize_batch(x̂_norm, normalizer)
+            x = denormalize_batch(x_norm, normalizer)
+        else
+            x = snapshots[:, :, :, s:s]            # (H,W,C,1)
+            x̂ = reconstruct(enc, dec, x)
+        end
 
         for ch in 1:C
             mat_in = x[:, :, ch, 1]
@@ -98,6 +111,8 @@ function visualize_reconstructions(checkpoint_path::Union{String,Nothing}=nothin
 end
 
 if abspath(PROGRAM_FILE) == (@__FILE__) || isinteractive()
-    # visualize_reconstructions("/home/matth/Thesis/data/models/2025-10-21_15-28-57")
+    pl = visualize_reconstructions("data/models/2025-10-23_18-23-36/checkpoint.jld2")
+    savefig(pl, "data/models/2025-10-23_18-23-36/reconstruction.png")
+
 end
 # visualize_reconstructions("/home/matth/Thesis/data/models/2025-10-21_11-43-40/checkpoint.jld2")

@@ -8,15 +8,14 @@ using Random
 using Statistics
 using ProgressMeter: Progress, next!
 using MLUtils: DataLoader
-using Zygote
 using Plots
 using Dates
 using DrWatson: struct2dict
-using ChainPlots
 
 includet("../custom.jl")
 includet("AE_core.jl")
 includet("../utils/AE_reconstructer.jl")
+
 
 
 function train(; kws...)
@@ -25,19 +24,22 @@ function train(; kws...)
     args = Args(; kws...)
     args.seed > 0 && Random.seed!(args.seed)
 
+    # load RHS data and normalizer
+    loader, normalizer = get_data(args.batch_size, args.data_path; n_samples=args.downsample, normalize=args.normalize)
+
     if args.use_gpu
         device = Flux.get_device()
+        normalizer = Normalizer(normalizer.μ |> device, normalizer.σ |> device, normalizer.method)
+
     else
         device = Flux.get_device("CPU")
     end
 
     @info "Training on $device"
 
-    # load RHS data
-    loader = get_data(args.batch_size, args.data_path; n_samples=args.downsample)
-
+ 
     # initialize encoder and decoder
-    encoder = Flux.f32(Encoder(args.input_dim, args.latent_dim; C_next=args.C_conv)) |> device
+    encoder = Flux.f32(Encoder(args.input_dim, args.latent_dim; C_next=args.C_conv, padding=args.padding, stride=args.stride)) |> device
     decoder = Flux.f32(Decoder(args.input_dim, args.latent_dim; C_next=args.C_conv)) |> device
 
     # define optimizer
@@ -61,11 +63,13 @@ function train(; kws...)
         @info "Epoch $(epoch)"
         progress = Progress(length(loader))
         for (i, x) in enumerate(loader)
-            x_dev = x |> device            
+            x_dev = x |> device
+            if args.normalize
+                x_dev, _ = normalize_batch(x_dev; normalizer=normalizer)    
+            end
 
-            # capture both total loss and components
             loss_tuple, (grad_enc, grad_dec) = Flux.withgradient(encoder, decoder) do enc, dec
-                total_loss(enc, dec, x_dev; λdiv=args.λdiv, λdiff=args.λdiff)
+                    total_loss(enc, dec, x; λdiv=args.λdiv, λdiff=args.λdiff)
             end
             loss_total, (Lrec, L2div, L2div_diff) = loss_tuple
 
@@ -96,11 +100,13 @@ function train(; kws...)
     let encoder = cpu(encoder), decoder = cpu(decoder), args=struct2dict(args)
         JLD2.save(filepath, "encoder", Flux.state(encoder),
                             "decoder", Flux.state(decoder),
+                            "normalizer", normalizer,
                             "args", args)
         JLD2.save(loss_trajectory_path, "train_losses", train_losses,
                                         "rec_losses", rec_losses,
                                         "div_losses", div_losses,
-                                        "div_diff_losses", div_diff_losses)
+                                        "div_diff_losses", div_diff_losses,
+                                        "iters", iters)
                                                      
         @info "Model saved: $(filepath)"
     end

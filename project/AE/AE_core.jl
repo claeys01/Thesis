@@ -7,14 +7,21 @@ using ProgressMeter: Progress, next!
 using MLUtils: DataLoader
 using Zygote
 
+includet("../utils/AE_normalizer.jl")
 
-function get_data(batch_size, path; tmin=-1, tmax=-1, n_samples=500)
+
+function get_data(batch_size, path; tmin=-1, tmax=-1, n_samples=500, normalize=false)
     @load path RHS_data
     downsample_RHS_data!(RHS_data; tmin=tmin, tmax=tmax, n_samples=n_samples, clip_bc=true)
     X = cat(RHS_data["RHS"]...; dims=4)   # now X has shape (H,W,C,N)
     X = Float32.(X)
-    # print("input")
-    return DataLoader(X, batchsize=batch_size, shuffle=true)
+    X_normalized, normalizer = normalize_batch(X; normalizer=nothing)
+    if normalize
+        loader = DataLoader(X_normalized, batchsize=batch_size, shuffle=true)
+    else
+        loader = DataLoader(X, batchsize=batch_size, shuffle=true)
+    end
+    return loader, normalizer
 end
 
 
@@ -25,33 +32,18 @@ end
 
 Flux.@layer Encoder
 
-# Encoder(input_size::Tuple{Int,Int, Int}, latent_dim::Int; C_next::Int=4, padding=1, stride=1) = begin
-#     H, W, C = input_size
-
-#     convpart = Chain(
-#         Conv((3,3), C           => C_next,   identity; pad=padding, stride=stride), relu,
-#         MaxPool((2,2)),
-#         Conv((3,3), C_next      => 2C_next,  identity; pad=padding, stride=stride), relu,
-#         MaxPool((2,2)),
-#         Conv((3,3), 2C_next     => 4C_next,  identity; pad=padding, stride=stride), relu,
-#         MaxPool((2,2)),
-#         Conv((3,3), 4C_next     => 8C_next,  identity; pad=padding, stride=stride), relu,
-#         MaxPool((2,2)),
-#         Flux.flatten
-#     )
-#     dummy = zeros(Float32, H, W, C, 1)
-#     flat = convpart(dummy)
-#     dense_in = size(flat, 1)
-#     return Encoder(Chain(convpart, Dense(dense_in, latent_dim)))
-# end
 Encoder(input_size::Tuple{Int,Int, Int}, latent_dim::Int; C_next::Int=4, padding=1, stride=2) = begin
     H, W, C = input_size
 
     convpart = Chain(
         Conv((3,3), C           => C_next,   identity; pad=padding, stride=stride), relu,
+        MaxPool((2,2)),
         Conv((3,3), C_next      => 2C_next,  identity; pad=padding, stride=stride), relu,
+        MaxPool((2,2)),
         Conv((3,3), 2C_next     => 4C_next,  identity; pad=padding, stride=stride), relu,
+        MaxPool((2,2)),
         Conv((3,3), 4C_next     => 8C_next,  identity; pad=padding, stride=stride), relu,
+        MaxPool((2,2)),
         Flux.flatten
     )
     dummy = zeros(Float32, H, W, C, 1)
@@ -60,6 +52,23 @@ Encoder(input_size::Tuple{Int,Int, Int}, latent_dim::Int; C_next::Int=4, padding
     @info "Initialize Encoder with $(dense_in) connected nodes and $(latent_dim) latent dimensions"
     return Encoder(Chain(convpart, Dense(dense_in, latent_dim)))
 end
+
+# Encoder(input_size::Tuple{Int,Int, Int}, latent_dim::Int; C_next::Int=4, padding=1, stride=2) = begin
+#     H, W, C = input_size
+
+#     convpart = Chain(
+#         Conv((3,3), C           => C_next,   identity; pad=padding, stride=stride), relu,
+#         Conv((3,3), C_next      => 2C_next,  identity; pad=padding, stride=stride), relu,
+#         Conv((3,3), 2C_next     => 4C_next,  identity; pad=padding, stride=stride), relu,
+#         Conv((3,3), 4C_next     => 8C_next,  identity; pad=padding, stride=stride), relu,
+#         Flux.flatten
+#     )
+#     dummy = zeros(Float32, H, W, C, 1)
+#     flat = convpart(dummy)
+#     dense_in = size(flat, 1)
+#     @info "Initialize Encoder with $(dense_in) connected nodes and $(latent_dim) latent dimensions"
+#     return Encoder(Chain(convpart, Dense(dense_in, latent_dim)))
+# end
 
 
 function (encoder::Encoder)(x)
@@ -203,14 +212,17 @@ Base.@kwdef mutable struct Args
     λdiff = 0                   # divergence difference weight
     batch_size = 256             # batch size
     downsample = 1500           # amount of RHS used for training 
-    epochs = 100                # number of epochs
+    epochs = 100                  # number of epochs
     seed = 42                   # random seed
     n_reconstruct = 2           # sampling size for output    
     use_gpu = false             # use GPU
     input_dim = (128, 128, 2)   # flow field size
+    stride = 1
+    padding = 1
     latent_dim = 8^3             # latent dimension
     C_conv = 8                  # first amount of channels for convs
     verbose_freq = 5            # logging for every verbose_freq iterations
+    normalize = true           # normalise training data
     save_path = "data/models"   # results path
     data_path = "data/RHS_biot_data_arr.jld2"
 end
