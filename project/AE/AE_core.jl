@@ -129,15 +129,30 @@ end
 
 # run_dim_check()
 
+"""
+    divergence_ad(field; dx=1.0, dy=1.0)
+
+Zygote-safe divergence of a 2D vector field stored as (Nx, Ny, 2).
+Assumes periodic boundaries (via circshift).
+
+- field[:,:,1] = u(x,y)
+- field[:,:,2] = v(x,y)
+Returns (Nx, Ny).
+"""
+function divergence(field; dx=1.0, dy=1.0)
+    u = field[:, :, 1]
+    v = field[:, :, 2]
+    du_dx = (circshift(u, (-1, 0)) .- circshift(u, (1, 0))) ./ (2dx)
+    dv_dy = (circshift(v, (0, -1)) .- circshift(v, (0, 1))) ./ (2dy)
+    du_dx .+ dv_dy
+end
+
 function divergence_field(u; mean=false, max=false)
     if ndims(u) == 4
         H, W, C, N = size(u)
-        σ = zeros(eltype(u), H, W, N)
-        # @info "divergence_field: input is batched (H,W,C,N) = $(size(u)), computing per-sample"
-        for n in 1:N
-            # compute divergence for single sample (H,W,C)
-            σ[:, :, n] = divergence_field(view(u, :, :, :, n); mean=false, max=false)
-        end
+        # Build a list of H×W matrices (one per sample) without mutating.
+        mats = [divergence_field(view(u, :, :, :, n); mean=false, max=false) for n in 1:N]
+        σ = cat(mats...; dims=3)  # result has shape (H, W, N)
         if mean
             return mean(σ)
         elseif max
@@ -147,9 +162,13 @@ function divergence_field(u; mean=false, max=false)
         end
     elseif ndims(u) == 3
         H, W, C = size(u)
-        σ = zeros(eltype(u), H, W)
-        @inside σ[I] = WaterLily.div(I, u)
-        # @info "divergence_field: single sample sizes (u, σ) = $(size(u)), $(size(σ))"
+        # compute divergence for every (i,j) without setindex!
+        # vals = [WaterLily.div(I, u) for I in eachindex(u)]
+        # init=zero(eltype(u))
+        # @loop init[I] = WaterLily.div(I, u) over I in CartesianIndices(u)
+        # println(init)
+        # σ = reshape(vals, H, W)
+        σ = divergence(u)
         if mean
             return mean(σ)
         elseif max
@@ -190,7 +209,8 @@ function total_loss(encoder, decoder, x; λdiv=0, λdiff=0)
     end
     if λdiff != 0
         try 
-            L2div_diff = div_diff_loss(ŷ, x)
+            div_diff = divergence_field(ŷ) .- divergence_field(x)
+            L2div_diff = mean(abs2, div_diff)
         catch e
             @warn "div_loss_L2 failed (likely GPU/CPU mismatch). skipping divergence loss: $e"
             L2div_diff = zero(eltype(Lrec))
@@ -200,13 +220,13 @@ function total_loss(encoder, decoder, x; λdiv=0, λdiff=0)
 end
 
 Base.@kwdef mutable struct Args
-    η = 1e-4                    # learning rate
-    λ = 1e-5                    # regularization paramater
+    η = 1e-3                    # learning rate
+    λ = 1e-4                    # regularization paramater
     λdiv = 0                    # divergence loss weight
-    λdiff = 0                   # divergence difference weight
-    batch_size = 100             # batch size
+    λdiff = 1                   # divergence difference weight
+    batch_size = 64             # batch size
     downsample = 1500           # amount of RHS used for training 
-    epochs = 300                # number of epochs
+    epochs = 50                # number of epochs
     seed = 42                   # random seed
     n_reconstruct = 2           # sampling size for output    
     use_gpu = false             # use GPU
