@@ -57,6 +57,7 @@ Encoder(input_size::Tuple{Int,Int, Int}, latent_dim::Int; C_next::Int=4, padding
     dummy = zeros(Float32, H, W, C, 1)
     flat = convpart(dummy)
     dense_in = size(flat, 1)
+    @info "Initialize Encoder with $(dense_in) connected nodes and $(latent_dim) latent dimensions"
     return Encoder(Chain(convpart, Dense(dense_in, latent_dim)))
 end
 
@@ -90,6 +91,7 @@ Decoder(output_size::Tuple{Int,Int, Int}, latent_dim::Int; C_next::Int=4) = begi
     w_lat = div(W, 16)
     channels_mid = 8 * C_next
     dense_len = h_lat * w_lat * channels_mid
+    @info "Initialize Dencoder with $(dense_len) connected nodes and $(latent_dim) latent dimensions"
 
     return Decoder(Chain(
         Dense(latent_dim, dense_len),
@@ -113,21 +115,6 @@ function check_ae_dims(encoder, decoder, x; device=Flux.get_device("CPU"))
     return size(x_dev) == size(ŷ), size(x_dev), size(ŷ)
 end
 
-function run_dim_check(; kws...)
-    args = Args(; kws...)
-    device = args.use_gpu ? Flux.get_device() : Flux.get_device("CPU")
-    encoder = Flux.f32(Encoder(args.input_dim, args.latent_dim)) |> device
-    decoder = Flux.f32(Decoder(args.input_dim, args.latent_dim)) |> device
-    loader = get_data(1, args.data_path)
-    x = first(loader)
-    ok, xin, xout = check_ae_dims(encoder, decoder, x; device=device)
-    println("AE output matches input shapes? ", ok)
-    println("input size: ", xin)
-    println("output size: ", xout)
-    return ok
-end
-
-# run_dim_check()
 
 """
     divergence_ad(field; dx=1.0, dy=1.0)
@@ -162,12 +149,6 @@ function divergence_field(u; mean=false, max=false)
         end
     elseif ndims(u) == 3
         H, W, C = size(u)
-        # compute divergence for every (i,j) without setindex!
-        # vals = [WaterLily.div(I, u) for I in eachindex(u)]
-        # init=zero(eltype(u))
-        # @loop init[I] = WaterLily.div(I, u) over I in CartesianIndices(u)
-        # println(init)
-        # σ = reshape(vals, H, W)
         σ = divergence(u)
         if mean
             return mean(σ)
@@ -186,10 +167,6 @@ end
 recon_loss(ŷ, x) = mean(abs2, ŷ .- x)                # MSE
 div_loss_L2(u) = mean(abs2, divergence_field(u))     # L2 of divergence field
 div_diff_loss(ŷ, x) = mean(abs2, divergence_field(ŷ) .- divergence_field(x))
-
-# Zygote.@nograd divergence_field
-# Zygote.@nograd div_loss_L2
-# Zygote.@nograd div_diff_loss
 
 
 # combined total loss (ŷ = decoder(z) or ae(x))
@@ -223,16 +200,17 @@ Base.@kwdef mutable struct Args
     η = 1e-3                    # learning rate
     λ = 1e-4                    # regularization paramater
     λdiv = 0                    # divergence loss weight
-    λdiff = 1                   # divergence difference weight
-    batch_size = 64             # batch size
+    λdiff = 0                   # divergence difference weight
+    batch_size = 256             # batch size
     downsample = 1500           # amount of RHS used for training 
-    epochs = 50                # number of epochs
+    epochs = 100                # number of epochs
     seed = 42                   # random seed
     n_reconstruct = 2           # sampling size for output    
     use_gpu = false             # use GPU
     input_dim = (128, 128, 2)   # flow field size
-    latent_dim = 64             # latent dimension
+    latent_dim = 8^3             # latent dimension
+    C_conv = 8                  # first amount of channels for convs
     verbose_freq = 5            # logging for every verbose_freq iterations
-    save_path = "data/models"        # results path
+    save_path = "data/models"   # results path
     data_path = "data/RHS_biot_data_arr.jld2"
 end

@@ -37,8 +37,8 @@ function train(; kws...)
     loader = get_data(args.batch_size, args.data_path; n_samples=args.downsample)
 
     # initialize encoder and decoder
-    encoder = Flux.f32(Encoder(args.input_dim, args.latent_dim)) |> device
-    decoder = Flux.f32(Decoder(args.input_dim, args.latent_dim)) |> device
+    encoder = Flux.f32(Encoder(args.input_dim, args.latent_dim; C_next=args.C_conv)) |> device
+    decoder = Flux.f32(Decoder(args.input_dim, args.latent_dim; C_next=args.C_conv)) |> device
 
     # define optimizer
     opt_enc = Flux.setup(AdamW(eta=args.η, lambda=args.λ), encoder)
@@ -95,13 +95,17 @@ function train(; kws...)
     let encoder = cpu(encoder), decoder = cpu(decoder), args=struct2dict(args)
         JLD2.save(filepath, "encoder", Flux.state(encoder),
                             "decoder", Flux.state(decoder),
+                            "train_losses", train_losses,
+                            "rec_losses", rec_losses,
+                            "div_losses", div_losses,
+                            "div_diff_losses", div_diff_losses,
                             "args", args)                            
         @info "Model saved: $(filepath)"
     end
 
     #plot and save reconstruction of 2 random snapshots
     try 
-        reconstruction = visualize_reconstructions(filepath; n=args.n_reconstruct)
+        reconstruction = visualize_reconstructions(;encoder=encoder, decoder=decoder, args=args)
         reconstruct_path = joinpath(save_folder, "reconstruction.png")
         savefig(reconstruction, reconstruct_path)
         @info "Saved reconstruction plot to $reconstruct_path"
