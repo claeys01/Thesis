@@ -90,16 +90,18 @@ function train(; kws...)
     save_folder = joinpath(args.save_path, timestamp)
     !ispath(save_folder) && mkpath(save_folder)
     filepath = joinpath(save_folder, "checkpoint.jld2")
+    loss_trajectory_path = joinpath(save_folder, "loss_trajectory.jld2")
 
 
     let encoder = cpu(encoder), decoder = cpu(decoder), args=struct2dict(args)
         JLD2.save(filepath, "encoder", Flux.state(encoder),
                             "decoder", Flux.state(decoder),
-                            "train_losses", train_losses,
-                            "rec_losses", rec_losses,
-                            "div_losses", div_losses,
-                            "div_diff_losses", div_diff_losses,
-                            "args", args)                            
+                            "args", args)
+        JLD2.save(loss_trajectory_path, "train_losses", train_losses,
+                                        "rec_losses", rec_losses,
+                                        "div_losses", div_losses,
+                                        "div_diff_losses", div_diff_losses)
+                                                     
         @info "Model saved: $(filepath)"
     end
 
