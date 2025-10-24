@@ -23,40 +23,40 @@ function circle_shedding_biot(Re=250, U=1; mem=Array)
     return sim
 end
 
-# sim = circle_shedding_biot(mem=Array)
-# t_end = 100
+sim = circle_shedding_biot(mem=Array)
+t_end = 50
 
 # sim_gif!(sim;duration=t_end,clims=(-5,5),plotbody=true)
 
-# sim_step!(sim, t_end; verbose=true)
-# u = sim.flow.u[:,:,1] # x velocity
-# ω = zeros(size(u));
+sim_step!(sim, t_end; verbose=true)
+u = sim.flow.u[:,:,1] # x velocity
+ω = zeros(size(u));
 
-# @inside ω[I] = WaterLily.curl(3,I,sim.flow.u)*sim.L/sim.U
+@inside ω[I] = WaterLily.curl(3,I,sim.flow.u)*sim.L/sim.U
 
-# println(sum(abs, ω))
-# println(sim.U)
+println(sum(abs, ω))
+println(sim.U)
 
-# plt = flood(ω, clims=(-5,5), border=:none)
+plt = flood(ω, clims=(-5,5), border=:none)
 
-# # draw grid lines for a (rows,cols) array onto an existing Plots plot
-# function overlay_grid!(plt, rows::Int, cols::Int; color=:black, lw=0.3, alpha=0.6)
-#     # cell boundaries are at 0.5, 1.5, ..., so lines align with image pixels
-#     x_min, x_max = 0.5, cols + 0.5
-#     y_min, y_max = 0.5, rows + 0.5
-#     # vertical lines
-#     for j in 0:cols
-#         x = j + 0.5
-#         plot!(plt, [x, x], [y_min, y_max], color=color, lw=lw, alpha=alpha, legend=false)
-#     end
-#     # horizontal lines
-#     for i in 0:rows
-#         y = i + 0.5
-#         plot!(plt, [x_min, x_max], [y, y], color=color, lw=lw, alpha=alpha, legend=false)
-#     end
-#     return plt
-# end
+# draw grid lines for a (rows,cols) array onto an existing Plots plot
+function overlay_grid!(plt, rows::Int, cols::Int; color=:black, lw=0.3, alpha=0.6)
+    # cell boundaries are at 0.5, 1.5, ..., so lines align with image pixels
+    x_min, x_max = 0.5, cols + 0.5
+    y_min, y_max = 0.5, rows + 0.5
+    # vertical lines
+    for j in 0:cols
+        x = j + 0.5
+        plot!(plt, [x, x], [y_min, y_max], color=color, lw=lw, alpha=alpha, legend=false)
+    end
+    # horizontal lines
+    for i in 0:rows
+        y = i + 0.5
+        plot!(plt, [x_min, x_max], [y, y], color=color, lw=lw, alpha=alpha, legend=false)
+    end
+    return plt
+end
 
-# overlay_grid!(plt, size(ω,1), size(ω,2); color=:gray, lw=0.4, alpha=0.5)
+overlay_grid!(plt, size(ω,1), size(ω,2); color=:gray, lw=0.4, alpha=0.5)
 
-# display(plt)
+display(plt)
