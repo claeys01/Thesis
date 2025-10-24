@@ -60,3 +60,4 @@ end
 overlay_grid!(plt, size(ω,1), size(ω,2); color=:gray, lw=0.4, alpha=0.5)
 
 display(plt)
+savefig(plt, "biot_sim.png")
