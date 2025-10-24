@@ -1,6 +1,8 @@
 using WaterLily
 import WaterLily: ∂, @loop, @inside
 using JLD2
+using Random
+using Statistics
 
 function grad(field::AbstractArray)
     T = eltype(field)
@@ -93,4 +95,42 @@ function get_random_snapshots(path_or_RHS; n::Int=5, seed::Int=42,
     snapshots = X[:, :, :, inds]   # (H,W,C,n)
 
     return snapshots, collect(inds)
+end
+
+"""
+    mean_divergence(a)
+
+Compute the mean divergence of a staggered vector field `a` whose components
+are stored on the last axis (e.g. Nx×Ny×2). Returns the mean over interior cells.
+"""
+function mean_divergence(a::AbstractArray)
+    nd = ndims(a)
+    spatial_dim = nd - 1
+    if spatial_dim <= 0
+        throw(ArgumentError("mean_divergence: expected array with component axis; got ndims=$nd"))
+    end
+    ncomp = size(a, nd)
+    if ncomp < spatial_dim
+        throw(ArgumentError("mean_divergence: expected last axis to contain ≥ $spatial_dim components, got $ncomp"))
+    end
+
+    spat_sizes = Tuple(size(a)[1:spatial_dim])
+    init = zeros(eltype(a), spat_sizes...)   # scalar field to hold divergence
+
+    # compute divergence on interior cells only (consistent with library's conventions)
+    @inside init[I] = WaterLily.div(I, a)
+
+    # If there are no interior cells (small arrays) fall back to computing over all valid indices
+    if sum(!iszero, init) == 0 && length(init) > 0
+        # compute directly over CartesianIndices(init) but skipping boundaries
+        for I in CartesianIndices(init)
+            try
+                init[I] = WaterLily.div(I, a)
+            catch
+                # ignore indices where div cannot be evaluated
+            end
+        end
+    end
+
+    return mean(init)
 end

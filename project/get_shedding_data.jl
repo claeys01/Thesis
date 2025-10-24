@@ -31,4 +31,4 @@ end
 
 RHS_data = data_run(sim_shedding, t_end; verbose=true)
 
-@save "data/RHS_biot_data_arr.jld2" RHS_data
+@save "data/RHS_biot_data_arr_new2.jld2" RHS_data

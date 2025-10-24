@@ -1,5 +1,5 @@
 using WaterLily
-using CUDA
+# using CUDA
 
 # Define simulation size, geometry dimensions, viscosity
 function circle_shedding(Re=250, U=1; mem=Array)
@@ -24,5 +24,6 @@ function circle_shedding(Re=250, U=1; mem=Array)
     return sim
 end
 
-sim = circle_shedding()
-gif = sim_gif!(sim;duration=50,clims=(-5,5),plotbody=true)
+# sim = circle_shedding()
+# sim_step!(sim, 2; verbose=true)
+# gif = sim_gif!(sim;duration=50,clims=(-5,5),plotbody=true)

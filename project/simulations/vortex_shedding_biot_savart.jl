@@ -1,6 +1,9 @@
 using WaterLily
 using BiotSavartBCs
 using Plots
+using Revise 
+
+includet("../custom.jl")
 
 function circle_shedding_biot(Re=250, U=1; mem=Array)
     n = 2^7
@@ -23,41 +26,46 @@ function circle_shedding_biot(Re=250, U=1; mem=Array)
     return sim
 end
 
-sim = circle_shedding_biot(mem=Array)
-t_end = 50
+if abspath(PROGRAM_FILE) == (@__FILE__) || isinteractive()
 
-# sim_gif!(sim;duration=t_end,clims=(-5,5),plotbody=true)
+    sim = circle_shedding_biot(mem=Array)
+    t_end = 10
 
-sim_step!(sim, t_end; verbose=true)
-u = sim.flow.u[:,:,1] # x velocity
-ω = zeros(size(u));
+    # sim_gif!(sim;duration=t_end,clims=(-5,5),plotbody=true)
 
-@inside ω[I] = WaterLily.curl(3,I,sim.flow.u)*sim.L/sim.U
+    sim_step!(sim, t_end; verbose=false)
+    u = sim.flow.u[:,:,1] # x velocity
+    ω = zeros(size(u));
 
-println(sum(abs, ω))
-println(sim.U)
+    @inside ω[I] = WaterLily.curl(3,I,sim.flow.u)*sim.L/sim.U
 
-plt = flood(ω, clims=(-5,5), border=:none)
-
-# draw grid lines for a (rows,cols) array onto an existing Plots plot
-function overlay_grid!(plt, rows::Int, cols::Int; color=:black, lw=0.3, alpha=0.6)
-    # cell boundaries are at 0.5, 1.5, ..., so lines align with image pixels
-    x_min, x_max = 0.5, cols + 0.5
-    y_min, y_max = 0.5, rows + 0.5
-    # vertical lines
-    for j in 0:cols
-        x = j + 0.5
-        plot!(plt, [x, x], [y_min, y_max], color=color, lw=lw, alpha=alpha, legend=false)
+    # plt = flood(ω, clims=(-5,5), border=:none)
+    conv_diff = WaterLily.conv_diff!(sim.flow.f,sim.flow.u⁰,sim.flow.σ,WaterLily.quick;ν=sim.flow.ν,perdir=sim.flow.perdir)
+    p_grad = grad(sim.flow.p)
+    println(size(p_grad))
+    plt = flood(p_grad[:,:,1], clims=(-0.075, 0.075))
+    # draw grid lines for a (rows,cols) array onto an existing Plots plot
+    function overlay_grid!(plt, rows::Int, cols::Int; color=:black, lw=0.3, alpha=0.6)
+        # cell boundaries are at 0.5, 1.5, ..., so lines align with image pixels
+        x_min, x_max = 0.5, cols + 0.5
+        y_min, y_max = 0.5, rows + 0.5
+        # vertical lines
+        for j in 0:cols
+            x = j + 0.5
+            plot!(plt, [x, x], [y_min, y_max], color=color, lw=lw, alpha=alpha, legend=false)
+        end
+        # horizontal lines
+        for i in 0:rows
+            y = i + 0.5
+            plot!(plt, [x_min, x_max], [y, y], color=color, lw=lw, alpha=alpha, legend=false)
+        end
+        return plt
     end
-    # horizontal lines
-    for i in 0:rows
-        y = i + 0.5
-        plot!(plt, [x_min, x_max], [y, y], color=color, lw=lw, alpha=alpha, legend=false)
-    end
-    return plt
+
+    # overlay_grid!(plt, size(ω,1), size(ω,2); color=:gray, lw=0.4, alpha=0.5)
+
+    display(plt)
+    println(mean_divergence(sim.flow.u))
+    println(mean_divergence(RHS(sim.flow)))
+    # savefig(plt, "biot_sim.png")
 end
-
-overlay_grid!(plt, size(ω,1), size(ω,2); color=:gray, lw=0.4, alpha=0.5)
-
-display(plt)
-savefig(plt, "biot_sim.png")

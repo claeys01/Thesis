@@ -1,50 +1,81 @@
 using JLD2
 using WaterLily
+using WaterLily: @inside
 using Statistics
-
-@load "data/RHS_biot_data_arr.jld2" RHS_data
-
-# Select indices corresponding to time 50 to 75
-time_indices = findall(t -> t ≥ 50 && t ≤ 75, RHS_data["time"])
-selected_indices = time_indices
-
-# Downsample to ~50 entries
-n_samples = 1500
-downsampled_indices = round.(Int, range(1, length(selected_indices), length=n_samples))
-final_indices = selected_indices[downsampled_indices]
-
-# Downsample all relevant entries in RHS_data
-RHS_data["time"] = RHS_data["time"][final_indices]
-RHS_data["Δt"] = RHS_data["Δt"][final_indices]
-RHS_data["RHS"] = RHS_data["RHS"][final_indices]
-
-println("Downsampled to ", length(RHS_data["time"]), " time steps.")
-
-# RHS_data["flattened"] = [vec(r) for r in RHS_data["RHS"]]
-
 using Plots
 
-# Select a random matrix from RHS_data["RHS"]
-random_idx = rand(1:length(RHS_data["RHS"]))
-random_matrix = RHS_data["RHS"][random_idx]
-println("Randomly selected matrix at index $random_idx with size: ", size(random_matrix))
+# load helpers from project
+includet("custom.jl")   # provides grad, RHS, get_random_snapshots, downsample_RHS_data!, remove_ghosts
 
-println("Matrix type: ", typeof(random_matrix))
-println("Matrix element type: ", eltype(random_matrix))
-println("matrix dimensions: ", size(random_matrix))
-println("Mean of random matrix: ", mean(random_matrix))
 
-function RHS_stats(RHS)
-    return mean(RHS), std(RHS)
+
+"""
+    inspect_RHS_data(path_or_RHS; kwargs...)
+
+Inspect RHS dataset (either the Dict loaded from JLD2 or a filename). Selects
+random snapshot(s), prints statistics and plots each snapshot.
+
+Keyword args:
+- n=1         : number of random snapshots to plot
+- seed=42
+- tmin,tmax   : time window passed to get_random_snapshots
+- downsample  : downsample argument passed to get_random_snapshots
+- clip_bc=true: remove ghost cells before analysis (recommended)
+- verbose=true
+"""
+function inspect_RHS_data(path_or_RHS; n::Int=1, seed::Int=42, tmin=-1, tmax=-1, downsample=-1, clip_bc=true, verbose=true)
+    # delegate loading/downsampling/selection to helper in custom.jl
+    snapshots, inds = get_random_snapshots(path_or_RHS; n=n, seed=seed, tmin=tmin, tmax=tmax, downsample=downsample, clip_bc=clip_bc, verbose=verbose)
+    # snapshots shaped (H, W, C, n)
+    ns = size(snapshots, 4)
+    for k in 1:ns
+        s = snapshots[:,:,:,k]
+        idx = inds[k]
+        println("Snapshot #$k  (original index = $(idx))  size=$(size(s))  eltype=$(eltype(s))")
+
+        # component fields (s[:,:,i] already returns a 2D array)
+        u = s[:,:,1]
+        v = s[:,:,2]
+
+        u_mean, u_std = mean(u), std(u)
+        v_mean, v_std = mean(v), std(v)
+        mag = dropdims(sqrt.(sum(s .^ 2, dims=3)), dims=3)   # remove singleton component axis
+        mag_mean, mag_std = mean(mag), std(mag)
+
+        # divergence
+        div_mean = try
+            mean_divergence(s)
+        catch e
+            @warn "mean_divergence failed: $e"
+            NaN
+        end
+
+        println("u: mean=$(round(u_mean, sigdigits=6)), std=$(round(u_std, sigdigits=6))")
+        println("v: mean=$(round(v_mean, sigdigits=6)), std=$(round(v_std, sigdigits=6))")
+        println("|u|: mean=$(round(mag_mean, sigdigits=6)), std=$(round(mag_std, sigdigits=6))")
+        println("mean(divergence) = $(round(div_mean, sigdigits=6))")
+
+        # plotting
+        px = flood(u, border=:none, clims=(u_mean-u_std, u_mean+u_std))
+        py = flood(v, border=:none, clims=(v_mean-v_std, v_mean+v_std))
+        pmag = flood(mag, border=:none, clims=(mag_mean-mag_std, mag_mean+mag_std))
+
+        p = plot(px, py, pmag, layout=(3,1), size=(500,750), title=["u" "v" "|u|"])
+        display(p)
+    end
+    return snapshots, inds
 end
 
-rand_u, (u_mean, u_std) = random_matrix[:,:,1], RHS_stats(random_matrix[:,:,1])
-rand_v, (v_mean, v_std) = random_matrix[:,:,2], RHS_stats(random_matrix[:,:,2])
-mag  = sqrt.(sum(random_matrix .^ 2, dims=3))
-(mag_mean, mag_std) = RHS_stats(mag) 
+# Convenience CLI-like behaviour when file is run interactively
+if abspath(PROGRAM_FILE) == (@__FILE__) || isinteractive()
+    # try to load default file if present
+    default_file = "data/RHS_biot_data_arr.jld2"
+    println("Inspecting default RHS file: $default_file")
+    inspect_RHS_data(default_file; n=1, seed=42, clip_bc=false, verbose=true)
 
-px = flood(rand_u, border=:none, clims=(u_mean-u_std, u_mean+u_std))
-py = flood(rand_v, border=:none, clims=(v_mean-v_std, v_mean+v_std))
-pmag = flood(mag[:,:,1], border=:none, clims=(mag_mean-mag_std, mag_mean+mag_std))
+    new_file = "data/RHS_biot_data_arr_new2.jld2"
+    println("Inspecting default RHS file: $new_file")
+    inspect_RHS_data(new_file; n=1, seed=42, clip_bc=false, verbose=true)
 
-plot(px, py, pmag, layout=(3, 1), size=(500, 750))
+
+end
