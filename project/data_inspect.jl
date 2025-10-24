@@ -9,7 +9,7 @@ time_indices = findall(t -> t ≥ 50 && t ≤ 75, RHS_data["time"])
 selected_indices = time_indices
 
 # Downsample to ~50 entries
-n_samples = 50
+n_samples = 1500
 downsampled_indices = round.(Int, range(1, length(selected_indices), length=n_samples))
 final_indices = selected_indices[downsampled_indices]
 
