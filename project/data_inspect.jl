@@ -25,57 +25,128 @@ Keyword args:
 """
 function inspect_RHS_data(path_or_RHS; n::Int=1, seed::Int=42, tmin=-1, tmax=-1, downsample=-1, clip_bc=true, verbose=true)
     # delegate loading/downsampling/selection to helper in custom.jl
-    snapshots, inds = get_random_snapshots(path_or_RHS; n=n, seed=seed, tmin=tmin, tmax=tmax, downsample=downsample, clip_bc=clip_bc, verbose=verbose)
+    random_RHS, random_flow, inds = get_random_snapshots(path_or_RHS; n=n, seed=seed, tmin=tmin, tmax=tmax, downsample=downsample, clip_bc=clip_bc, verbose=verbose)
     # snapshots shaped (H, W, C, n)
-    ns = size(snapshots, 4)
-    for k in 1:ns
-        s = snapshots[:,:,:,k]
-        idx = inds[k]
-        println("Snapshot #$k  (original index = $(idx))  size=$(size(s))  eltype=$(eltype(s))")
-
-        # component fields (s[:,:,i] already returns a 2D array)
-        u = s[:,:,1]
-        v = s[:,:,2]
-
-        u_mean, u_std = mean(u), std(u)
-        v_mean, v_std = mean(v), std(v)
-        mag = dropdims(sqrt.(sum(s .^ 2, dims=3)), dims=3)   # remove singleton component axis
-        mag_mean, mag_std = mean(mag), std(mag)
-
-        # divergence
-        div_mean = try
-            mean_divergence(s)
-        catch e
-            @warn "mean_divergence failed: $e"
-            NaN
+    for k in 1:n
+        RHS = random_RHS[:,:,:,k]
+        u = random_flow[k].u
+        println("Random Snapshot #$k  (original index = $(inds[k]))  size=$(size(RHS))  eltype=$(eltype(RHS))")
+        plots = []
+        comps = ["x-comp", "y-comp"]
+        # collect stats
+        flow_stats = Dict{String,NamedTuple}()
+        rhs_stats  = Dict{String,NamedTuple}()
+        for comp in 1:2
+            u_comp = u[:,:,comp]; RHS_comp = RHS[:,:,comp]
+            flow_stats[comps[comp]] = (mean=mean(u_comp),  std=std(u_comp))
+            rhs_stats[comps[comp]]  = (mean=mean(RHS_comp), std=std(RHS_comp))
+            up = flood(u_comp, border=:none; title="$(comps[comp]) of velocity field", titlefontsize=10)
+            rhsp = flood(RHS_comp, border=:none; title="$(comps[comp]) of RHS field", titlefontsize=10)
+            push!(plots, up)
+            push!(plots, rhsp)
         end
 
-        println("u: mean=$(round(u_mean, sigdigits=6)), std=$(round(u_std, sigdigits=6))")
-        println("v: mean=$(round(v_mean, sigdigits=6)), std=$(round(v_std, sigdigits=6))")
-        println("|u|: mean=$(round(mag_mean, sigdigits=6)), std=$(round(mag_std, sigdigits=6))")
-        println("mean(divergence) = $(round(div_mean, sigdigits=6))")
+        @info "Snapshot $(k) (orig index $(inds[k])) stats" flow=flow_stats rhs=rhs_stats
 
-        # plotting
-        px = flood(u, border=:none, clims=(u_mean-u_std, u_mean+u_std))
-        py = flood(v, border=:none, clims=(v_mean-v_std, v_mean+v_std))
-        pmag = flood(mag, border=:none, clims=(mag_mean-mag_std, mag_mean+mag_std))
+        @info "Mean divergence:" flow = mean_divergence(u) RHS = mean_divergence(RHS)
 
-        p = plot(px, py, pmag, layout=(3,1), size=(500,750), title=["u" "v" "|u|"])
+        u_mag = dropdims(sqrt.(sum(u .^ 2, dims=3)), dims=3) 
+        RHS_mag = dropdims(sqrt.(sum(RHS .^ 2, dims=3)), dims=3)
+
+        u_magp = flood(u_mag, border=:none; title="magnitude of velocity field", titlefontsize=10); push!(plots, u_magp)
+        RHS_magp = flood(RHS_mag, border=:none; title="magnitude of RHS field", titlefontsize=10); push!(plots, RHS_magp)
+
+
+        p = plot(plots..., layout=(3,2), size=(600,750))
         display(p)
+        
+        # # divergence
+        # div_mean = try
+        #     mean_divergence(s)
+        # catch e
+        #     @warn "mean_divergence failed: $e"
+        #     NaN
+        # end
+
+        # println("u: mean=$(round(u_mean, sigdigits=6)), std=$(round(u_std, sigdigits=6))")
+        # println("v: mean=$(round(v_mean, sigdigits=6)), std=$(round(v_std, sigdigits=6))")
+        # println("|u|: mean=$(round(mag_mean, sigdigits=6)), std=$(round(mag_std, sigdigits=6))")
+        # println("mean(divergence) = $(round(div_mean, sigdigits=6))")
     end
-    return snapshots, inds
+    # return snapshots, inds
 end
+
+function get_4d!(RHS_data::Dict)
+    # build a 4-D array from whatever is stored under "RHS" and replace it in-place
+    arr = RHS_data["RHS"]
+    new = if isa(arr, AbstractArray) && ndims(arr) == 4
+        Float32.(arr)
+    else
+        Float32.(cat(arr...; dims=4))
+    end
+    RHS_data["RHS"] = new
+    return RHS_data["RHS"]
+end
+
+function get_random_snapshots(path_or_RHS; n::Int=5, seed::Int=42,
+                              tmin=-1, tmax=-1, downsample=-1, clip_bc=true, verbose=false)
+    # load or accept RHS_data dict
+    RHS_data = if isa(path_or_RHS, AbstractString)
+        @load path_or_RHS RHS_data
+        # ensure we have a Dict with Any values so we can replace entries with Arrays
+        Dict{String,Any}(RHS_data)
+    elseif isa(path_or_RHS, Dict)
+        # make a writable copy with Any-typed values to allow in-place replacement
+        Dict{String,Any}(path_or_RHS)
+    else
+        throw(ArgumentError("path_or_RHS must be a filename or a Dict as loaded from JLD2"))
+    end
+
+    # downsample / clip in-place on our copy
+    downsample_RHS_data!(RHS_data; tmin=tmin, tmax=tmax, n_samples=downsample, clip_bc=clip_bc, verbose=verbose)
+
+    # build 4-D array (H,W,C,N)
+    get_4d!(RHS_data)
+
+    nsnaps = size(RHS_data["RHS"], 4)
+
+    if nsnaps == 0
+        throw(ArgumentError("No snapshots available in RHS_data"))
+    end
+
+    if n > nsnaps
+        @warn "Requested $n snapshots but only $nsnaps available — returning all"
+        n = nsnaps
+    end
+
+    rng = MersenneTwister(seed)
+    inds = randperm(rng, nsnaps)[1:n]
+    random_RHS = RHS_data["RHS"][:, :, :, inds]   # (H,W,C,n)
+    random_flow = try
+        RHS_data["flow"][inds]
+    catch e
+        @warn "flow key not present in this database: $e"
+        zeros(size(random_RHS))
+    end
+
+
+    return random_RHS, random_flow, collect(inds)
+end
+
+
+
 
 # Convenience CLI-like behaviour when file is run interactively
 if abspath(PROGRAM_FILE) == (@__FILE__) || isinteractive()
     # try to load default file if present
-    default_file = "data/RHS_biot_data_arr.jld2"
+    default_file = "data/flow_RHS_biot_data_arr_new.jld2"
     println("Inspecting default RHS file: $default_file")
     inspect_RHS_data(default_file; n=1, seed=42, clip_bc=false, verbose=true)
+    nothing
 
-    new_file = "data/RHS_biot_data_arr_new2.jld2"
-    println("Inspecting default RHS file: $new_file")
-    inspect_RHS_data(new_file; n=1, seed=42, clip_bc=false, verbose=true)
+    # new_file = "data/RHS_biot_data_arr_new2.jld2"
+    # println("Inspecting default RHS file: $new_file")
+    # inspect_RHS_data(new_file; n=1, seed=42, clip_bc=false, verbose=true)
 
 
 end
