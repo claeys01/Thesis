@@ -115,12 +115,8 @@ function get_random_snapshots(path_or_RHS; n::Int=5, seed::Int=42,
         @warn "flow key not present in this database: $e"
         zeros(size(random_RHS))
     end
-
-
     return random_RHS, random_flow, collect(inds)
 end
-
-
 
 
 # Convenience CLI-like behaviour when file is run interactively

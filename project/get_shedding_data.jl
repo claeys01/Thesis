@@ -99,5 +99,5 @@ plot!(period_data["time"], last.(period_data["force"]);
 
 
 display(plt)
-savefig(plt, "figures/period_sample.png")
+savefig(plt, "figs/period_sample.png")
 
