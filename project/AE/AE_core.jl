@@ -1,18 +1,14 @@
 using Flux
-using Flux: glorot_uniform, Conv, ConvTranspose, Dense, Chain, relu, MaxPool
 using WaterLily
-using Random
 using Statistics
-using ProgressMeter: Progress, next!
 using MLUtils: DataLoader
-using Zygote
 
 includet("../utils/AE_normalizer.jl")
 
 
-function get_data(batch_size, path; tmin=-1, tmax=-1, n_samples=500, normalize=false)
+function get_data(batch_size, path; tmin=-1, tmax=-1, n_samples=500, normalize=false, clip_bc=true)
     @load path RHS_data
-    downsample_RHS_data!(RHS_data; tmin=tmin, tmax=tmax, n_samples=n_samples, clip_bc=true)
+    downsample_RHS_data!(RHS_data; tmin=tmin, tmax=tmax, n_samples=n_samples, clip_bc=clip_bc)
     X = cat(RHS_data["RHS"]...; dims=4)   # now X has shape (H,W,C,N)
     X = Float32.(X)
     X_normalized, normalizer = normalize_batch(X; normalizer=nothing)
@@ -210,19 +206,20 @@ Base.@kwdef mutable struct Args
     λ = 1e-4                    # regularization paramater
     λdiv = 0                    # divergence loss weight
     λdiff = 0                   # divergence difference weight
-    batch_size = 256             # batch size
-    downsample = 1500           # amount of RHS used for training 
-    epochs = 100                  # number of epochs
+    batch_size = 1             # batch size
+    downsample = -1             # amount of RHS used for training 
+    epochs = 1                  # number of epochs
     seed = 42                   # random seed
     n_reconstruct = 2           # sampling size for output    
     use_gpu = false             # use GPU
+    clip_bc = true              # removes the ghost cells from the snapshot
     input_dim = (128, 128, 2)   # flow field size
     stride = 1
     padding = 1
-    latent_dim = 8^3             # latent dimension
+    latent_dim = 8^3            # latent dimension
     C_conv = 8                  # first amount of channels for convs
     verbose_freq = 5            # logging for every verbose_freq iterations
-    normalize = true           # normalise training data
+    normalize = true            # normalise training data
     save_path = "data/models"   # results path
-    data_path = "data/RHS_biot_data_arr.jld2"
+    data_path = "data/datasets/RHS_biot_data_arr_force_period.jld2"
 end

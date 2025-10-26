@@ -1,13 +1,9 @@
 using JLD2
-using CUDA
 using Flux
-using Flux: glorot_uniform, Conv, ConvTranspose, Dense, Chain, relu, MaxPool
 using Optimisers: AdamW
 using WaterLily
 using Random
-using Statistics
 using ProgressMeter: Progress, next!
-using MLUtils: DataLoader
 using Plots
 using Dates
 using DrWatson: struct2dict
@@ -25,7 +21,7 @@ function train(; kws...)
     args.seed > 0 && Random.seed!(args.seed)
 
     # load RHS data and normalizer
-    loader, normalizer = get_data(args.batch_size, args.data_path; n_samples=args.downsample, normalize=args.normalize)
+    loader, normalizer = get_data(args.batch_size, args.data_path; n_samples=args.downsample, normalize=args.normalize, clip_bc=args.clip_bc)
 
     if args.use_gpu
         device = Flux.get_device()
@@ -88,8 +84,8 @@ function train(; kws...)
             next!(progress; showvalues=[(:loss, loss_total, (Lrec, L2div, L2div_diff))]) 
         end
     end
+    
     # save model
-
     timestamp = Dates.format(now(), "yyyy-mm-dd_HH-MM-SS")
     save_folder = joinpath(args.save_path, timestamp)
     !ispath(save_folder) && mkpath(save_folder)
@@ -138,6 +134,7 @@ function train(; kws...)
         @warn "Failed to save loss plot: $e"
     end
 end
+
 
 if abspath(PROGRAM_FILE) == (@__FILE__) || isinteractive()
     train()

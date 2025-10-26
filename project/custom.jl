@@ -60,7 +60,7 @@ function downsample_RHS_data!(RHS_data; tmin=-1, tmax=-1, n_samples=-1, clip_bc=
         end
         if haskey(RHS_data, "flow")
             for (i, flow) in enumerate(RHS_data["flow"])
-                RHS_data["flow"][i] = remove_ghosts(flow)
+                RHS_data["flow"][i] = remove_ghosts(flow.u)
             end
         end
     end

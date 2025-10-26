@@ -111,8 +111,8 @@ function visualize_reconstructions(checkpoint_path::Union{String,Nothing}=nothin
 end
 
 if abspath(PROGRAM_FILE) == (@__FILE__) || isinteractive()
-    pl = visualize_reconstructions("data/models/2025-10-23_18-23-36/checkpoint.jld2")
-    savefig(pl, "data/models/2025-10-23_18-23-36/reconstruction.png")
+    # pl = visualize_reconstructions("data/models/2025-10-23_18-23-36/checkpoint.jld2")
+    # savefig(pl, "data/models/2025-10-23_18-23-36/reconstruction.png")
 
 end
 # visualize_reconstructions("/home/matth/Thesis/data/models/2025-10-21_11-43-40/checkpoint.jld2")
