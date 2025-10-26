@@ -63,60 +63,7 @@ function inspect_RHS_data(path_or_RHS; n::Int=1, seed::Int=42, tmin=-1, tmax=-1,
     # return snapshots, inds
 end
 
-function get_4d!(RHS_data::Dict)
-    # build a 4-D array from whatever is stored under "RHS" and replace it in-place
-    arr = RHS_data["RHS"]
-    new = if isa(arr, AbstractArray) && ndims(arr) == 4
-        Float32.(arr)
-    else
-        Float32.(cat(arr...; dims=4))
-    end
-    RHS_data["RHS"] = new
-    return RHS_data["RHS"]
-end
 
-function get_random_snapshots(path_or_RHS; n::Int=5, seed::Int=42,
-                              tmin=-1, tmax=-1, downsample=-1, clip_bc=true, verbose=false)
-    # load or accept RHS_data dict
-    RHS_data = if isa(path_or_RHS, AbstractString)
-        @load path_or_RHS RHS_data
-        # ensure we have a Dict with Any values so we can replace entries with Arrays
-        Dict{String,Any}(RHS_data)
-    elseif isa(path_or_RHS, Dict)
-        # make a writable copy with Any-typed values to allow in-place replacement
-        Dict{String,Any}(path_or_RHS)
-    else
-        throw(ArgumentError("path_or_RHS must be a filename or a Dict as loaded from JLD2"))
-    end
-
-    # downsample / clip in-place on our copy
-    downsample_RHS_data!(RHS_data; tmin=tmin, tmax=tmax, n_samples=downsample, clip_bc=clip_bc, verbose=verbose)
-
-    # build 4-D array (H,W,C,N)
-    get_4d!(RHS_data)
-
-    nsnaps = size(RHS_data["RHS"], 4)
-
-    if nsnaps == 0
-        throw(ArgumentError("No snapshots available in RHS_data"))
-    end
-
-    if n > nsnaps
-        @warn "Requested $n snapshots but only $nsnaps available — returning all"
-        n = nsnaps
-    end
-
-    rng = MersenneTwister(seed)
-    inds = randperm(rng, nsnaps)[1:n]
-    random_RHS = RHS_data["RHS"][:, :, :, inds]   # (H,W,C,n)
-    random_flow = try
-        RHS_data["flow"][inds]
-    catch e
-        @warn "flow key not present in this database: $e"
-        zeros(size(random_RHS))
-    end
-    return random_RHS, random_flow, collect(inds)
-end
 
 
 # Convenience CLI-like behaviour when file is run interactively

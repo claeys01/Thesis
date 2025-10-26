@@ -21,7 +21,8 @@ function train(; kws...)
     args.seed > 0 && Random.seed!(args.seed)
 
     # load RHS data and normalizer
-    loader, normalizer = get_data(args.batch_size, args.data_path; n_samples=args.downsample, normalize=args.normalize, clip_bc=args.clip_bc)
+    train_loader, validation_loader, normalizer = get_data(args.batch_size, args.data_path; 
+                                n_samples=args.downsample, clip_bc=args.clip_bc, split=args.split)
 
     if args.use_gpu
         device = Flux.get_device()
@@ -46,10 +47,12 @@ function train(; kws...)
 
     # record losses
     train_losses = Float32[]
+    val_losses = Float32[1]
     rec_losses = Float32[]
     div_losses = Float32[]
     div_diff_losses = Float32[]
     iters = Int[]
+    val_iters = Int[0]
     iter = 0
 
     # training
@@ -57,16 +60,9 @@ function train(; kws...)
 
     for epoch = 1:args.epochs
         @info "Epoch $(epoch)"
-        progress = Progress(length(loader))
-        for (i, x) in enumerate(loader)
-            x_dev = x |> device
-            if args.normalize
-                x_dev, _ = normalize_batch(x_dev; normalizer=normalizer)    
-            end
-
-            loss_tuple, (grad_enc, grad_dec) = Flux.withgradient(encoder, decoder) do enc, dec
-                    total_loss(enc, dec, x; λdiv=args.λdiv, λdiff=args.λdiff)
-            end
+        progress = Progress(length(train_loader))
+        for x in train_loader
+            loss_tuple, grad_enc, grad_dec = training_step(encoder, decoder, x, device, args, normalizer)
             loss_total, (Lrec, L2div, L2div_diff) = loss_tuple
 
             Flux.update!(opt_enc, encoder, grad_enc)
@@ -83,6 +79,21 @@ function train(; kws...)
             # progress meter
             next!(progress; showvalues=[(:loss, loss_total, (Lrec, L2div, L2div_diff))]) 
         end
+
+        # ---- VALIDATION (epoch-level) ----
+        val_sum = 0.0
+        n_val   = 0
+        for xval in validation_loader
+            val_loss_tuple, _, _ = training_step(encoder, decoder, xval, device, args, normalizer)
+            val_loss_total, _ = val_loss_tuple
+            val_sum += val_loss_total
+            n_val   += 1
+        end
+        val_mean = Float32(val_sum / max(n_val, 1))
+        push!(val_losses, val_mean)
+        push!(val_iters,  iter)      # <— align the validation point to the last train iter of this epoch
+
+
     end
     
     # save model
@@ -109,7 +120,8 @@ function train(; kws...)
 
     #plot and save reconstruction of 2 random snapshots
     try 
-        reconstruction = visualize_reconstructions(;encoder=encoder, decoder=decoder, args=args)
+        # reconstruction = visualize_reconstructions(;encoder=encoder, decoder=decoder, args=args)
+        reconstruction = visualize_reconstructions(filepath)
         reconstruct_path = joinpath(save_folder, "reconstruction.png")
         savefig(reconstruction, reconstruct_path)
         @info "Saved reconstruction plot to $reconstruct_path"
@@ -121,6 +133,8 @@ function train(; kws...)
     try
         p = plot(iters, train_losses, label="total", xlabel="Iteration", ylabel="Loss", title="Training loss", lw=2)
         plot!(p, iters, rec_losses, label="reconstruction", lw=1, ls=:dash)
+        plot!(p, val_iters, val_losses, label="total val")
+
         if args.λdiv != 0
             plot!(p, iters, div_losses, label="divergence", lw=1, ls=:dot)
         end
@@ -134,6 +148,22 @@ function train(; kws...)
         @warn "Failed to save loss plot: $e"
     end
 end
+
+function training_step(encoder, decoder, x, device, args, normalizer)
+    # # Move to GPU/CPU
+    x_dev = x |> device
+
+    # # Optional normalization
+    if args.normalize
+        x_dev, _ = normalize_batch(x_dev; normalizer=normalizer)
+    end
+    loss_tuple, (grad_enc, grad_dec) = Flux.withgradient(encoder, decoder) do enc, dec 
+        total_loss(enc, dec, x_dev; λdiv=args.λdiv, λdiff=args.λdiff) 
+    end
+
+    return loss_tuple, grad_enc, grad_dec
+end
+
 
 
 if abspath(PROGRAM_FILE) == (@__FILE__) || isinteractive()

@@ -21,38 +21,23 @@ function visualize_reconstructions(checkpoint_path::Union{String,Nothing}=nothin
       - provide checkpoint_path (String) -> load encoder/decoder and args from checkpoint
       - OR provide encoder and decoder objects and args (Args) -> use those
     """
-    # load from checkpoint if a path was given
-    if checkpoint_path !== nothing
-        checkpoint = JLD2.load(checkpoint_path)
-        encoder_state = checkpoint["encoder"]
-        decoder_state = checkpoint["decoder"]
-        normalizer = checkpoint["normalizer"]
-        args = Args(; checkpoint["args"]...)
+    # load from checkpoint
 
-        enc = Encoder(args.input_dim, args.latent_dim; C_next=args.C_conv, padding=args.padding, stride=args.stride)
-        dec = Decoder(args.input_dim, args.latent_dim; C_next=args.C_conv)
-        Flux.loadmodel!(enc, encoder_state)
-        Flux.loadmodel!(dec, decoder_state)
-    else
-        # no checkpoint: require provided encoder, decoder and args
-        if encoder === nothing || decoder === nothing
-            error("Either checkpoint_path or both encoder and decoder must be provided.")
-        end
-        if args === nothing
-            error("args must be provided when not loading from a checkpoint (needed for data_path, downsample, seed, ...).")
-        end
-        args = Args(; checkpoint["args"]...)
-        normalizer = checkpoint["normalizer"]
-        enc = encoder
-        dec = decoder
-
-    end
+    checkpoint = JLD2.load(checkpoint_path)
+    encoder_state = checkpoint["encoder"]
+    decoder_state = checkpoint["decoder"]
+    normalizer = checkpoint["normalizer"]
+    args = Args(; checkpoint["args"]...)
+    enc = Encoder(args.input_dim, args.latent_dim; C_next=args.C_conv, padding=args.padding, stride=args.stride, verbose=false)
+    dec = Decoder(args.input_dim, args.latent_dim; C_next=args.C_conv, verbose=false)
+    Flux.loadmodel!(enc, encoder_state)
+    Flux.loadmodel!(dec, decoder_state)
 
     # optional seeding
     args.seed > 0 && Random.seed!(args.seed)
 
     @load args.data_path RHS_data
-    snapshots, ids = get_random_snapshots(args.data_path; n=args.n_reconstruct, downsample=args.downsample)
+    snapshots, _, ids = get_random_snapshots(args.data_path; n=args.n_reconstruct, downsample=args.downsample)
 
     _, _, C, nn = size(snapshots)
     @info "Selected snapshot indices for reconstruction: $ids"
@@ -111,7 +96,17 @@ function visualize_reconstructions(checkpoint_path::Union{String,Nothing}=nothin
 end
 
 if abspath(PROGRAM_FILE) == (@__FILE__) || isinteractive()
-    # pl = visualize_reconstructions("data/models/2025-10-23_18-23-36/checkpoint.jld2")
+
+    # checkpoint = JLD2.load("data/models/2025-10-26_16-49-45/checkpoint.jld2")
+    # encoder_state = checkpoint["encoder"]
+    # decoder_state = checkpoint["decoder"]
+    # normalizer = checkpoint["normalizer"]
+    # args = Args(; checkpoint["args"]...)
+    # enc = Encoder(args.input_dim, args.latent_dim; C_next=args.C_conv, padding=args.padding, stride=args.stride)
+    # dec = Decoder(args.input_dim, args.latent_dim; C_next=args.C_conv)
+    # Flux.loadmodel!(enc, encoder_state)
+    # Flux.loadmodel!(dec, decoder_state)
+    # pl = visualize_reconstructions(;encoder=enc, decoder=dec, args=args)
     # savefig(pl, "data/models/2025-10-23_18-23-36/reconstruction.png")
 
 end

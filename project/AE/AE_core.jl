@@ -5,19 +5,64 @@ using MLUtils: DataLoader
 
 includet("../utils/AE_normalizer.jl")
 
+Base.@kwdef mutable struct Args
+    η = 1e-3                    # learning rate
+    λ = 1e-4                    # regularization paramater
+    λdiv = 0                    # divergence loss weight
+    λdiff = 0                   # divergence difference weight
+    batch_size = 32             # batch size
+    downsample = -1             # amount of RHS used for training 
+    epochs = 300                  # number of epochs
+    seed = 42                   # random seed
+    n_reconstruct = 2           # sampling size for output    
+    use_gpu = false             # use GPU
+    clip_bc = true              # removes the ghost cells from the snapshot
+    input_dim = (128, 128, 2)   # flow field size
+    split = 0.2
+    stride = 1
+    padding = 1
+    latent_dim = 8^3            # latent dimension
+    C_conv = 8                  # first amount of channels for convs
+    verbose_freq = 5            # logging for every verbose_freq iterations
+    normalize = true            # normalise training data
+    save_path = "data/models"   # results path
+    data_path = "data/datasets/RHS_biot_data_arr_force_period.jld2"
+end
 
-function get_data(batch_size, path; tmin=-1, tmax=-1, n_samples=500, normalize=false, clip_bc=true)
+
+function get_data(batch_size, path; tmin=-1, tmax=-1, n_samples=500, normalize=false, clip_bc=true, split=0.2)
     @load path RHS_data
     downsample_RHS_data!(RHS_data; tmin=tmin, tmax=tmax, n_samples=n_samples, clip_bc=clip_bc)
-    X = cat(RHS_data["RHS"]...; dims=4)   # now X has shape (H,W,C,N)
+
+    # construct data array (H,W,C,N) and cast to Float32
+    X = cat(RHS_data["RHS"]...; dims=4)
     X = Float32.(X)
-    X_normalized, normalizer = normalize_batch(X; normalizer=nothing)
-    if normalize
-        loader = DataLoader(X_normalized, batchsize=batch_size, shuffle=true)
-    else
-        loader = DataLoader(X, batchsize=batch_size, shuffle=true)
+
+    # compute normalizer on full dataset (returned always)
+    X_norm, normalizer = normalize_batch(X; normalizer=nothing)
+
+    # split indices into train / val
+    N = size(X, 4)
+    if N < 2
+        error("get_data: need at least 2 samples to create train/validation split (got $N)")
     end
-    return loader, normalizer
+    nval = max(1, Int(round(split * N)))
+    nval = min(nval, N-1)   # ensure at least one train sample
+    @info "Data_split into $(N-nval) training  and $(nval) validation snapshots"
+    perm = randperm(N)
+    val_idx = perm[1:nval]
+    train_idx = perm[(nval+1):end]
+
+    # build DataLoaders
+    if normalize
+        train_loader = DataLoader(X_norm[:, :, :, train_idx], batchsize=batch_size, shuffle=true)
+        val_loader   = DataLoader(X_norm[:, :, :, val_idx],   batchsize=batch_size, shuffle=false)
+    else
+        train_loader = DataLoader(X[:, :, :, train_idx], batchsize=batch_size, shuffle=true)
+        val_loader   = DataLoader(X[:, :, :, val_idx],   batchsize=batch_size, shuffle=false)
+    end
+
+    return train_loader, val_loader, normalizer
 end
 
 
@@ -28,7 +73,7 @@ end
 
 Flux.@layer Encoder
 
-Encoder(input_size::Tuple{Int,Int, Int}, latent_dim::Int; C_next::Int=4, padding=1, stride=2) = begin
+Encoder(input_size::Tuple{Int,Int, Int}, latent_dim::Int; C_next::Int=4, padding=1, stride=2, verbose::Bool=true) = begin
     H, W, C = input_size
 
     convpart = Chain(
@@ -45,7 +90,9 @@ Encoder(input_size::Tuple{Int,Int, Int}, latent_dim::Int; C_next::Int=4, padding
     dummy = zeros(Float32, H, W, C, 1)
     flat = convpart(dummy)
     dense_in = size(flat, 1)
-    @info "Initialize Encoder with $(dense_in) connected nodes and $(latent_dim) latent dimensions"
+    if verbose
+        @info "Initialize Encoder with $(dense_in) connected nodes and $(latent_dim) latent dimensions"
+    end
     return Encoder(Chain(convpart, Dense(dense_in, latent_dim)))
 end
 
@@ -85,18 +132,17 @@ end
 Flux.@layer Decoder
 
 
-Decoder(output_size::Tuple{Int,Int, Int}, latent_dim::Int; C_next::Int=4) = begin
+Decoder(output_size::Tuple{Int,Int, Int}, latent_dim::Int; C_next::Int=4, verbose::Bool=true) = begin
     H, W, C = output_size
     # after four 2x2 downsamples: h_out = H ÷ 16, w_out = W ÷ 16
-    # if H % 16 != 0 || W % 16 != 0
-        # throw(ArgumentError("Input of encoder needs to be deviseable by 16, please exclude ghost cells"))
-    # end
 
     h_lat = div(H, 16)
     w_lat = div(W, 16)
     channels_mid = 8 * C_next
     dense_len = h_lat * w_lat * channels_mid
-    @info "Initialize Dencoder with $(dense_len) connected nodes and $(latent_dim) latent dimensions"
+    if verbose
+        @info "Initialize Decoder with $(dense_len) connected nodes and $(latent_dim) latent dimensions"
+    end
 
     return Decoder(Chain(
         Dense(latent_dim, dense_len),
@@ -201,25 +247,3 @@ function total_loss(encoder, decoder, x; λdiv=0, λdiff=0)
     return Lrec + λdiv * L2div + λdiff * L2div_diff, (Lrec, L2div, L2div_diff)
 end
 
-Base.@kwdef mutable struct Args
-    η = 1e-3                    # learning rate
-    λ = 1e-4                    # regularization paramater
-    λdiv = 0                    # divergence loss weight
-    λdiff = 0                   # divergence difference weight
-    batch_size = 1             # batch size
-    downsample = -1             # amount of RHS used for training 
-    epochs = 1                  # number of epochs
-    seed = 42                   # random seed
-    n_reconstruct = 2           # sampling size for output    
-    use_gpu = false             # use GPU
-    clip_bc = true              # removes the ghost cells from the snapshot
-    input_dim = (128, 128, 2)   # flow field size
-    stride = 1
-    padding = 1
-    latent_dim = 8^3            # latent dimension
-    C_conv = 8                  # first amount of channels for convs
-    verbose_freq = 5            # logging for every verbose_freq iterations
-    normalize = true            # normalise training data
-    save_path = "data/models"   # results path
-    data_path = "data/datasets/RHS_biot_data_arr_force_period.jld2"
-end
