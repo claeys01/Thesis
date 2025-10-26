@@ -2,6 +2,7 @@ using WaterLily
 using BiotSavartBCs
 using Plots
 using Revise 
+using JLD2
 
 includet("../custom.jl")
 
@@ -25,31 +26,119 @@ function circle_shedding_biot(Re=250, U=1; mem=Array)
     perturb!(sim; noise=0.1)
     return sim
 end
+function gradient_array(A::AbstractArray, dx::Real=1.0)
+    nd = ndims(A)
+    G = ntuple(d -> similar(A), nd)
+    sizes = size(A)
+    for I in CartesianIndices(A)
+        iT = Tuple(I)
+        for d in 1:nd
+            idx = iT[d]
+            N = sizes[d]
+            if idx == 1
+                # forward difference at left boundary
+                i_plus = Base.setindex(iT, min(2, N), d)
+                G[d][I] = (A[CartesianIndex(i_plus)] - A[I]) / dx
+            elseif idx == N
+                # backward difference at right boundary
+                i_minus = Base.setindex(iT, max(N-1, 1), d)
+                G[d][I] = (A[I] - A[CartesianIndex(i_minus)]) / dx
+            else
+                # central difference
+                i_plus = Base.setindex(iT, idx+1, d)
+                i_minus = Base.setindex(iT, idx-1, d)
+                G[d][I] = (A[CartesianIndex(i_plus)] - A[CartesianIndex(i_minus)]) / (2dx)
+            end
+        end
+    end
+    return G
+end
+
+function zero_crossing(y; direction=:both, eps=0.0)
+    @assert direction in (:both, :rising, :falling)
+    n = length(y)
+    idx = Int[]
+    # treat tiny values as exact zeros if eps>0
+    yproc = copy(y)
+    if eps > 0.0
+        for i in eachindex(yproc)
+            if abs(yproc[i]) <= eps
+                yproc[i] = zero(yproc[i])
+            end
+        end
+    end
+
+    for i in 1:n-1
+        a, b = yproc[i], yproc[i+1]
+        if a*b < 0 || a == 0 || b == 0
+            dir = if a < 0 && b > 0
+                :rising
+            elseif a > 0 && b < 0
+                :falling
+            elseif a == 0 && b != 0
+                b > 0 ? :rising : :falling
+            elseif b == 0 && a != 0
+                a > 0 ? :falling : :rising 
+            else
+                # flat at zero
+                nothing
+            end
+            if dir !== nothing && (direction == :both || dir == direction)
+                push!(idx, i)
+            end
+        end
+    end
+    return idx
+end
+
+function get_forces!(sim,t)
+    sim_step!(sim,t,remeasure=false; verbose=true)
+    force = WaterLily.pressure_force(sim)
+    force./(0.5sim.L*sim.U^2) # scale the forces!
+end
+
 
 if abspath(PROGRAM_FILE) == (@__FILE__) || isinteractive()
 
-    sim = circle_shedding_biot(mem=Array)
+    # sim = circle_shedding_biot(mem=Array)
     t_end = 100
 
-    # sim_gif!(sim;duration=t_end,clims=(-5,5),plotbody=true)
+    # # sim_gif!(sim;duration=t_end,clims=(-5,5),plotbody=true)
 
-    # sim_step!(sim, t_end; verbose=false)
+    # # sim_step!(sim, t_end; verbose=false)
 
-    function get_forces!(sim,t)
-        sim_step!(sim,t,remeasure=false; verbose=true)
-        force = WaterLily.pressure_force(sim)
-        force./(0.5sim.L*sim.U^2) # scale the forces!
-    end
+    # function get_forces!(sim,t)
+    #     sim_step!(sim,t,remeasure=false; verbose=true)
+    #     force = WaterLily.pressure_force(sim)
+    #     force./(0.5sim.L*sim.U^2) # scale the forces!
+    # end
 
-    # Simulate through the time range and get forces
+    # # Simulate through the time range and get forces
+    # time = 1:0.1:t_end # time scale is sim.L/sim.U
+    # forces = [get_forces!(sim,t) for t in time];
+    
     time = 1:0.1:t_end # time scale is sim.L/sim.U
-    forces = [get_forces!(sim,t) for t in time];
+    # @save "data/datasets/biot_forces.jld2" forces
+    @load "data/datasets/biot_forces.jld2" forces;
 
     #Plot it
-    plot(time,[first.(forces) last.(forces)],
+    drag, lift = first.(forces), last.(forces)
+    plt = plot(time,[drag, lift],
         labels=["drag" "lift"],
         xlabel="tU/L",
         ylabel="Pressure force coefficients")
+
+    zero_idxs = zero_crossing(last.(forces); direction=:rising)
+    println(zero_idxs)
+    
+    for idx in zero_idxs
+        scatter!(plt, [time[idx]], [lift[idx]]; label=false)
+        annotate!(time[idx], lift[idx], (idx, 5, :left))
+    end
+    # annotate!([(4, 0, ("More text", 8, 45.0, :bottom, :red))])
+    # display(plt)
+
+
     # u = sim.flow.u[:,:,1] # x velocity
     # ω = zeros(size(u));
 

@@ -59,19 +59,6 @@ function inspect_RHS_data(path_or_RHS; n::Int=1, seed::Int=42, tmin=-1, tmax=-1,
 
         p = plot(plots..., layout=(3,2), size=(600,750))
         display(p)
-        
-        # # divergence
-        # div_mean = try
-        #     mean_divergence(s)
-        # catch e
-        #     @warn "mean_divergence failed: $e"
-        #     NaN
-        # end
-
-        # println("u: mean=$(round(u_mean, sigdigits=6)), std=$(round(u_std, sigdigits=6))")
-        # println("v: mean=$(round(v_mean, sigdigits=6)), std=$(round(v_std, sigdigits=6))")
-        # println("|u|: mean=$(round(mag_mean, sigdigits=6)), std=$(round(mag_std, sigdigits=6))")
-        # println("mean(divergence) = $(round(div_mean, sigdigits=6))")
     end
     # return snapshots, inds
 end
@@ -139,7 +126,7 @@ end
 # Convenience CLI-like behaviour when file is run interactively
 if abspath(PROGRAM_FILE) == (@__FILE__) || isinteractive()
     # try to load default file if present
-    default_file = "data/flow_RHS_biot_data_arr_new.jld2"
+    default_file = "data/RHS_biot_data_arr_forceperiod.jld2"
     println("Inspecting default RHS file: $default_file")
     inspect_RHS_data(default_file; n=1, seed=42, clip_bc=false, verbose=true)
     nothing
