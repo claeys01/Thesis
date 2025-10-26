@@ -126,7 +126,7 @@ end
 # Convenience CLI-like behaviour when file is run interactively
 if abspath(PROGRAM_FILE) == (@__FILE__) || isinteractive()
     # try to load default file if present
-    default_file = "data/RHS_biot_data_arr_forceperiod.jld2"
+    default_file = "data/RHS_biot_data_arr_force_period.jld2"
     println("Inspecting default RHS file: $default_file")
     inspect_RHS_data(default_file; n=1, seed=42, clip_bc=false, verbose=true)
     nothing

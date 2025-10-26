@@ -3,7 +3,7 @@ import WaterLily: ∂, @loop
 using Revise
 using JLD2
 
-includet("simulations/vortex_shedding.jl")
+# includet("simulations/vortex_shedding.jl")
 includet("simulations/vortex_shedding_biot_savart.jl")
 includet("custom.jl")
 
@@ -41,8 +41,7 @@ function data_run(sim::AbstractSimulation, time_max, save_path; sample_instance=
     if sample_single_period
         split_path = split(save_path, ".")
         single_period_save = split_path[1] * "_period." * split_path[2]
-        forces = data["force"]
-        zero_idxs = zero_crossing(last.(forces); direction=single_period_direction)
+        zero_idxs = zero_crossing(last.(data["force"]); direction=single_period_direction)
         if length(zero_idxs) >= 2
             mid = length(zero_idxs) ÷ 2
             # ensure valid mid index
@@ -53,7 +52,7 @@ function data_run(sim::AbstractSimulation, time_max, save_path; sample_instance=
                     period_data[key] = data[key][single_period]
                 end
                 # save the single-period dictionary and indices
-                @save single_period_save period_data
+                @save single_period_save RHS_data = period_data
                 @info "Saved data from a single period to $(single_period_save)"
 
                 # also attach to returned data for convenience
@@ -66,40 +65,39 @@ function data_run(sim::AbstractSimulation, time_max, save_path; sample_instance=
         end
     end
 
-    @save save_path data
+    @save save_path RHS_data = data
 
     return data
 end
 
-data = data_run(sim_shedding, t_end, "data/RHS_biot_data_arr_force.jld2"; verbose=true, sample_single_period=true)
+# RHS_data = data_run(sim_shedding, t_end, "data/RHS_biot_data_arr_force.jld2"; verbose=true, sample_single_period=true)
 
-# @save "data/RHS_biot_data_arr_force.jld2" RHS_data
+@load "data/RHS_biot_data_arr_force.jld2" RHS_data
 
-# forces = RHS_data["force"]
-# time = RHS_data["time"]
-# zero_idxs = zero_crossing(last.(forces); direction=:rising)
-# drag, lift = first.(forces), last.(forces)
+forces = RHS_data["force"]
+time = RHS_data["time"]
+zero_idxs = zero_crossing(last.(forces); direction=:rising)
+drag, lift = first.(forces), last.(forces)
 
-# plt = plot(time,[drag, lift],
-#     labels=["drag" "lift"],
-#     xlabel="tU/L",
-#     ylabel="Pressure force coefficients")
-# zero_idxs = zero_crossing(last.(forces); direction=:rising)
+plt = plot(time,[drag, lift],
+    labels=["drag" "lift"],
+    colors=[:red, :blue],
+    xlabel="tU/L",
+    ylabel="Pressure force coefficients")
+zero_idxs = zero_crossing(last.(forces); direction=:rising)
 
-# for idx in zero_idxs
-#     scatter!(plt, [time[idx]], [lift[idx]]; label=false)
-#     annotate!(time[idx], lift[idx], (idx, 5, :left))
-# end
+for idx in zero_idxs
+    scatter!(plt, [time[idx]], [lift[idx]]; label=false, color=:black)
+    annotate!(time[idx], lift[idx], (idx, 5, :left))
+end
 
-# mid = length(zero_idxs) ÷ 2
-# single_period = zero_idxs[mid] : zero_idxs[mid+1]
-# plot!(time[single_period], lift[single_period]; 
-#     linestyle =:dash, lw=2, label="sampled period")
+mid = length(zero_idxs) ÷ 2
+single_period = zero_idxs[mid] : zero_idxs[mid+1]
+period_data = RHS_data["single_period"]
+plot!(period_data["time"], last.(period_data["force"]); 
+    linestyle =:dash, lw=2, label="sampled period", color=:green)
 
 
-# display(plt)
-# period_data = Dict()
-# for key in keys(RHS_data)
-#     period_data[key] = RHS_data[key][single_period]
-# end
-# println(keys(period_data), size(period_data["force"]))
+display(plt)
+savefig(plt, "figures/period_sample.png")
+

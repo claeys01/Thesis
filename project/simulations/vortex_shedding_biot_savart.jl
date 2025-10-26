@@ -26,33 +26,7 @@ function circle_shedding_biot(Re=250, U=1; mem=Array)
     perturb!(sim; noise=0.1)
     return sim
 end
-function gradient_array(A::AbstractArray, dx::Real=1.0)
-    nd = ndims(A)
-    G = ntuple(d -> similar(A), nd)
-    sizes = size(A)
-    for I in CartesianIndices(A)
-        iT = Tuple(I)
-        for d in 1:nd
-            idx = iT[d]
-            N = sizes[d]
-            if idx == 1
-                # forward difference at left boundary
-                i_plus = Base.setindex(iT, min(2, N), d)
-                G[d][I] = (A[CartesianIndex(i_plus)] - A[I]) / dx
-            elseif idx == N
-                # backward difference at right boundary
-                i_minus = Base.setindex(iT, max(N-1, 1), d)
-                G[d][I] = (A[I] - A[CartesianIndex(i_minus)]) / dx
-            else
-                # central difference
-                i_plus = Base.setindex(iT, idx+1, d)
-                i_minus = Base.setindex(iT, idx-1, d)
-                G[d][I] = (A[CartesianIndex(i_plus)] - A[CartesianIndex(i_minus)]) / (2dx)
-            end
-        end
-    end
-    return G
-end
+
 
 function zero_crossing(y; direction=:both, eps=0.0)
     @assert direction in (:both, :rising, :falling)
@@ -125,6 +99,7 @@ if abspath(PROGRAM_FILE) == (@__FILE__) || isinteractive()
     drag, lift = first.(forces), last.(forces)
     plt = plot(time,[drag, lift],
         labels=["drag" "lift"],
+        colors=[:red, :blue],
         xlabel="tU/L",
         ylabel="Pressure force coefficients")
 
@@ -132,11 +107,12 @@ if abspath(PROGRAM_FILE) == (@__FILE__) || isinteractive()
     println(zero_idxs)
     
     for idx in zero_idxs
-        scatter!(plt, [time[idx]], [lift[idx]]; label=false)
+        scatter!(plt, [time[idx]], [lift[idx]]; label=false, color=:black)
         annotate!(time[idx], lift[idx], (idx, 5, :left))
     end
     # annotate!([(4, 0, ("More text", 8, 45.0, :bottom, :red))])
     # display(plt)
+    # savefig(plt, "figures/biot_forces.png")
 
 
     # u = sim.flow.u[:,:,1] # x velocity
