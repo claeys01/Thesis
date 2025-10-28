@@ -9,10 +9,9 @@ Base.@kwdef mutable struct Args
     η = 1e-3                    # learning rate
     λ = 1e-4                    # regularization paramater
     λdiv = 0                    # divergence loss weight
-    λdiff = 0                   # divergence difference weight
     batch_size = 32             # batch size
     downsample = -1             # amount of RHS used for training 
-    epochs = 300                  # number of epochs
+    epochs = 1                  # number of epochs
     seed = 42                   # random seed
     n_reconstruct = 2           # sampling size for output    
     use_gpu = false             # use GPU
@@ -217,7 +216,6 @@ end
 # losses
 recon_loss(ŷ, x) = mean(abs2, ŷ .- x)                # MSE
 div_loss_L2(u) = mean(abs2, divergence_field(u))     # L2 of divergence field
-div_diff_loss(ŷ, x) = mean(abs2, divergence_field(ŷ) .- divergence_field(x))
 
 
 # combined total loss (ŷ = decoder(z) or ae(x))
@@ -225,7 +223,6 @@ function total_loss(encoder, decoder, x; λdiv=0, λdiff=0)
     ŷ = reconstruct(encoder, decoder, x)
     Lrec = recon_loss(ŷ, x)
     L2div = zero(eltype(Lrec))
-    L2div_diff = zero(eltype(Lrec))
     if λdiv != 0
         try
             # If divergence computation fails on GPU we skip it (avoid CPU/GPU mix)
@@ -235,15 +232,6 @@ function total_loss(encoder, decoder, x; λdiv=0, λdiff=0)
             L2div = zero(eltype(Lrec))
         end
     end
-    if λdiff != 0
-        try 
-            div_diff = divergence_field(ŷ) .- divergence_field(x)
-            L2div_diff = mean(abs2, div_diff)
-        catch e
-            @warn "div_loss_L2 failed (likely GPU/CPU mismatch). skipping divergence loss: $e"
-            L2div_diff = zero(eltype(Lrec))
-        end
-    end
-    return Lrec + λdiv * L2div + λdiff * L2div_diff, (Lrec, L2div, L2div_diff)
+    return Lrec + λdiv * L2div, (Lrec, L2div)
 end
 

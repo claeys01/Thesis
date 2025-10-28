@@ -3,9 +3,10 @@ using Flux
 using Optimisers: AdamW
 using WaterLily
 using Random
-using ProgressMeter: Progress, next!
+using ProgressMeter
 using Plots
 using Dates
+using CUDA
 using DrWatson: struct2dict
 
 includet("../custom.jl")
@@ -26,11 +27,14 @@ function train(; kws...)
 
     if args.use_gpu
         device = Flux.get_device()
-        normalizer = Normalizer(normalizer.μ |> device, normalizer.σ |> device, normalizer.method)
+        # normalizer = Normalizer(normalizer.μ |> device, normalizer.σ |> device, normalizer.method)
 
     else
         device = Flux.get_device("CPU")
     end
+
+    # device = (args.use_gpu && CUDA.has_cuda()) ? gpu : cpu
+    normalizer = Normalizer(device(Float32.(normalizer.μ)), device(Float32.(normalizer.σ)), normalizer.method)
 
     @info "Training on $device"
 
@@ -57,13 +61,14 @@ function train(; kws...)
 
     # training
     @info "Start Training, total $(args.epochs) epochs"
-
+    val_mean = 1
     for epoch = 1:args.epochs
         @info "Epoch $(epoch)"
-        progress = Progress(length(train_loader))
+        train_progress = Progress(length(train_loader); desc="Training")
+        # ---- TRAIN ----
         for x in train_loader
             loss_tuple, grad_enc, grad_dec = training_step(encoder, decoder, x, device, args, normalizer)
-            loss_total, (Lrec, L2div, L2div_diff) = loss_tuple
+            loss_total, (Lrec, L2div) = loss_tuple
 
             Flux.update!(opt_enc, encoder, grad_enc)
             Flux.update!(opt_dec, decoder, grad_dec)
@@ -74,15 +79,18 @@ function train(; kws...)
             push!(train_losses, Float32(loss_total))
             push!(rec_losses, Float32(Lrec))
             push!(div_losses, Float32(L2div))
-            push!(div_diff_losses, Float32(L2div_diff))
 
             # progress meter
-            next!(progress; showvalues=[(:loss, loss_total, (Lrec, L2div, L2div_diff))]) 
+            next!(train_progress; showvalues=[(:loss, loss_total)]) 
         end
+
+        finish!(train_progress)
 
         # ---- VALIDATION (epoch-level) ----
         val_sum = 0.0
         n_val   = 0
+
+
         for xval in validation_loader
             val_loss_tuple, _, _ = training_step(encoder, decoder, xval, device, args, normalizer)
             val_loss_total, _ = val_loss_tuple
@@ -151,7 +159,7 @@ end
 
 function training_step(encoder, decoder, x, device, args, normalizer)
     # # Move to GPU/CPU
-    x_dev = x |> device
+    x_dev = device(x)
 
     # # Optional normalization
     if args.normalize
