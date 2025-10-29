@@ -67,7 +67,15 @@ function train(; kws...)
         train_progress = Progress(length(train_loader); desc="Training")
         # ---- TRAIN ----
         for x in train_loader
-            loss_tuple, grad_enc, grad_dec = training_step(encoder, decoder, x, device, args, normalizer)
+            # loss_tuple, grad_enc, grad_dec = training_step(encoder, decoder, x, device, args, normalizer)
+            # # Move to GPU/CPU
+            x_dev = device(x)
+
+            # # Optional normalization
+            if args.normalize
+                x_dev, _ = normalize_batch(x_dev; normalizer=normalizer)
+            end
+            loss_tuple, grad_enc, grad_dec = training_step_pil(encoder, decoder, x, device, args, normalizer)
             loss_total, (Lrec, L2div) = loss_tuple
 
             Flux.update!(opt_enc, encoder, grad_enc)
@@ -157,6 +165,29 @@ function train(; kws...)
     end
 end
 
+function training_step_pil(encoder, decoder, x, device, args, normalizer)
+    # # Move to GPU/CPU
+    x_dev = device(x)
+    
+    # # Optional normalization
+    if args.normalize
+        x_dev, _ = normalize_batch(x_dev; normalizer=normalizer)
+    end
+    x̂_dev = reconstruct(encoder, decoder, x_dev)
+    x̂_dev_denorm =  denormalize_batch(x̂_dev, normalizer)
+    div = div_loss(x̂_dev_denorm, args.λdiv)
+    div_pre = div_loss(denormalize_batch(x_dev, normalizer), args.λdiv)
+    # println(size(x))
+    # println(size(div))
+    println(mean(abs2, div))
+    println(mean(abs2, div_pre))
+
+    loss_tuple, (grad_enc, grad_dec) = Flux.withgradient(encoder, decoder) do enc, dec 
+        total_loss(enc, dec, x_dev; λdiv=args.λdiv) 
+    end
+    return loss_tuple, grad_enc, grad_dec
+end
+
 function training_step(encoder, decoder, x, device, args, normalizer)
     # # Move to GPU/CPU
     x_dev = device(x)
@@ -166,9 +197,9 @@ function training_step(encoder, decoder, x, device, args, normalizer)
         x_dev, _ = normalize_batch(x_dev; normalizer=normalizer)
     end
     loss_tuple, (grad_enc, grad_dec) = Flux.withgradient(encoder, decoder) do enc, dec 
-        total_loss(enc, dec, x_dev; λdiv=args.λdiv, λdiff=args.λdiff) 
+        # total_loss(enc, dec, x_dev; λdiv=args.λdiv, λdiff=args.λdiff) 
+        1, (1, 1)
     end
-
     return loss_tuple, grad_enc, grad_dec
 end
 

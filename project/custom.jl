@@ -7,8 +7,11 @@ using Statistics
 function grad(field::AbstractArray)
     T = eltype(field); sz = size(field); N = ndims(field)
     grad = zeros(T, sz..., N)  # e.g., zeros(Float32, Nx, Ny, 2)
+    grad = Matrix(zeros(eltype(field), size()))
+
     for n in 1:N
         @loop grad[Tuple(I)..., n] = ∂(n, I, field) over I ∈ inside(field)
+        # @inside grad[Tuple(I)..., n] = ∂(n, I, field) 
     end
     return grad
 end

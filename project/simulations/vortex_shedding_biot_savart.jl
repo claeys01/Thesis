@@ -75,7 +75,7 @@ end
 if abspath(PROGRAM_FILE) == (@__FILE__) || isinteractive()
 
     # sim = circle_shedding_biot(mem=Array)
-    t_end = 100
+    # t_end = 100
 
     # # sim_gif!(sim;duration=t_end,clims=(-5,5),plotbody=true)
 
@@ -91,25 +91,25 @@ if abspath(PROGRAM_FILE) == (@__FILE__) || isinteractive()
     # time = 1:0.1:t_end # time scale is sim.L/sim.U
     # forces = [get_forces!(sim,t) for t in time];
     
-    time = 1:0.1:t_end # time scale is sim.L/sim.U
-    # @save "data/datasets/biot_forces.jld2" forces
-    @load "data/datasets/biot_forces.jld2" forces;
+    # time = 1:0.1:t_end # time scale is sim.L/sim.U
+    # # @save "data/datasets/biot_forces.jld2" forces
+    # @load "data/datasets/biot_forces.jld2" forces;
 
-    #Plot it
-    drag, lift = first.(forces), last.(forces)
-    plt = plot(time,[drag, lift],
-        labels=["drag" "lift"],
-        colors=[:red, :blue],
-        xlabel="tU/L",
-        ylabel="Pressure force coefficients")
+    # #Plot it
+    # drag, lift = first.(forces), last.(forces)
+    # plt = plot(time,[drag, lift],
+    #     labels=["drag" "lift"],
+    #     colors=[:red, :blue],
+    #     xlabel="tU/L",
+    #     ylabel="Pressure force coefficients")
 
-    zero_idxs = zero_crossing(last.(forces); direction=:rising)
-    println(zero_idxs)
+    # zero_idxs = zero_crossing(last.(forces); direction=:rising)
+    # println(zero_idxs)
     
-    for idx in zero_idxs
-        scatter!(plt, [time[idx]], [lift[idx]]; label=false, color=:black)
-        annotate!(time[idx], lift[idx], (idx, 5, :left))
-    end
+    # for idx in zero_idxs
+    #     scatter!(plt, [time[idx]], [lift[idx]]; label=false, color=:black)
+    #     annotate!(time[idx], lift[idx], (idx, 5, :left))
+    # end
     # annotate!([(4, 0, ("More text", 8, 45.0, :bottom, :red))])
     # display(plt)
     # savefig(plt, "figures/biot_forces.png")

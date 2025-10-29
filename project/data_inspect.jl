@@ -49,6 +49,7 @@ function inspect_RHS_data(path_or_RHS; n::Int=1, seed::Int=42, tmin=-1, tmax=-1,
         @info "Snapshot $(k) (orig index $(inds[k])) stats" flow=flow_stats rhs=rhs_stats
 
         @info "Mean divergence:" flow = mean_divergence(u) RHS = mean_divergence(RHS)
+        @info "Self made divergence function: " flow = mean(divergence(u)) RHS = mean(divergence(RHS))
 
         u_mag = dropdims(sqrt.(sum(u .^ 2, dims=3)), dims=3) 
         RHS_mag = dropdims(sqrt.(sum(RHS .^ 2, dims=3)), dims=3)
@@ -63,6 +64,13 @@ function inspect_RHS_data(path_or_RHS; n::Int=1, seed::Int=42, tmin=-1, tmax=-1,
     # return snapshots, inds
 end
 
+function divergence(field; dx=1.0, dy=1.0)
+    u = field[:, :, 1]
+    v = field[:, :, 2]
+    du_dx = (circshift(u, (-1, 0)) .- circshift(u, (1, 0))) ./ (2dx)
+    dv_dy = (circshift(v, (0, -1)) .- circshift(v, (0, 1))) ./ (2dy)
+    du_dx .+ dv_dy
+end
 
 
 

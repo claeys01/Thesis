@@ -176,13 +176,6 @@ Assumes periodic boundaries (via circshift).
 - field[:,:,2] = v(x,y)
 Returns (Nx, Ny).
 """
-function divergence(field; dx=1.0, dy=1.0)
-    u = field[:, :, 1]
-    v = field[:, :, 2]
-    du_dx = (circshift(u, (-1, 0)) .- circshift(u, (1, 0))) ./ (2dx)
-    dv_dy = (circshift(v, (0, -1)) .- circshift(v, (0, 1))) ./ (2dy)
-    du_dx .+ dv_dy
-end
 
 function divergence_field(u; mean=false, max=false)
     if ndims(u) == 4
@@ -212,6 +205,22 @@ function divergence_field(u; mean=false, max=false)
     end
 end
 
+    
+function div_loss(x̂, λdiv)
+    if ndims(x̂) == 4
+        H, W, C, N = size(x̂)
+        divs = [div_loss(@view(x̂[:,:,:,n]), λdiv) for n in 1:N]
+        divs = cat(divs...; dims=3)  # result has shape (H, W, N)
+
+        return divs
+    elseif ndims(x̂) == 3
+        w, h, _ = size(x̂)
+        div = Matrix(zeros(eltype(x̂), (w,h)))
+        @inside div[I] = WaterLily.div(I, x̂)
+        return div
+    end
+end
+
 
 # losses
 recon_loss(ŷ, x) = mean(abs2, ŷ .- x)                # MSE
@@ -219,7 +228,7 @@ div_loss_L2(u) = mean(abs2, divergence_field(u))     # L2 of divergence field
 
 
 # combined total loss (ŷ = decoder(z) or ae(x))
-function total_loss(encoder, decoder, x; λdiv=0, λdiff=0)
+function total_loss(encoder, decoder, x; λdiv=0)
     ŷ = reconstruct(encoder, decoder, x)
     Lrec = recon_loss(ŷ, x)
     L2div = zero(eltype(Lrec))
