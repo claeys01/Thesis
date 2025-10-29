@@ -39,10 +39,15 @@ function train(; kws...)
     @info "Training on $device"
 
  
-    # initialize encoder and decoder
+    # # initialize encoder and decoder
     encoder = Flux.f32(Encoder(args.input_dim, args.latent_dim; C_next=args.C_conv, padding=args.padding, stride=args.stride)) |> device
     decoder = Flux.f32(Decoder(args.input_dim, args.latent_dim; C_next=args.C_conv)) |> device
 
+    # ck = JLD2.load("data/models/2025-10-29_10-13-36/checkpoint.jld2")
+    # Flux.loadmodel!(encoder, ck["encoder"])
+    # Flux.loadmodel!(decoder, ck["decoder"])
+    # normalizer = ck["normalizer"]
+    
     # define optimizer
     opt_enc = Flux.setup(AdamW(eta=args.η, lambda=args.λ), encoder)
     opt_dec = Flux.setup(AdamW(eta=args.η, lambda=args.λ), decoder)
@@ -54,7 +59,6 @@ function train(; kws...)
     val_losses = Float32[1]
     rec_losses = Float32[]
     div_losses = Float32[]
-    div_diff_losses = Float32[]
     iters = Int[]
     val_iters = Int[0]
     iter = 0
@@ -120,8 +124,9 @@ function train(; kws...)
         JLD2.save(loss_trajectory_path, "train_losses", train_losses,
                                         "rec_losses", rec_losses,
                                         "div_losses", div_losses,
-                                        "div_diff_losses", div_diff_losses,
-                                        "iters", iters)
+                                        "iters", iters, 
+                                        "val_losses", val_losses, 
+                                        "val_iters", val_iters)
                                                      
         @info "Model saved: $(filepath)"
     end
@@ -146,9 +151,9 @@ function train(; kws...)
         if args.λdiv != 0
             plot!(p, iters, div_losses, label="divergence", lw=1, ls=:dot)
         end
-        if args.λdiff != 0
-            plot!(p, iters, div_diff_losses, label="divergence difference", lw=1, ls=:dashdot)
-        end
+        # if args.λdiff != 0
+        #     plot!(p, iters, div_diff_losses, label="divergence difference", lw=1, ls=:dashdot)
+        # end
         png_path = joinpath(save_folder, "loss_evolution.png")
         savefig(p, png_path)
         @info "Saved loss plot to $png_path"
@@ -166,7 +171,7 @@ function training_step(encoder, decoder, x, device, args, normalizer)
         x_dev, _ = normalize_batch(x_dev; normalizer=normalizer)
     end
     loss_tuple, (grad_enc, grad_dec) = Flux.withgradient(encoder, decoder) do enc, dec 
-        total_loss(enc, dec, x_dev; λdiv=args.λdiv, λdiff=args.λdiff) 
+        total_loss(enc, dec, x_dev; λdiv=args.λdiv) 
     end
 
     return loss_tuple, grad_enc, grad_dec
