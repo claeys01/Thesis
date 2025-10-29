@@ -12,7 +12,7 @@ Base.@kwdef mutable struct Args
     λdiv = 0                    # divergence loss weight
     batch_size = 32             # batch size
     downsample = -1             # amount of RHS used for training 
-    epochs = 100                # number of epochs
+    epochs = 1               # number of epochs
     seed = 42                   # random seed
     n_reconstruct = 2           # sampling size for output    
     use_gpu = false             # use GPU

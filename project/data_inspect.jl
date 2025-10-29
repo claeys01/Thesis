@@ -64,19 +64,30 @@ function inspect_RHS_data(path_or_RHS; n::Int=1, seed::Int=42, tmin=-1, tmax=-1,
 end
 
 
+function inspect_mu(path; n::Int=1, seed::Int=42, tmin=-1, tmax=-1, downsample=-1, clip_bc=false, verbose=true)
+    random_RHS, random_flow, inds = get_random_snapshots(path; n=n, seed=seed, tmin=tmin, tmax=tmax, downsample=downsample, clip_bc=clip_bc, verbose=verbose)
+    for k in 1:n
+        flow = random_flow[k]
+
+        plt = flood(flow.μ₀[:,:,2])
+        display(plt)
+    end
+end
+
 
 
 # Convenience CLI-like behaviour when file is run interactively
 if abspath(PROGRAM_FILE) == (@__FILE__) || isinteractive()
     # try to load default file if present
     default_file = "data/datasets/RHS_biot_data_arr_force_period.jld2"
-    println("Inspecting default RHS file: $default_file")
-    inspect_RHS_data(default_file; n=1, seed=42, clip_bc=false, verbose=true)
-    nothing
+    # println("Inspecting default RHS file: $default_file")
+    inspect_mu(default_file)
+
+    # inspect_RHS_data(default_file; n=1, seed=42, clip_bc=false, verbose=true)
+    # nothing
 
     # new_file = "data/RHS_biot_data_arr_new2.jld2"
     # println("Inspecting default RHS file: $new_file")
     # inspect_RHS_data(new_file; n=1, seed=42, clip_bc=false, verbose=true)
-
 
 end
