@@ -29,7 +29,7 @@ function visualize_reconstructions(checkpoint_path::Union{String,Nothing}=nothin
     normalizer = checkpoint["normalizer"]
     args = Args(; checkpoint["args"]...)
     enc = Encoder(args.input_dim, args.latent_dim; C_next=args.C_conv, padding=args.padding, stride=args.stride, verbose=false)
-    dec = Decoder(args.input_dim, args.latent_dim; C_next=args.C_conv, verbose=false)
+    dec = Decoder(args.output_dim, args.latent_dim; C_next=args.C_conv, verbose=false)
     Flux.loadmodel!(enc, encoder_state)
     Flux.loadmodel!(dec, decoder_state)
 
@@ -51,24 +51,19 @@ function visualize_reconstructions(checkpoint_path::Union{String,Nothing}=nothin
         μ₀ = remove_ghosts(RHS_data["μ₀"][ids[s]])
 
         if args.normalize
-            x_norm, _ = normalize_batch(snapshots[:, :, :, s:s], normalizer=normalizer)
-            x̂_norm = reconstruct(enc, dec, x_norm)
+            x_target, _ = normalize_batch(snapshots[:, :, :, s:s], normalizer=normalizer)
+            x_in = cat(x_target, μ₀; dims=3) 
+            x̂_norm = reconstruct(enc, dec, x_in)
             x̂ = denormalize_batch(x̂_norm, normalizer)
-            x = denormalize_batch(x_norm, normalizer)
+            x_target = denormalize_batch(x_target, normalizer)
         else
             x = snapshots[:, :, :, s:s]            # (H,W,C,1)
+            x = cat(x, μ₀; dims=3) 
             x̂ = reconstruct(enc, dec, x)
         end
-        # x = x .* μ₀
-        # plt = flood(μ₀[:,:,1])
-        # display(plt)
-        
-        x = x[:,:,:,1]
-        x̂ = x̂[:,:,:,1]
-        # x̂ = x̂ .* μ₀
 
         for ch in 1:C
-            mat_in = x[:, :, ch]
+            mat_in = x_target[:, :, ch]
             mat_out = x̂[:, :, ch] 
 
             μ = mean(mat_in)
@@ -107,7 +102,7 @@ end
 
 if abspath(PROGRAM_FILE) == (@__FILE__) || isinteractive()
     # visualize_reconstructions("data/saved_models/period_100e_4096n_64l_norm_pooling_ups/checkpoint.jld2")
-    visualize_reconstructions("data/models/2025-10-30_09-40-16/checkpoint.jld2")
+    # visualize_reconstructions("data/models/2025-10-30_12-45-30/checkpoint.jld2")
 
     # checkpoint = JLD2.load("data/models/2025-10-26_16-49-45/checkpoint.jld2")
     # encoder_state = checkpoint["encoder"]

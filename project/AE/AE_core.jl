@@ -13,16 +13,17 @@ Base.@kwdef mutable struct Args
     λmask = 0
     batch_size = 32             # batch size
     downsample = -1             # amount of RHS used for training 
-    epochs = 50               # number of epochs
+    epochs = 100                # number of epochs
     seed = 42                   # random seed
     n_reconstruct = 2           # sampling size for output    
     use_gpu = false             # use GPU
     clip_bc = true              # removes the ghost cells from the snapshot
-    input_dim = (128, 128, 2)   # flow field size
+    input_dim = (128, 128, 4)   # flow field size with μ₀ concatenated
+    output_dim = (128, 128, 2)  # size of reconstructed RHS field
     split = 0.2
-    stride = 2
+    stride = 1
     padding = 1
-    latent_dim = 8^3           # latent dimension
+    latent_dim = 8^3            # latent dimension
     C_conv = 8                  # first amount of channels for convs
     verbose_freq = 5            # logging for every verbose_freq iterations
     normalize = true            # normalise training data
@@ -31,45 +32,60 @@ Base.@kwdef mutable struct Args
 end
 
 
-function get_data(batch_size, path; tmin=-1, tmax=-1, n_samples=500, normalize=false, clip_bc=true, split=0.2)
+function get_data(batch_size, path; tmin=-1, tmax=-1, n_samples=500,
+                  normalize=false, clip_bc=true, split=0.2)
+
     @load path RHS_data
-    downsample_RHS_data!(RHS_data; tmin=tmin, tmax=tmax, n_samples=n_samples, clip_bc=clip_bc)
+    downsample_RHS_data!(RHS_data; tmin=tmin, tmax=tmax,
+                                   n_samples=n_samples, clip_bc=clip_bc)
 
-    # construct data array (H,W,C,N) and cast to Float32
-    X = cat(RHS_data["RHS"]...; dims=4)
-    X = Float32.(X)
+    # X :: (H,W,2,N)
+    X  = cat(RHS_data["RHS"]...; dims=4)
+    X  = Float32.(X)
 
-    # compute normalizer on full dataset (returned always)
+    # μ₀ :: (H,W,1,N), 1 outside; 0 inside
+    μ₀ = cat(RHS_data["μ₀"]...; dims=4)
+    μ₀ = Float32.(μ₀)
+
+    # normalizer from X only (physics channels)
     X_norm, normalizer = normalize_batch(X; normalizer=nothing)
 
-    # split indices into train / val
-    N = size(X, 4)
+    # indices
+    N = size(X,4)
     if N < 2
         error("get_data: need at least 2 samples to create train/validation split (got $N)")
     end
     nval = max(1, Int(round(split * N)))
-    nval = min(nval, N-1)   # ensure at least one train sample
-    @info "Data_split into $(N-nval) training  and $(nval) validation snapshots"
-    perm = randperm(N)
-    val_idx = perm[1:nval]
-    train_idx = perm[(nval+1):end]
+    nval = min(nval, N-1)
+    @info "Data_split into $(N-nval) training and $(nval) validation snapshots"
+    perm     = randperm(N)
+    val_idx  = perm[1:nval]
+    train_idx= perm[(nval+1):end]
 
-    # get the μ₀ field of the training data
-    μ₀ = cat(RHS_data["μ₀"]...; dims=4)
-    μ₀ = Float32.(μ₀)
-
-    # build DataLoaders
     if normalize
-        train_data = (X_norm[:, :, :, train_idx], μ₀[:, :, :, train_idx])
-        val_data = (X_norm[:, :, :, val_idx], μ₀[:, :, :, val_idx])
-        train_loader = DataLoader(train_data, batchsize=batch_size, shuffle=true)
-        val_loader   = DataLoader(val_data,   batchsize=batch_size, shuffle=true)
+        Xin_train = cat(X_norm[:,:,:,train_idx], μ₀[:,:,:,train_idx]; dims=3) # (u,v,mask)
+        Xin_val   = cat(X_norm[:,:,:,val_idx],   μ₀[:,:,:,val_idx];   dims=3)
+
+        Xtarget_train = X_norm[:,:,:,train_idx]  # (u,v)
+        Xtarget_val   = X_norm[:,:,:,val_idx]
+
+        μ₀_train = μ₀[:,:,:,train_idx]
+        μ₀_val   = μ₀[:,:,:,val_idx]
     else
-        train_data = (X[:, :, :, train_idx], μ₀[:, :, :, train_idx])
-        val_data = (X[:, :, :, val_idx], μ₀[:, :, :, val_idx])
-        train_loader = DataLoader(train_data, batchsize=batch_size, shuffle=true)
-        val_loader   = DataLoader(val_data,   batchsize=batch_size, shuffle=true)
+        Xin_train = cat(X[:,:,:,train_idx], μ₀[:,:,:,train_idx]; dims=3)
+        Xin_val   = cat(X[:,:,:,val_idx],   μ₀[:,:,:,val_idx];   dims=3)
+
+        Xtarget_train = X[:,:,:,train_idx]
+        Xtarget_val   = X[:,:,:,val_idx]
+
+        μ₀_train = μ₀[:,:,:,train_idx]
+        μ₀_val   = μ₀[:,:,:,val_idx]
     end
+
+    train_loader = DataLoader((Xin_train, Xtarget_train, μ₀_train),
+                              batchsize=batch_size, shuffle=true)
+    val_loader   = DataLoader((Xin_val,   Xtarget_val,   μ₀_val),
+                              batchsize=batch_size, shuffle=true)
 
     return train_loader, val_loader, normalizer
 end
@@ -82,7 +98,7 @@ end
 
 Flux.@layer Encoder
 
-Encoder(input_size::Tuple{Int,Int, Int}, latent_dim::Int; C_next::Int=4, padding=1, stride=2, verbose::Bool=true) = begin
+Encoder(input_size::Tuple{Int, Int, Int}, latent_dim::Int; C_next::Int=4, padding=1, stride=2, verbose::Bool=true) = begin
     H, W, C = input_size
 
     convpart = Chain(
@@ -275,26 +291,45 @@ end
 recon_loss(ŷ, x) = mean(abs2, ŷ .- x)                # MSE
 div_loss_L2(u) = mean(abs2, divergence_field(u))     # L2 of divergence field
 
+
+function Lrec_charbonnier(x, x̂; eps=1f-4)
+    Δ = (x̂ .- x) 
+    mean(sqrt.(Δ.^2 .+ eps^2))
+end
+
+function Lrec_charbonnier_mask(x, x̂, μ₀; eps=1f-4)
+    Δ = (x̂ .- x).*μ₀ 
+    mean(sqrt.(Δ.^2 .+ eps^2))
+end
+
 function masked_loss(x, x̂, μ₀)
     outside = μ₀
     inside = 1f0 .- μ₀
+    boundary = outside .* inside
     # Lrec = recon_loss(x̂ .* outside, x)
-    Lrec = mean(abs2, (x̂ .- x) .* outside)  
-    Linside = mean(abs2, x̂ .* inside)
+    Lrec = Lrec_charbonnier_mask(x, x̂, outside; eps=1f-4)
+    Linside = mean(abs, (x̂ .- x) .* boundary)
     # Linside = 0
     return Lrec, Linside
 end
 
 
 # combined total loss (x̂ = decoder(z) or ae(x))
-function total_loss(encoder::Encoder, decoder::Decoder, x::AbstractArray, μ₀::AbstractArray; λdiv=0, λmask=0)
-    x̂ = reconstruct(encoder, decoder, x)
+function total_loss(encoder::Encoder,
+                    decoder::Decoder,
+                    x_in::AbstractArray,        # (u,v,mask)
+                    x_target::AbstractArray,    # (u,v)
+                    μ₀::AbstractArray;          # (H,W,1,B)  1 outside / 0 inside
+                    λdiv=0f0,
+                    λmask=0f0)    
+    x̂ = reconstruct(encoder, decoder, x_in)
     # Lrec = recon_loss(x̂, x)
 
     if λmask != 0
-        Lrec, Linside = masked_loss(x, x̂, μ₀)
+        Lrec, Linside = masked_loss(x_target, x̂, μ₀)
     else
-        Lrec = recon_loss(x̂, x)
+        # Lrec = recon_loss(x̂, x_target)
+        Lrec = Lrec_charbonnier(x_target, x̂)
         Linside = zero(eltype(Lrec))
     end
     L2div = zero(eltype(Lrec))

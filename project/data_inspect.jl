@@ -72,8 +72,8 @@ function inspect_mu(path; n::Int=1, seed::Int=42, tmin=-1, tmax=-1, downsample=-
         μ₀ = remove_ghosts(flow.μ₀)
         outside = μ₀
         inside = 1f0 .- μ₀
-
-        plt = flood(inside[:,:,2])
+        boundary = outside .* inside
+        plt = flood(boundary[:,:,2])
         display(plt)
     end
 end
@@ -87,7 +87,7 @@ if abspath(PROGRAM_FILE) == (@__FILE__) || isinteractive()
     # println("Inspecting default RHS file: $default_file")
     inspect_mu(default_file)
 
-    inspect_RHS_data(default_file; n=1, seed=42, clip_bc=false, verbose=true)
+    # inspect_RHS_data(default_file; n=1, seed=42, clip_bc=false, verbose=true)
     # nothing
 
     # new_file = "data/RHS_biot_data_arr_new2.jld2"

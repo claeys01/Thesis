@@ -41,7 +41,7 @@ function train(; kws...)
  
     # # initialize encoder and decoder
     encoder = Flux.f32(Encoder(args.input_dim, args.latent_dim; C_next=args.C_conv, padding=args.padding, stride=args.stride)) |> device
-    decoder = Flux.f32(Decoder(args.input_dim, args.latent_dim; C_next=args.C_conv)) |> device
+    decoder = Flux.f32(Decoder(args.output_dim, args.latent_dim; C_next=args.C_conv)) |> device
 
     # ck = JLD2.load("data/models/2025-10-29_10-13-36/checkpoint.jld2")
     # Flux.loadmodel!(encoder, ck["encoder"])
@@ -71,8 +71,9 @@ function train(; kws...)
         @info "Epoch $(epoch)"
         train_progress = Progress(length(train_loader); desc="Training")
         # ---- TRAIN ----
-        for (x, μ₀) in train_loader
-            loss_tuple, grad_enc, grad_dec = training_step(encoder, decoder, x, μ₀, device, args, normalizer)
+        for (x_in, x_target, μ₀) in train_loader
+            # println(size(x_in))
+            loss_tuple, grad_enc, grad_dec = training_step(encoder, decoder, x_in, x_target, μ₀, device, args, normalizer)
             loss_total, (Lrec, Linside, L2div) = loss_tuple
             
             Flux.update!(opt_enc, encoder, grad_enc)
@@ -98,8 +99,8 @@ function train(; kws...)
         n_val   = 0
 
 
-        for (xval, μ₀) in validation_loader
-            val_loss_tuple, _, _ = training_step(encoder, decoder, xval, μ₀, device, args, normalizer)
+        for (x_in_val, x_target_val, μ₀_val) in validation_loader
+            val_loss_tuple, _, _ = training_step(encoder, decoder, x_in_val, x_target_val, μ₀_val, device, args, normalizer)
             val_loss_total, _ = val_loss_tuple
             val_sum += val_loss_total
             n_val   += 1
@@ -169,16 +170,32 @@ function train(; kws...)
     end
 end
 
-function training_step(encoder, decoder, x, μ₀, device, args, normalizer)
+function training_step(encoder, decoder, x_in, x_target, μ₀, device, args, normalizer)
     # # Move to GPU/CPU
-    x_dev = device(x)
+    x_in_dev      = device(x_in)
+    x_target_dev  = device(x_target)
+    μ₀_dev        = device(μ₀)
 
     # # Optional normalization
     if args.normalize
-        x_dev, _ = normalize_batch(x_dev; normalizer=normalizer)
+        # x_in_dev = (u,v,mask)
+        # normalize u,v, leave mask alone:
+        uvmask = x_in_dev
+        uvc    = uvmask[:, :, 1:2, :]                # u,v
+        uvc_norm, _ = normalize_batch(uvc; normalizer=normalizer)
+
+        x_in_dev = cat(uvc_norm, uvmask[:, :, 3:4, :]; dims=3)
+        x_target_dev, _ = normalize_batch(x_target_dev; normalizer=normalizer)
+
     end
+    # println(size(x_target_dev))
     loss_tuple, (grad_enc, grad_dec) = Flux.withgradient(encoder, decoder) do enc, dec 
-        total_loss(enc, dec, x_dev, μ₀; λdiv=args.λdiv, λmask=args.λmask) 
+        total_loss(enc, dec,
+                       x_in_dev,
+                       x_target_dev,
+                       μ₀_dev;
+                       λdiv=args.λdiv,
+                       λmask=args.λmask) 
     end
 
     return loss_tuple, grad_enc, grad_dec
