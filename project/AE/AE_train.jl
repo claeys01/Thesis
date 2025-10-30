@@ -59,6 +59,7 @@ function train(; kws...)
     val_losses = Float32[1]
     rec_losses = Float32[]
     div_losses = Float32[]
+    inside_losses = Float32[]
     iters = Int[]
     val_iters = Int[0]
     iter = 0
@@ -70,10 +71,10 @@ function train(; kws...)
         @info "Epoch $(epoch)"
         train_progress = Progress(length(train_loader); desc="Training")
         # ---- TRAIN ----
-        for x in train_loader
-            loss_tuple, grad_enc, grad_dec = training_step(encoder, decoder, x, device, args, normalizer)
-            loss_total, (Lrec, L2div) = loss_tuple
-
+        for (x, μ₀) in train_loader
+            loss_tuple, grad_enc, grad_dec = training_step(encoder, decoder, x, μ₀, device, args, normalizer)
+            loss_total, (Lrec, Linside, L2div) = loss_tuple
+            
             Flux.update!(opt_enc, encoder, grad_enc)
             Flux.update!(opt_dec, decoder, grad_dec)
 
@@ -83,6 +84,8 @@ function train(; kws...)
             push!(train_losses, Float32(loss_total))
             push!(rec_losses, Float32(Lrec))
             push!(div_losses, Float32(L2div))
+            push!(inside_losses, Float32(Linside))
+
 
             # progress meter
             next!(train_progress; showvalues=[(:loss, loss_total)]) 
@@ -95,8 +98,8 @@ function train(; kws...)
         n_val   = 0
 
 
-        for xval in validation_loader
-            val_loss_tuple, _, _ = training_step(encoder, decoder, xval, device, args, normalizer)
+        for (xval, μ₀) in validation_loader
+            val_loss_tuple, _, _ = training_step(encoder, decoder, xval, μ₀, device, args, normalizer)
             val_loss_total, _ = val_loss_tuple
             val_sum += val_loss_total
             n_val   += 1
@@ -124,6 +127,7 @@ function train(; kws...)
         JLD2.save(loss_trajectory_path, "train_losses", train_losses,
                                         "rec_losses", rec_losses,
                                         "div_losses", div_losses,
+                                        "inside_losses", inside_losses,
                                         "iters", iters, 
                                         "val_losses", val_losses, 
                                         "val_iters", val_iters)
@@ -151,9 +155,12 @@ function train(; kws...)
         if args.λdiv != 0
             plot!(p, iters, div_losses, label="divergence", lw=1, ls=:dot)
         end
-        # if args.λdiff != 0
-        #     plot!(p, iters, div_diff_losses, label="divergence difference", lw=1, ls=:dashdot)
-        # end
+
+        if args.λmask !=0
+            plot!(p, iters, inside_losses, label="inside", lw=1, ls=:dashdot)
+        end
+
+
         png_path = joinpath(save_folder, "loss_evolution.png")
         savefig(p, png_path)
         @info "Saved loss plot to $png_path"
@@ -162,7 +169,7 @@ function train(; kws...)
     end
 end
 
-function training_step(encoder, decoder, x, device, args, normalizer)
+function training_step(encoder, decoder, x, μ₀, device, args, normalizer)
     # # Move to GPU/CPU
     x_dev = device(x)
 
@@ -171,7 +178,7 @@ function training_step(encoder, decoder, x, device, args, normalizer)
         x_dev, _ = normalize_batch(x_dev; normalizer=normalizer)
     end
     loss_tuple, (grad_enc, grad_dec) = Flux.withgradient(encoder, decoder) do enc, dec 
-        total_loss(enc, dec, x_dev; λdiv=args.λdiv) 
+        total_loss(enc, dec, x_dev, μ₀; λdiv=args.λdiv, λmask=args.λmask) 
     end
 
     return loss_tuple, grad_enc, grad_dec

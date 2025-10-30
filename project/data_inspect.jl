@@ -36,6 +36,7 @@ function inspect_RHS_data(path_or_RHS; n::Int=1, seed::Int=42, tmin=-1, tmax=-1,
         # collect stats
         flow_stats = Dict{String,NamedTuple}()
         rhs_stats  = Dict{String,NamedTuple}()
+
         for comp in 1:2
             u_comp = u[:,:,comp]; RHS_comp = RHS[:,:,comp]
             flow_stats[comps[comp]] = (mean=mean(u_comp),  std=std(u_comp))
@@ -65,11 +66,14 @@ end
 
 
 function inspect_mu(path; n::Int=1, seed::Int=42, tmin=-1, tmax=-1, downsample=-1, clip_bc=false, verbose=true)
-    random_RHS, random_flow, inds = get_random_snapshots(path; n=n, seed=seed, tmin=tmin, tmax=tmax, downsample=downsample, clip_bc=clip_bc, verbose=verbose)
+    random_RHS, random_flow, inds = get_random_snapshots(path; n=2, seed=seed, tmin=tmin, tmax=tmax, downsample=downsample, clip_bc=clip_bc, verbose=verbose)
     for k in 1:n
         flow = random_flow[k]
+        μ₀ = remove_ghosts(flow.μ₀)
+        outside = μ₀
+        inside = 1f0 .- μ₀
 
-        plt = flood(flow.μ₀[:,:,2])
+        plt = flood(inside[:,:,2])
         display(plt)
     end
 end
@@ -83,7 +87,7 @@ if abspath(PROGRAM_FILE) == (@__FILE__) || isinteractive()
     # println("Inspecting default RHS file: $default_file")
     inspect_mu(default_file)
 
-    # inspect_RHS_data(default_file; n=1, seed=42, clip_bc=false, verbose=true)
+    inspect_RHS_data(default_file; n=1, seed=42, clip_bc=false, verbose=true)
     # nothing
 
     # new_file = "data/RHS_biot_data_arr_new2.jld2"

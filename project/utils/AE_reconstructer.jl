@@ -36,16 +36,19 @@ function visualize_reconstructions(checkpoint_path::Union{String,Nothing}=nothin
     # optional seeding
     args.seed > 0 && Random.seed!(args.seed)
 
-    @load args.data_path RHS_data
+    # @load args.data_path RHS_data
     snapshots, _, ids = get_random_snapshots(args.data_path; n=args.n_reconstruct, downsample=args.downsample)
+
+    @load "data/datasets/128_RHS_biot_data_arr_force_period.jld2" RHS_data
+    
 
     _, _, C, nn = size(snapshots)
     @info "Selected snapshot indices for reconstruction: $ids"
-
     # prepare plotting grid: each sample has C rows; two columns (input, recon)
     plots = []
     dirs = ["x" , "y"]
     for s in 1:nn
+        μ₀ = remove_ghosts(RHS_data["μ₀"][ids[s]])
 
         if args.normalize
             x_norm, _ = normalize_batch(snapshots[:, :, :, s:s], normalizer=normalizer)
@@ -56,10 +59,17 @@ function visualize_reconstructions(checkpoint_path::Union{String,Nothing}=nothin
             x = snapshots[:, :, :, s:s]            # (H,W,C,1)
             x̂ = reconstruct(enc, dec, x)
         end
+        # x = x .* μ₀
+        # plt = flood(μ₀[:,:,1])
+        # display(plt)
+        
+        x = x[:,:,:,1]
+        x̂ = x̂[:,:,:,1]
+        # x̂ = x̂ .* μ₀
 
         for ch in 1:C
-            mat_in = x[:, :, ch, 1]
-            mat_out = x̂[:, :, ch, 1]
+            mat_in = x[:, :, ch]
+            mat_out = x̂[:, :, ch] 
 
             μ = mean(mat_in)
             σ = std(mat_in)
@@ -96,6 +106,8 @@ function visualize_reconstructions(checkpoint_path::Union{String,Nothing}=nothin
 end
 
 if abspath(PROGRAM_FILE) == (@__FILE__) || isinteractive()
+    # visualize_reconstructions("data/saved_models/period_100e_4096n_64l_norm_pooling_ups/checkpoint.jld2")
+    visualize_reconstructions("data/models/2025-10-30_09-40-16/checkpoint.jld2")
 
     # checkpoint = JLD2.load("data/models/2025-10-26_16-49-45/checkpoint.jld2")
     # encoder_state = checkpoint["encoder"]

@@ -10,23 +10,24 @@ Base.@kwdef mutable struct Args
     η = 1e-3                    # learning rate
     λ = 1e-4                    # regularization paramater
     λdiv = 0                    # divergence loss weight
+    λmask = 0
     batch_size = 32             # batch size
     downsample = -1             # amount of RHS used for training 
-    epochs = 1               # number of epochs
+    epochs = 50               # number of epochs
     seed = 42                   # random seed
     n_reconstruct = 2           # sampling size for output    
     use_gpu = false             # use GPU
     clip_bc = true              # removes the ghost cells from the snapshot
     input_dim = (128, 128, 2)   # flow field size
     split = 0.2
-    stride = 1
+    stride = 2
     padding = 1
     latent_dim = 8^3           # latent dimension
     C_conv = 8                  # first amount of channels for convs
     verbose_freq = 5            # logging for every verbose_freq iterations
     normalize = true            # normalise training data
     save_path = "data/models"   # results path
-    data_path = "data/datasets/RHS_biot_data_arr_force_period.jld2"
+    data_path = "data/datasets/128_RHS_biot_data_arr_force_period.jld2"
 end
 
 
@@ -53,13 +54,21 @@ function get_data(batch_size, path; tmin=-1, tmax=-1, n_samples=500, normalize=f
     val_idx = perm[1:nval]
     train_idx = perm[(nval+1):end]
 
+    # get the μ₀ field of the training data
+    μ₀ = cat(RHS_data["μ₀"]...; dims=4)
+    μ₀ = Float32.(μ₀)
+
     # build DataLoaders
     if normalize
-        train_loader = DataLoader(X_norm[:, :, :, train_idx], batchsize=batch_size, shuffle=true)
-        val_loader   = DataLoader(X_norm[:, :, :, val_idx],   batchsize=batch_size, shuffle=false)
+        train_data = (X_norm[:, :, :, train_idx], μ₀[:, :, :, train_idx])
+        val_data = (X_norm[:, :, :, val_idx], μ₀[:, :, :, val_idx])
+        train_loader = DataLoader(train_data, batchsize=batch_size, shuffle=true)
+        val_loader   = DataLoader(val_data,   batchsize=batch_size, shuffle=true)
     else
-        train_loader = DataLoader(X[:, :, :, train_idx], batchsize=batch_size, shuffle=true)
-        val_loader   = DataLoader(X[:, :, :, val_idx],   batchsize=batch_size, shuffle=false)
+        train_data = (X[:, :, :, train_idx], μ₀[:, :, :, train_idx])
+        val_data = (X[:, :, :, val_idx], μ₀[:, :, :, val_idx])
+        train_loader = DataLoader(train_data, batchsize=batch_size, shuffle=true)
+        val_loader   = DataLoader(val_data,   batchsize=batch_size, shuffle=true)
     end
 
     return train_loader, val_loader, normalizer
@@ -96,20 +105,34 @@ Encoder(input_size::Tuple{Int,Int, Int}, latent_dim::Int; C_next::Int=4, padding
     return Encoder(Chain(convpart, Dense(dense_in, latent_dim)))
 end
 
-# Encoder(input_size::Tuple{Int,Int, Int}, latent_dim::Int; C_next::Int=4, padding=1, stride=2) = begin
+# Encoder(input_size::Tuple{Int,Int, Int}, latent_dim::Int; C_next::Int=4, padding=1, stride=2, verbose::Bool=true) = begin
 #     H, W, C = input_size
 
 #     convpart = Chain(
-#         Conv((3,3), C           => C_next,   identity; pad=padding, stride=stride), relu,
-#         Conv((3,3), C_next      => 2C_next,  identity; pad=padding, stride=stride), relu,
-#         Conv((3,3), 2C_next     => 4C_next,  identity; pad=padding, stride=stride), relu,
-#         Conv((3,3), 4C_next     => 8C_next,  identity; pad=padding, stride=stride), relu,
+#         # level 1: H,W -> H/2,W/2
+#         Conv((3,3), C        => C_next,   relu; pad=padding, stride=2),
+#         Conv((3,3), C_next   => C_next,   relu; pad=padding, stride=1),
+
+#         # level 2: H/2 -> H/4
+#         Conv((3,3), C_next   => 2C_next,  relu; pad=padding, stride=2),
+#         Conv((3,3), 2C_next  => 2C_next,  relu; pad=padding, stride=1),
+
+#         # level 3: H/4 -> H/8
+#         Conv((3,3), 2C_next  => 4C_next,  relu; pad=padding, stride=2),
+#         Conv((3,3), 4C_next  => 4C_next,  relu; pad=padding, stride=1),
+
+#         # level 4: H/8 -> H/16
+#         Conv((3,3), 4C_next  => 8C_next,  relu; pad=padding, stride=2),
+#         Conv((3,3), 8C_next  => 8C_next,  relu; pad=padding, stride=1),
+
 #         Flux.flatten
 #     )
 #     dummy = zeros(Float32, H, W, C, 1)
 #     flat = convpart(dummy)
 #     dense_in = size(flat, 1)
-#     @info "Initialize Encoder with $(dense_in) connected nodes and $(latent_dim) latent dimensions"
+#     if verbose
+#         @info "Initialize Encoder with $(dense_in) connected nodes and $(latent_dim) latent dimensions"
+#     end
 #     return Encoder(Chain(convpart, Dense(dense_in, latent_dim)))
 # end
 
@@ -252,21 +275,40 @@ end
 recon_loss(ŷ, x) = mean(abs2, ŷ .- x)                # MSE
 div_loss_L2(u) = mean(abs2, divergence_field(u))     # L2 of divergence field
 
+function masked_loss(x, x̂, μ₀)
+    outside = μ₀
+    inside = 1f0 .- μ₀
+    # Lrec = recon_loss(x̂ .* outside, x)
+    Lrec = mean(abs2, (x̂ .- x) .* outside)  
+    Linside = mean(abs2, x̂ .* inside)
+    # Linside = 0
+    return Lrec, Linside
+end
 
-# combined total loss (ŷ = decoder(z) or ae(x))
-function total_loss(encoder, decoder, x; λdiv=0)
-    ŷ = reconstruct(encoder, decoder, x)
-    Lrec = recon_loss(ŷ, x)
+
+# combined total loss (x̂ = decoder(z) or ae(x))
+function total_loss(encoder::Encoder, decoder::Decoder, x::AbstractArray, μ₀::AbstractArray; λdiv=0, λmask=0)
+    x̂ = reconstruct(encoder, decoder, x)
+    # Lrec = recon_loss(x̂, x)
+
+    if λmask != 0
+        Lrec, Linside = masked_loss(x, x̂, μ₀)
+    else
+        Lrec = recon_loss(x̂, x)
+        Linside = zero(eltype(Lrec))
+    end
     L2div = zero(eltype(Lrec))
     if λdiv != 0
         try
             # If divergence computation fails on GPU we skip it (avoid CPU/GPU mix)
-            L2div = div_loss_L2(ŷ)
+            L2div = div_loss_L2(x̂)
         catch e
             @warn "div_loss_L2 failed (likely GPU/CPU mismatch). skipping divergence loss: $e"
             L2div = zero(eltype(Lrec))
         end
     end
-    return Lrec + λdiv * L2div, (Lrec, L2div)
+    
+
+    return Lrec + λdiv * L2div + λmask * Linside, (Lrec, Linside, L2div)
 end
 

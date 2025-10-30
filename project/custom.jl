@@ -23,8 +23,7 @@ function RHS(flow::Flow{N};λ=WaterLily.quick,kwargs...) where N
 end
 
 function remove_ghosts(snapshot::AbstractArray)
-        return snapshot[2:end-1, 2:end-1, :]
-    return out
+    return snapshot[2:end-1, 2:end-1, :]
 end
 
 function downsample_RHS_data!(RHS_data; tmin=-1, tmax=-1, n_samples=-1, clip_bc=false, verbose=true)
@@ -49,8 +48,13 @@ function downsample_RHS_data!(RHS_data; tmin=-1, tmax=-1, n_samples=-1, clip_bc=
     RHS_data["time"] = RHS_data["time"][final_indices]
     RHS_data["Δt"] = RHS_data["Δt"][final_indices]
     RHS_data["RHS"] = RHS_data["RHS"][final_indices]
+
     if haskey(RHS_data, "flow")
         RHS_data["flow"] = RHS_data["flow"][final_indices]
+    end
+
+    if haskey(RHS_data, "μ₀")
+        RHS_data["μ₀"] = RHS_data["μ₀"][final_indices]
     end
 
     if clip_bc
@@ -58,9 +62,9 @@ function downsample_RHS_data!(RHS_data; tmin=-1, tmax=-1, n_samples=-1, clip_bc=
         for (i, RHS) in enumerate(RHS_data["RHS"])
             RHS_data["RHS"][i] = remove_ghosts(RHS)
         end
-        if haskey(RHS_data, "flow")
-            for (i, flow) in enumerate(RHS_data["flow"])
-                RHS_data["flow"][i] = remove_ghosts(flow.u)
+        if haskey(RHS_data, "μ₀")
+            for (j, mask) in enumerate(RHS_data["μ₀"])
+                RHS_data["μ₀"][j] = remove_ghosts(mask)
             end
         end
     end

@@ -17,6 +17,7 @@ function data_run(sim::AbstractSimulation, time_max, save_path; sample_instance=
         "time"  => Any[],
         "Δt"    => Any[],
         "flow"  => Any[],
+        "μ₀"    => Any[],
         "force" => Any[],
     )
     sample_counter = 0
@@ -30,6 +31,7 @@ function data_run(sim::AbstractSimulation, time_max, save_path; sample_instance=
             print("Sampling RHS - ")
             push!(data["force"], force)
             push!(data["flow"], sim.flow)
+            push!(data["μ₀"], sim.flow.μ₀)
             push!(data["RHS"], RHS(sim.flow))
             push!(data["time"], Float32(round(sim_time(sim),digits=4)))
             push!(data["Δt"], Float32(round(sim.flow.Δt[end], digits=3)))
@@ -70,9 +72,9 @@ function data_run(sim::AbstractSimulation, time_max, save_path; sample_instance=
     return data
 end
 
-# RHS_data = data_run(sim_shedding, t_end, "data/RHS_biot_data_arr_force.jld2"; verbose=true, sample_single_period=true)
+RHS_data = data_run(sim_shedding, t_end, "data/datasets/128_RHS_biot_data_arr_force.jld2"; verbose=true, sample_single_period=true)
 
-@load "data/RHS_biot_data_arr_force.jld2" RHS_data
+# @load "data/RHS_biot_data_arr_force.jld2" RHS_data
 
 forces = RHS_data["force"]
 time = RHS_data["time"]
