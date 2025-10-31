@@ -13,7 +13,7 @@ Base.@kwdef mutable struct Args
     λmask = 0                   # weight of body mask loss
     batch_size = 32             # batch size
     downsample = -1             # amount of RHS used for training 
-    epochs = 100                # number of epochs
+    epochs = 110                # number of epochs
     seed = 42                   # random seed
     n_reconstruct = 2           # sampling size for output    
     use_gpu = false             # use GPU
@@ -121,37 +121,6 @@ Encoder(input_size::Tuple{Int, Int, Int}, latent_dim::Int; C_next::Int=4, paddin
     return Encoder(Chain(convpart, Dense(dense_in, latent_dim)))
 end
 
-# Encoder(input_size::Tuple{Int,Int, Int}, latent_dim::Int; C_next::Int=4, padding=1, stride=2, verbose::Bool=true) = begin
-#     H, W, C = input_size
-
-#     convpart = Chain(
-#         # level 1: H,W -> H/2,W/2
-#         Conv((3,3), C        => C_next,   relu; pad=padding, stride=2),
-#         Conv((3,3), C_next   => C_next,   relu; pad=padding, stride=1),
-
-#         # level 2: H/2 -> H/4
-#         Conv((3,3), C_next   => 2C_next,  relu; pad=padding, stride=2),
-#         Conv((3,3), 2C_next  => 2C_next,  relu; pad=padding, stride=1),
-
-#         # level 3: H/4 -> H/8
-#         Conv((3,3), 2C_next  => 4C_next,  relu; pad=padding, stride=2),
-#         Conv((3,3), 4C_next  => 4C_next,  relu; pad=padding, stride=1),
-
-#         # level 4: H/8 -> H/16
-#         Conv((3,3), 4C_next  => 8C_next,  relu; pad=padding, stride=2),
-#         Conv((3,3), 8C_next  => 8C_next,  relu; pad=padding, stride=1),
-
-#         Flux.flatten
-#     )
-#     dummy = zeros(Float32, H, W, C, 1)
-#     flat = convpart(dummy)
-#     dense_in = size(flat, 1)
-#     if verbose
-#         @info "Initialize Encoder with $(dense_in) connected nodes and $(latent_dim) latent dimensions"
-#     end
-#     return Encoder(Chain(convpart, Dense(dense_in, latent_dim)))
-# end
-
 
 function (encoder::Encoder)(x)
     z = encoder.layers(x)
@@ -170,29 +139,6 @@ end
 
 Flux.@layer Decoder
 
-
-# Decoder(output_size::Tuple{Int,Int, Int}, latent_dim::Int; C_next::Int=4, verbose::Bool=true) = begin
-#     H, W, C = output_size
-#     # after four 2x2 downsamples: h_out = H ÷ 16, w_out = W ÷ 16
-
-#     h_lat = div(H, 16)
-#     w_lat = div(W, 16)
-#     channels_mid = 8 * C_next
-#     dense_len = h_lat * w_lat * channels_mid
-    
-#     verbose && @info "Initialize Decoder with $(dense_len) connected nodes and $(latent_dim) latent dimensions"
-    
-
-#     return Decoder(Chain(
-#         Dense(latent_dim, dense_len),
-#         x -> reshape(x, h_lat, w_lat, channels_mid, size(x, 2)),
-#         ConvTranspose((2, 2), 8*C_next => 4*C_next, relu; stride=(2, 2), pad=(0, 0)),
-#         ConvTranspose((2, 2), 4*C_next => 2*C_next, relu; stride=(2, 2), pad=(0, 0)),
-#         ConvTranspose((2, 2), 2*C_next => C_next,   relu; stride=(2, 2), pad=(0, 0)),
-#         ConvTranspose((2, 2), C_next   => C, relu; stride=(2, 2), pad=(0, 0)),
-#         ConvTranspose((3, 3), C => C, identity; stride=(1, 1), pad=(1, 1))
-#     ))
-# end
 
 function upsample2(x)
     H, W, C, N = size(x)

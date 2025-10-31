@@ -87,7 +87,7 @@ if abspath(PROGRAM_FILE) == (@__FILE__) || isinteractive()
     # println("Inspecting default RHS file: $default_file")
     inspect_mu(default_file)
 
-    # inspect_RHS_data(default_file; n=1, seed=42, clip_bc=false, verbose=true)
+    inspect_RHS_data(default_file; n=1, seed=42, clip_bc=false, verbose=true)
     # nothing
 
     # new_file = "data/RHS_biot_data_arr_new2.jld2"
