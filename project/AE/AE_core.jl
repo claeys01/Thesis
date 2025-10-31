@@ -7,10 +7,10 @@ using MLUtils: DataLoader
 includet("../utils/AE_normalizer.jl")
 
 Base.@kwdef mutable struct Args
-    η = 1e-3                    # learning rate
+    η = 5e-3                    # learning rate
     λ = 1e-4                    # regularization paramater
     λdiv = 0                    # divergence loss weight
-    λmask = 0
+    λmask = 0                   # weight of body mask loss
     batch_size = 32             # batch size
     downsample = -1             # amount of RHS used for training 
     epochs = 100                # number of epochs
@@ -23,7 +23,7 @@ Base.@kwdef mutable struct Args
     split = 0.2
     stride = 1
     padding = 1
-    latent_dim = 8^3            # latent dimension
+    latent_dim = 8^2            # latent dimension
     C_conv = 8                  # first amount of channels for convs
     verbose_freq = 5            # logging for every verbose_freq iterations
     normalize = true            # normalise training data
@@ -292,9 +292,14 @@ recon_loss(ŷ, x) = mean(abs2, ŷ .- x)                # MSE
 div_loss_L2(u) = mean(abs2, divergence_field(u))     # L2 of divergence field
 
 
-function Lrec_charbonnier(x, x̂; eps=1f-4)
+# function Lrec_charbonnier(x, x̂; eps=1f-10)
+#     Δ = (x̂ .- x) 
+#     mean(sqrt.(Δ.^2 .+ eps^2))
+# end
+
+function Lrec_charbonnier(x, x̂; eps=1f-10)
     Δ = (x̂ .- x) 
-    mean(sqrt.(Δ.^2 .+ eps^2))
+    mean(abs2, (Δ))
 end
 
 function Lrec_charbonnier_mask(x, x̂, μ₀; eps=1f-4)

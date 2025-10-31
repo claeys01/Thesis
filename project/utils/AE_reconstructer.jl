@@ -64,7 +64,8 @@ function visualize_reconstructions(checkpoint_path::Union{String,Nothing}=nothin
 
         for ch in 1:C
             mat_in = x_target[:, :, ch]
-            mat_out = x̂[:, :, ch] 
+            mat_out = x̂[:, :, ch] .* μ₀[:, :, ch]
+
 
             μ = mean(mat_in)
             σ = std(mat_in)
@@ -102,7 +103,7 @@ end
 
 if abspath(PROGRAM_FILE) == (@__FILE__) || isinteractive()
     # visualize_reconstructions("data/saved_models/period_100e_4096n_64l_norm_pooling_ups/checkpoint.jld2")
-    # visualize_reconstructions("data/models/2025-10-30_12-45-30/checkpoint.jld2")
+    visualize_reconstructions("data/saved_models/period_100e_4096n_512l_norm_pooling_ups_mu_char/checkpoint.jld2")
 
     # checkpoint = JLD2.load("data/models/2025-10-26_16-49-45/checkpoint.jld2")
     # encoder_state = checkpoint["encoder"]
