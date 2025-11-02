@@ -6,12 +6,13 @@ using Random
 using ProgressMeter
 using Plots
 using Dates
-using CUDA
+# using CUDA
 using DrWatson: struct2dict
 
 includet("../custom.jl")
 includet("AE_core.jl")
 includet("../utils/AE_reconstructer.jl")
+includet("../utils/AE_loss_plot.jl")
 
 
 
@@ -62,6 +63,8 @@ function train(; kws...)
     inside_losses = Float32[]
     iters = Int[]
     val_iters = Int[0]
+    train_corrs = Vector{Float32}[]
+    val_corrs = Vector{Float32}[]
     iter = 0
 
     # training
@@ -74,7 +77,7 @@ function train(; kws...)
         for (x_in, x_target, μ₀) in train_loader
             # println(size(x_in))
             loss_tuple, grad_enc, grad_dec = training_step(encoder, decoder, x_in, x_target, μ₀, device, args, normalizer)
-            loss_total, (Lrec, Linside, L2div) = loss_tuple
+            loss_total, (Lrec, Linside, L2div), corrs = loss_tuple
             
             Flux.update!(opt_enc, encoder, grad_enc)
             Flux.update!(opt_dec, decoder, grad_dec)
@@ -86,6 +89,7 @@ function train(; kws...)
             push!(rec_losses, Float32(Lrec))
             push!(div_losses, Float32(L2div))
             push!(inside_losses, Float32(Linside))
+            push!(train_corrs, corrs )
 
 
             # progress meter
@@ -97,17 +101,21 @@ function train(; kws...)
         # ---- VALIDATION (epoch-level) ----
         val_sum = 0.0
         n_val   = 0
+        val_corr_total = zeros(Float32, 2)
 
 
         for (x_in_val, x_target_val, μ₀_val) in validation_loader
             val_loss_tuple, _, _ = training_step(encoder, decoder, x_in_val, x_target_val, μ₀_val, device, args, normalizer)
-            val_loss_total, _ = val_loss_tuple
+            val_loss_total, _, val_corr = val_loss_tuple
             val_sum += val_loss_total
             n_val   += 1
+            val_corr_total .+= val_corr
         end
         val_mean = Float32(val_sum / max(n_val, 1))
+        val_corr_mean = Float32.(val_corr_total ./ max(n_val, 1))
         push!(val_losses, val_mean)
         push!(val_iters,  iter)      # <— align the validation point to the last train iter of this epoch
+        push!(val_corrs, val_corr_mean)
 
 
     end
@@ -131,7 +139,9 @@ function train(; kws...)
                                         "inside_losses", inside_losses,
                                         "iters", iters, 
                                         "val_losses", val_losses, 
-                                        "val_iters", val_iters)
+                                        "val_iters", val_iters, 
+                                        "train_corrs", train_corrs,
+                                        "val_corrs", val_corrs)
                                                      
         @info "Model saved: $(filepath)"
     end
@@ -147,21 +157,10 @@ function train(; kws...)
         @warn "Failed to save reconstruction plot: $e"
     end
 
-    # plot and save loss evolution
-    try
-        p = plot(iters, train_losses, label="total", xlabel="Iteration", ylabel="Loss", title="Training loss", lw=2)
-        plot!(p, iters, rec_losses, label="reconstruction", lw=1, ls=:dash)
-        plot!(p, val_iters, val_losses, label="total val")
-
-        if args.λdiv != 0
-            plot!(p, iters, div_losses, label="divergence", lw=1, ls=:dot)
-        end
-
-        if args.λmask !=0
-            plot!(p, iters, inside_losses, label="inside", lw=1, ls=:dashdot)
-        end
-
-
+   
+    try    
+         # plot and save loss evolution
+        p = plot_losses(loss_trajectory_path, filepath)
         png_path = joinpath(save_folder, "loss_evolution.png")
         savefig(p, png_path)
         @info "Saved loss plot to $png_path"
@@ -197,6 +196,7 @@ function training_step(encoder, decoder, x_in, x_target, μ₀, device, args, no
                        λdiv=args.λdiv,
                        λmask=args.λmask) 
     end
+
 
     return loss_tuple, grad_enc, grad_dec
 end

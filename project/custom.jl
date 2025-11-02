@@ -167,3 +167,10 @@ function get_4d!(RHS_data::Dict)
     RHS_data["RHS"] = new
     return RHS_data["RHS"]
 end
+
+function field_corr(x, xhat)
+    @assert size(x) == size(xhat)
+    a = vec(x)      # flatten to 1D
+    b = vec(xhat)
+    return cor(a, b)  # Pearson r
+end

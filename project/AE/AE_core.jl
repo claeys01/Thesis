@@ -2,6 +2,7 @@ using Flux
 using NNlib
 using WaterLily
 using Statistics
+using Zygote
 using MLUtils: DataLoader
 
 includet("../utils/AE_normalizer.jl")
@@ -13,7 +14,7 @@ Base.@kwdef mutable struct Args
     λmask = 0                   # weight of body mask loss
     batch_size = 32             # batch size
     downsample = -1             # amount of RHS used for training 
-    epochs = 110                # number of epochs
+    epochs = 100                # number of epochs
     seed = 42                   # random seed
     n_reconstruct = 2           # sampling size for output    
     use_gpu = false             # use GPU
@@ -132,8 +133,8 @@ struct Decoder
     layers::Chain
 end
 
-function (decoder::Decoder)(x)
-    x̂ = decoder.layers(x)
+function (decoder::Decoder)(z)
+    x̂ = decoder.layers(z)
     return x̂
 end
 
@@ -238,15 +239,11 @@ recon_loss(ŷ, x) = mean(abs2, ŷ .- x)                # MSE
 div_loss_L2(u) = mean(abs2, divergence_field(u))     # L2 of divergence field
 
 
-# function Lrec_charbonnier(x, x̂; eps=1f-10)
-#     Δ = (x̂ .- x) 
-#     mean(sqrt.(Δ.^2 .+ eps^2))
-# end
-
 function Lrec_charbonnier(x, x̂; eps=1f-10)
     Δ = (x̂ .- x) 
-    mean(abs2, (Δ))
+    mean(sqrt.(Δ.^2 .+ eps^2))
 end
+
 
 function Lrec_charbonnier_mask(x, x̂, μ₀; eps=1f-4)
     Δ = (x̂ .- x).*μ₀ 
@@ -265,6 +262,36 @@ function masked_loss(x, x̂, μ₀)
 end
 
 
+
+"""
+    field_corr(x, xhat)
+
+Return Pearson correlation coefficient between x and xhat.
+Both can be any N-D array of equal size.
+"""
+function field_corr(x, x̂)
+    @assert size(x) == size(xhat)
+    a = vec(x)      # flatten to 1D
+    b = vec(x̂)
+    return cor(a, b)  # Pearson r
+end
+
+
+function batch_corrs(x, x̂)
+    @assert size(x) == size(x̂)
+    nx, ny, nchan, nbatch = size(x)
+    rbatch = zeros(Float64, nchan, nbatch)
+    for b in 1:nbatch
+        for c in 1:nchan
+            rbatch[c, b] = cor(vec(view(x, :, :, c, b)),
+                               vec(view(x̂, :, :, c, b)))
+        end
+    end
+    return Float32.(mean(rbatch; dims=2)[:])  # average over batch dimension, as Float32
+end
+
+Zygote.@nograd batch_corrs
+
 # combined total loss (x̂ = decoder(z) or ae(x))
 function total_loss(encoder::Encoder,
                     decoder::Decoder,
@@ -275,7 +302,9 @@ function total_loss(encoder::Encoder,
                     λmask=0f0)    
     x̂ = reconstruct(encoder, decoder, x_in)
     # Lrec = recon_loss(x̂, x)
-
+    corrs = batch_corrs(x_target, x̂)
+    # println(size(corrs)) 
+    
     if λmask != 0
         Lrec, Linside = masked_loss(x_target, x̂, μ₀)
     else
@@ -295,6 +324,6 @@ function total_loss(encoder::Encoder,
     end
     
 
-    return Lrec + λdiv * L2div + λmask * Linside, (Lrec, Linside, L2div)
+    return Lrec + λdiv * L2div + λmask * Linside, (Lrec, Linside, L2div), corrs
 end
 
