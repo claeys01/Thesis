@@ -12,8 +12,9 @@ Base.@kwdef mutable struct Args
     λ = 1e-4                    # regularization paramater
     λdiv = 0                    # divergence loss weight
     λmask = 0                   # weight of body mask loss
+    loss = :L1               # loss function for reconstruction loss (:L1, :L2, :charb)
     batch_size = 32             # batch size
-    downsample = -1             # amount of RHS used for training 
+    downsample = 100            # amount of RHS used for training 
     epochs = 100                # number of epochs
     seed = 42                   # random seed
     n_reconstruct = 2           # sampling size for output    
@@ -238,6 +239,17 @@ end
 recon_loss(ŷ, x) = mean(abs2, ŷ .- x)                # MSE
 div_loss_L2(u) = mean(abs2, divergence_field(u))     # L2 of divergence field
 
+function recon_loss(x, x̂; loss=:L2)
+    Lrec = 0.0
+    if loss ==:L1
+        Lrec = mean(abs, x̂ .- x)
+    elseif loss ==:L2
+        Lrec = mean(abs2, x̂ .- x)
+    elseif loss ==:charb
+        Lrec = Lrec_charbonnier(x, x̂)
+    end
+    return Lrec
+end
 
 function Lrec_charbonnier(x, x̂; eps=1f-10)
     Δ = (x̂ .- x) 
@@ -250,11 +262,12 @@ function Lrec_charbonnier_mask(x, x̂, μ₀; eps=1f-4)
     mean(sqrt.(Δ.^2 .+ eps^2))
 end
 
-function masked_loss(x, x̂, μ₀)
+function masked_loss(x, x̂, μ₀; loss=:L2)
     outside = μ₀
     inside = 1f0 .- μ₀
     boundary = outside .* inside
-    # Lrec = recon_loss(x̂ .* outside, x)
+
+
     Lrec = Lrec_charbonnier_mask(x, x̂, outside; eps=1f-4)
     Linside = mean(abs, (x̂ .- x) .* boundary)
     # Linside = 0
@@ -298,30 +311,30 @@ function total_loss(encoder::Encoder,
                     x_in::AbstractArray,        # (u,v,mask)
                     x_target::AbstractArray,    # (u,v)
                     μ₀::AbstractArray;          # (H,W,1,B)  1 outside / 0 inside
+                    loss=:L2,
                     λdiv=0f0,
                     λmask=0f0)    
     x̂ = reconstruct(encoder, decoder, x_in)
-    # Lrec = recon_loss(x̂, x)
+
     corrs = batch_corrs(x_target, x̂)
-    # println(size(corrs)) 
     
+    
+    Linside = zero(Float32)
+    L2div = zero(Float32)
+
     if λmask != 0
-        Lrec, Linside = masked_loss(x_target, x̂, μ₀)
-    else
-        # Lrec = recon_loss(x̂, x_target)
-        Lrec = Lrec_charbonnier(x_target, x̂)
-        Linside = zero(eltype(Lrec))
-    end
-    L2div = zero(eltype(Lrec))
-    if λdiv != 0
+        Lrec, Linside = masked_loss(x_target, x̂, μ₀; loss=loss)
+    elseif λdiv != 0
         try
             # If divergence computation fails on GPU we skip it (avoid CPU/GPU mix)
             L2div = div_loss_L2(x̂)
         catch e
             @warn "div_loss_L2 failed (likely GPU/CPU mismatch). skipping divergence loss: $e"
-            L2div = zero(eltype(Lrec))
         end
+    else
+        Lrec = recon_loss(x_target, x̂; loss=loss)
     end
+    
     
 
     return Lrec + λdiv * L2div + λmask * Linside, (Lrec, Linside, L2div), corrs

@@ -103,9 +103,7 @@ function plot_losses(loss_trajectory_path::AbstractString, checkpoint_path::Abst
         framestyle = :box,
     )
     if final_loss_str != ""
-        # scatter!(p, Float32(maximum(iters)), Float32(last(train_losses)+0.01))
-        annotate!(p, (maximum(iters), last(train_losses)+0.01,
-                    text(final_loss_str, 8, :black, :right)))
+        plot!(p, title = final_loss_str, titlefont = font(10))  # change 10 to desired point size
     end
 
 
@@ -115,11 +113,11 @@ function plot_losses(loss_trajectory_path::AbstractString, checkpoint_path::Abst
     # assume train_corrs is a vector of 2-element vectors (or tuples)
     # first.(train_corrs) and last.(train_corrs) was in your code, keep that
     if !isempty(train_corrs)
-        cc1 = first.(train_corrs)
-        cc2 = last.(train_corrs)
+        cc1 = first.(val_corrs)
+        cc2 = last.(val_corrs)
 
         p2 = twinx()
-        plot!(p2, iters, cc1;
+        plot!(p2, val_iters, cc1;
             label = "CCᵤ",
             lw = 0.8,
             color = :green,
@@ -130,7 +128,7 @@ function plot_losses(loss_trajectory_path::AbstractString, checkpoint_path::Abst
             ytickfont  = font(8),
         )
 
-        plot!(p2, iters, cc2;
+        plot!(p2, val_iters, cc2;
             label = "CCᵥ",
             lw = 0.8,
             color = :magenta,
@@ -156,7 +154,9 @@ function plot_losses(loss_trajectory_path::AbstractString, checkpoint_path::Abst
 
 end
 
-# p = plot_losses("data/models/2025-11-02_13-08-15/loss_trajectory.jld2",
-#                 "data/models/2025-11-02_13-08-15/checkpoint.jld2")
-# display(p)
-# savefig(p, "data/models/2025-11-02_13-08-15/loss_evolution.png")
+checkpoint = "data/models/2025-11-02_17-52-57/checkpoint.jld2"
+losses = "data/models/2025-11-02_17-52-57/loss_trajectory.jld2"
+
+p = plot_losses(losses, checkpoint)
+display(p)
+savefig(p, "data/models/2025-11-02_17-52-57/loss_evolution.png")

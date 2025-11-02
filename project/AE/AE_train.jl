@@ -57,12 +57,12 @@ function train(; kws...)
 
     # record losses
     train_losses = Float32[]
-    val_losses = Float32[1]
+    val_losses = Float32[]
     rec_losses = Float32[]
     div_losses = Float32[]
     inside_losses = Float32[]
     iters = Int[]
-    val_iters = Int[0]
+    val_iters = Int[]
     train_corrs = Vector{Float32}[]
     val_corrs = Vector{Float32}[]
     iter = 0
@@ -111,8 +111,9 @@ function train(; kws...)
             n_val   += 1
             val_corr_total .+= val_corr
         end
+        # println(val_)
         val_mean = Float32(val_sum / max(n_val, 1))
-        val_corr_mean = Float32.(val_corr_total ./ max(n_val, 1))
+        val_corr_mean = vec((val_corr_total / max(n_val, 1)))
         push!(val_losses, val_mean)
         push!(val_iters,  iter)      # <— align the validation point to the last train iter of this epoch
         push!(val_corrs, val_corr_mean)
@@ -160,7 +161,7 @@ function train(; kws...)
    
     try    
          # plot and save loss evolution
-        p = plot_losses(loss_trajectory_path, filepath)
+         p = plot_losses(loss_trajectory_path, filepath)
         png_path = joinpath(save_folder, "loss_evolution.png")
         savefig(p, png_path)
         @info "Saved loss plot to $png_path"
@@ -193,6 +194,7 @@ function training_step(encoder, decoder, x_in, x_target, μ₀, device, args, no
                        x_in_dev,
                        x_target_dev,
                        μ₀_dev;
+                       loss=args.loss,
                        λdiv=args.λdiv,
                        λmask=args.λmask) 
     end
