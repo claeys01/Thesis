@@ -157,6 +157,6 @@ end
 checkpoint = "data/models/2025-11-02_17-52-57/checkpoint.jld2"
 losses = "data/models/2025-11-02_17-52-57/loss_trajectory.jld2"
 
-p = plot_losses(losses, checkpoint)
-display(p)
-savefig(p, "data/models/2025-11-02_17-52-57/loss_evolution.png")
+# p = plot_losses(losses, checkpoint)
+# display(p)
+# savefig(p, "data/models/2025-11-02_17-52-57/loss_evolution.png")

@@ -17,6 +17,7 @@ function data_run(sim::AbstractSimulation, time_max, save_path; sample_instance=
         "time"  => Any[],
         "Δt"    => Any[],
         "flow"  => Any[],
+        "u"     => Any[],
         "μ₀"    => Any[],
         "force" => Any[],
     )
@@ -31,6 +32,7 @@ function data_run(sim::AbstractSimulation, time_max, save_path; sample_instance=
             print("Sampling RHS - ")
             push!(data["force"], force)
             push!(data["flow"], sim.flow)
+            push!(data["u"], sim.flow.u)
             push!(data["μ₀"], sim.flow.μ₀)
             push!(data["RHS"], RHS(sim.flow))
             push!(data["time"], Float32(round(sim_time(sim),digits=4)))

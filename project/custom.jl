@@ -1,10 +1,10 @@
 using WaterLily
-import WaterLily: ∂, @loop, @inside
+import WaterLily: ∂, @loop, @inside, inside_u
 using JLD2
 using Random
 using Statistics
 
-function grad(field::AbstractArray)
+function scalar_grad(field::AbstractArray)
     T = eltype(field); sz = size(field); N = ndims(field)
     grad = zeros(T, sz..., N)  # e.g., zeros(Float32, Nx, Ny, 2)
     for n in 1:N
@@ -14,7 +14,7 @@ function grad(field::AbstractArray)
 end
 
 function grad_p(flow::Flow)
-    return grad(flow.p) .* flow.μ₀
+    return scalar_grad(flow.p) .* flow.μ₀
 end
 
 function RHS(flow::Flow{N};λ=WaterLily.quick,kwargs...) where N

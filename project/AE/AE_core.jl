@@ -12,7 +12,7 @@ Base.@kwdef mutable struct Args
     λ = 1e-4                    # regularization paramater
     λdiv = 0                    # divergence loss weight
     λmask = 0                   # weight of body mask loss
-    loss = :charb               # loss function for reconstruction loss (:L1, :L2, :charb)
+    loss = :L1               # loss function for reconstruction loss (:L1, :L2, :charb)
     batch_size = 32             # batch size
     downsample = 100            # amount of RHS used for training 
     epochs = 100                # number of epochs
@@ -172,14 +172,14 @@ function (encoder::Encoder)(x)
     return z
 end
 
-function (decoder::Decoder)(z)
+function (decoder::Decoder)(z, μ₀)
     x̂ = decoder.layers(z)
-    return x̂
+    return x̂ .* μ₀
 end
 
-function reconstruct(enc::Encoder, dec::Decoder, x)
+function reconstruct(enc::Encoder, dec::Decoder, x, μ₀)
     z = enc(x)
-    return dec(z)
+    return dec(z, μ₀)
 end
 
 function check_ae_dims(encoder, decoder, x; device=Flux.get_device("CPU"))
@@ -312,7 +312,7 @@ function total_loss(encoder::Encoder,
     loss=:L2,
     λdiv=0f0,
     λmask=0f0)
-    x̂ = reconstruct(encoder, decoder, x_in)
+    x̂ = reconstruct(encoder, decoder, x_in,  μ₀)
 
     corrs = batch_corrs(x_target, x̂)
 
