@@ -1,5 +1,5 @@
 using JLD2
-using Flux
+using Lux
 using Optimisers: AdamW
 using WaterLily
 using Random
@@ -27,10 +27,10 @@ function train(; kws...)
         n_samples=args.downsample, clip_bc=args.clip_bc, split=args.split)
 
     if args.use_gpu
-        device = Flux.get_device()
+        device = cpu_device()
 
     else
-        device = Flux.get_device("CPU")
+        device = CUDADevice()
     end
 
     normalizer = Normalizer(device(Float32.(normalizer.μ)), device(Float32.(normalizer.σ)), normalizer.method)
@@ -39,9 +39,10 @@ function train(; kws...)
 
 
     # # initialize encoder and decoder
-    encoder = Flux.f32(Encoder(args.input_dim, args.latent_dim; C_next=args.C_conv, padding=args.padding, stride=args.stride)) |> device
-    decoder = Flux.f32(Decoder(args.output_dim, args.latent_dim; C_next=args.C_conv)) |> device
+    encoder = Encoder(args.input_dim, args.latent_dim; C_next=args.C_conv, padding=args.padding, stride=args.stride) |> device
+    decoder = Decoder(args.output_dim, args.latent_dim; C_next=args.C_conv) |> device
 
+    enc_
 
     # define optimizer
     opt_enc = Flux.setup(AdamW(eta=args.η, lambda=args.λ), encoder)

@@ -1,4 +1,4 @@
-using Flux
+using Lux
 using NNlib
 using WaterLily
 using Statistics
@@ -98,7 +98,7 @@ struct Encoder
 end
 
 
-Flux.@layer Encoder
+Lux.@layer Encoder
 
 Encoder(input_size::Tuple{Int,Int,Int}, latent_dim::Int; C_next::Int=4, padding=1, stride=2, verbose::Bool=true) = begin
     H, W, C = input_size
@@ -112,7 +112,7 @@ Encoder(input_size::Tuple{Int,Int,Int}, latent_dim::Int; C_next::Int=4, padding=
         MaxPool((2, 2)),
         Conv((3, 3), 4C_next => 8C_next, identity; pad=padding, stride=stride), relu,
         MaxPool((2, 2)),
-        Flux.flatten
+        Lux.FlattenLayer
     )
     dummy = zeros(Float32, H, W, C, 1)
     flat = convpart(dummy)
@@ -130,7 +130,7 @@ struct Decoder
 end
 
 
-Flux.@layer Decoder
+Lux.@layer Decoder
 
 function upsample2(x)
     H, W, _, _ = size(x)
@@ -182,11 +182,6 @@ function reconstruct(enc::Encoder, dec::Decoder, x, μ₀)
     return dec(z, μ₀)
 end
 
-function check_ae_dims(encoder, decoder, x; device=Flux.get_device("CPU"))
-    x_dev = x |> device
-    ŷ = reconstruct(encoder, decoder, x_dev)
-    return size(x_dev) == size(ŷ), size(x_dev), size(ŷ)
-end
 
 
 """
