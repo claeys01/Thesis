@@ -1,5 +1,8 @@
 using JLD2 
-
+using Random
+using DiffEqFlux, ComponentArrays, Zygote, OrdinaryDiffEq,
+      Printf, Random, MLUtils, OneHotArrays, Lux, Flux
+using Optimization, OptimizationOptimisers
 
 includet("../AE/AE_core.jl")
 
@@ -7,11 +10,11 @@ includet("../AE/AE_core.jl")
 @load "data/latent_data/128_RHS_biot_data_arr_force_period.jld2" z
 @load "data/datasets/128_RHS_biot_data_arr_force_period.jld2" RHS_data
 
-
+u = RHS_data["u"]
 
 
 # load hyperparamters
-args = Args(; kws...)
+args = Args()
 args.seed > 0 && Random.seed!(args.seed)
 
 dense_mult = 4

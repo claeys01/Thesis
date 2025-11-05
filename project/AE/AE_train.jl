@@ -42,10 +42,6 @@ function train(; kws...)
     encoder = Flux.f32(Encoder(args.input_dim, args.latent_dim; C_next=args.C_conv, padding=args.padding, stride=args.stride)) |> device
     decoder = Flux.f32(Decoder(args.output_dim, args.latent_dim; C_next=args.C_conv)) |> device
 
-    # ck = JLD2.load("data/models/2025-10-29_10-13-36/checkpoint.jld2")
-    # Flux.loadmodel!(encoder, ck["encoder"])
-    # Flux.loadmodel!(decoder, ck["decoder"])
-    # normalizer = ck["normalizer"]
 
     # define optimizer
     opt_enc = Flux.setup(AdamW(eta=args.η, lambda=args.λ), encoder)

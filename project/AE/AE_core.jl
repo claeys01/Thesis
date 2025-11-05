@@ -291,7 +291,7 @@ end
 function batch_corrs(x, x̂)
     @assert size(x) == size(x̂)
     nx, ny, nchan, nbatch = size(x)
-    rbatch = zeros(Float64, nchan, nbatch)
+    rbatch = zeros(Float32, nchan, nbatch)
     for b in 1:nbatch
         for c in 1:nchan
             rbatch[c, b] = cor(vec(view(x, :, :, c, b)),
