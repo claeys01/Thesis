@@ -57,6 +57,11 @@ function downsample_RHS_data!(RHS_data; tmin=-1, tmax=-1, n_samples=-1, clip_bc=
         RHS_data["μ₀"] = RHS_data["μ₀"][final_indices]
     end
 
+    if haskey(RHS_data, "u")
+        RHS_data["u"] = RHS_data["u"][final_indices]
+    end
+
+
     if clip_bc
         # Exclude outer cells (boundary) from each RHS entry
         for (i, RHS) in enumerate(RHS_data["RHS"])
@@ -67,7 +72,13 @@ function downsample_RHS_data!(RHS_data; tmin=-1, tmax=-1, n_samples=-1, clip_bc=
                 RHS_data["μ₀"][j] = remove_ghosts(mask)
             end
         end
+        if haskey(RHS_data, "u")
+            for (j, u) in enumerate(RHS_data["u"])
+                RHS_data["u"][j] = remove_ghosts(u)
+            end
+        end
     end
+
     if verbose
         @info "Downsampled to $(length(RHS_data["time"])) time steps."
         @info "Input data size: $(size(RHS_data["RHS"][1]))"
@@ -131,7 +142,7 @@ function get_random_snapshots(path_or_RHS; n::Int=5, seed::Int=42,
     downsample_RHS_data!(RHS_data; tmin=tmin, tmax=tmax, n_samples=downsample, clip_bc=clip_bc, verbose=verbose)
 
     # build 4-D array (H,W,C,N)
-    get_4d!(RHS_data)
+    get_4d_RHS!(RHS_data)
 
     nsnaps = size(RHS_data["RHS"], 4)
 
@@ -156,7 +167,7 @@ function get_random_snapshots(path_or_RHS; n::Int=5, seed::Int=42,
     return random_RHS, random_flow, collect(inds)
 end
 
-function get_4d!(RHS_data::Dict)
+function get_4d_RHS!(RHS_data::Dict)
     # build a 4-D array from whatever is stored under "RHS" and replace it in-place
     arr = RHS_data["RHS"]
     new = if isa(arr, AbstractArray) && ndims(arr) == 4
@@ -166,6 +177,16 @@ function get_4d!(RHS_data::Dict)
     end
     RHS_data["RHS"] = new
     return RHS_data["RHS"]
+end
+
+function get_4d!(arr::AbstractArray)
+    new = if isa(arr, AbstractArray) && ndims(arr) == 4
+        Float32.(arr)
+    else
+        Float32.(cat(arr...; dims=4))
+    end
+    arr = new
+    return arr
 end
 
 function field_corr(x, xhat)

@@ -34,7 +34,7 @@ function get_latent_data(checkpoint_path::String; save_path::Union{String,Nothin
 
     latent_snaps = Vector{Vector{Float32}}()
     for i in 1:nsnaps
-        x = RHS_data["RHS"][:, :, :, i]         # H×W×C
+        x = RHS_data["u"][:, :, :, i]         # H×W×C
         μ₀ = haskey(RHS_data, "μ₀") ? RHS_data["μ₀"][:, :, :, i] : zeros(Float32, size(x,1), size(x,2), 1)
 
         # make a (H,W,C,1) input batch
@@ -59,6 +59,6 @@ function get_latent_data(checkpoint_path::String; save_path::Union{String,Nothin
 end
 
 checkpoint = "data/saved_models/100period_100e_4096n_64l_norm_pooling_ups_mu_L2/checkpoint.jld2"
-save_path = "data/latent_data/128_RHS_biot_data_arr_force_period.jld2"
+save_path = "data/latent_data/128_u_biot_data_arr_force_period.jld2"
 kkr = get_latent_data(checkpoint; save_path=save_path)
 nothing

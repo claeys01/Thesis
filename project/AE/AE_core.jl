@@ -14,7 +14,7 @@ Base.@kwdef mutable struct Args
     λmask = 0                   # weight of body mask loss
     loss = :L1               # loss function for reconstruction loss (:L1, :L2, :charb)
     batch_size = 32             # batch size
-    downsample = 100            # amount of RHS used for training 
+    downsample = -1            # amount of RHS used for training 
     epochs = 100                # number of epochs
     seed = 42                   # random seed
     n_reconstruct = 2           # sampling size for output    
@@ -45,7 +45,6 @@ function get_data(batch_size, path; tmin=-1, tmax=-1, n_samples=500,
     X = cat(RHS_data["RHS"]...; dims=4)
     X = Float32.(X)
 
-    # μ₀ :: (H,W,1,N), 1 outside; 0 inside
     μ₀ = cat(RHS_data["μ₀"]...; dims=4)
     μ₀ = Float32.(μ₀)
 
