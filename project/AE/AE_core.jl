@@ -12,12 +12,13 @@ Base.@kwdef mutable struct Args
     λ = 1e-4                    # regularization paramater
     λdiv = 0                    # divergence loss weight
     λmask = 0                   # weight of body mask loss
-    loss = :L1               # loss function for reconstruction loss (:L1, :L2, :charb)
+    loss = :L2                  # loss function for reconstruction loss (:L1, :L2, :charb)
     batch_size = 32             # batch size
-    downsample = -1            # amount of RHS used for training 
+    downsample = 100             # amount of data used for training 
     epochs = 100                # number of epochs
     seed = 42                   # random seed
-    n_reconstruct = 2           # sampling size for output    
+    n_reconstruct = 2           # sampling size for output   
+    field = "u" 
     use_gpu = false             # use GPU
     clip_bc = true              # removes the ghost cells from the snapshot
     input_dim = (128, 128, 4)   # flow field size with μ₀ concatenated
@@ -35,17 +36,17 @@ end
 
 
 function get_data(batch_size, path; tmin=-1, tmax=-1, n_samples=500,
-    normalize=false, clip_bc=true, split=0.2)
+    normalize=false, clip_bc=true, split=0.2, field="u")
 
-    @load path RHS_data
-    downsample_RHS_data!(RHS_data; tmin=tmin, tmax=tmax,
+    @load path data
+    preprocess_data!(data; tmin=tmin, tmax=tmax,
         n_samples=n_samples, clip_bc=clip_bc)
 
     # X :: (H,W,2,N)
-    X = cat(RHS_data["RHS"]...; dims=4)
+    X = data[field]
     X = Float32.(X)
 
-    μ₀ = cat(RHS_data["μ₀"]...; dims=4)
+    μ₀ = data["μ₀"]
     μ₀ = Float32.(μ₀)
 
     # normalizer from X only (physics channels)
@@ -171,22 +172,15 @@ function (encoder::Encoder)(x)
     return z
 end
 
-function (decoder::Decoder)(z, μ₀)
+function (decoder::Decoder)(z)
     x̂ = decoder.layers(z)
-    return x̂ .* μ₀
+    return x̂
 end
 
-function reconstruct(enc::Encoder, dec::Decoder, x, μ₀)
+function reconstruct(enc::Encoder, dec::Decoder, x)
     z = enc(x)
-    return dec(z, μ₀)
+    return dec(z)
 end
-
-function check_ae_dims(encoder, decoder, x; device=Flux.get_device("CPU"))
-    x_dev = x |> device
-    ŷ = reconstruct(encoder, decoder, x_dev)
-    return size(x_dev) == size(ŷ), size(x_dev), size(ŷ)
-end
-
 
 """
     divergence_ad(field; dx=1.0, dy=1.0)
@@ -311,9 +305,12 @@ function total_loss(encoder::Encoder,
     loss=:L2,
     λdiv=0f0,
     λmask=0f0)
-    x̂ = reconstruct(encoder, decoder, x_in,  μ₀)
+
+    x̂ = reconstruct(encoder, decoder, x_in)
 
     corrs = batch_corrs(x_target, x̂)
+
+    x̂ = x̂ .* μ₀
 
     Linside = zero(Float32)
     L2div = zero(Float32)

@@ -80,10 +80,9 @@ end
 
 
 
-# Convenience CLI-like behaviour when file is run interactively
 if abspath(PROGRAM_FILE) == (@__FILE__) || isinteractive()
     # try to load default file if present
-    default_file = "data/datasets/RHS_biot_data_arr_force_period.jld2"
+    default_file = "data/datasets/128_RHS_biot_data_arr_force_period.jld2"
     # println("Inspecting default RHS file: $default_file")
     inspect_mu(default_file)
 

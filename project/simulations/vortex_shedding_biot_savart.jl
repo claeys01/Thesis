@@ -6,7 +6,7 @@ using JLD2
 
 includet("../custom.jl")
 
-function circle_shedding_biot(Re=250, U=1;n = 2^7,m = 2^7, mem=Array)
+function circle_shedding_biot(;Re=250, U=1, n = 2^7,m = 2^7, mem=Array)
     # n = 2^7
     # m = 2^7
     radius = Float32(m / 16) # radius of the circle relative to the height of the domain
@@ -74,9 +74,10 @@ end
 
 if abspath(PROGRAM_FILE) == (@__FILE__) || isinteractive()
 
-    # sim = circle_shedding_biot(mem=Array)
-    t_end = 100
-
+    sim = circle_shedding_biot(mem=Array)
+    t_end = 10
+    sim_step!(sim, t_end; verbose=true)
+    
     # # sim_gif!(sim;duration=t_end,clims=(-5,5),plotbody=true)
 
     # # sim_step!(sim, t_end; verbose=false)

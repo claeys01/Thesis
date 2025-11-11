@@ -23,68 +23,78 @@ function RHS(flow::Flow{N};λ=WaterLily.quick,kwargs...) where N
 end
 
 function remove_ghosts(snapshot::AbstractArray)
-    return snapshot[2:end-1, 2:end-1, :]
+    return snapshot[2:end-1, 2:end-1, :, :]
 end
 
-function downsample_RHS_data!(RHS_data; tmin=-1, tmax=-1, n_samples=-1, clip_bc=false, verbose=true)
-    if n_samples == -1
-        n_samples = length(RHS_data["time"])
-    end
-    if tmin == -1
-        tmin = RHS_data["time"][1]
-    end
-    if tmax == -1
-        tmax = RHS_data["time"][end]
-    end 
-    # Select indices corresponding to time tmin to tmax
-    time_indices = findall(t -> t ≥ tmin && t ≤ tmax, RHS_data["time"])
-    selected_indices = time_indices
 
-    # Downsample to n_samples entries
-    downsampled_indices = round.(Int, range(1, length(selected_indices), length=n_samples))
-    final_indices = selected_indices[downsampled_indices]
+function preprocess_data!(data; tmin=-1, tmax=-1, n_samples=-1, clip_bc=false, verbose=true)
+    time = data["time"]
 
-    # Downsample all relevant entries in RHS_data
-    RHS_data["time"] = RHS_data["time"][final_indices]
-    RHS_data["Δt"] = RHS_data["Δt"][final_indices]
-    RHS_data["RHS"] = RHS_data["RHS"][final_indices]
+    # Resolve defaults
+    tlo = (tmin == -1) ? first(time) : tmin
+    thi = (tmax == -1) ? last(time)  : tmax
+    ns  = (n_samples == -1) ? length(time) : n_samples
 
-    if haskey(RHS_data, "flow")
-        RHS_data["flow"] = RHS_data["flow"][final_indices]
+    # Select indices within [tlo, thi]
+    selected = findall(t -> t >= tlo && t <= thi, time)
+    if isempty(selected)
+        verbose && @info "No samples in [$(tlo), $(thi)]. Nothing changed."
+        return data
     end
 
-    if haskey(RHS_data, "μ₀")
-        RHS_data["μ₀"] = RHS_data["μ₀"][final_indices]
+    # Downsample to ns entries (clamped to available range)
+    ns = clamp(ns, 1, length(selected))
+    idx_in_selected = round.(Int, collect(range(1, length(selected), length=ns)))
+    final_idx = selected[idx_in_selected]
+
+    # Helper: downsample a key if present
+    @inline function maybe_downsample!(dict, key, idx)
+        if haskey(dict, key)
+            val = dict[key]
+            d = ndims(val)
+            if d == 1
+                dict[key] = val[idx]
+            else
+                leading = ntuple(_ -> Colon(), d - 1)
+                dict[key] = val[leading..., idx]
+            end
+        end
+
+        return nothing
     end
 
-    if haskey(RHS_data, "u")
-        RHS_data["u"] = RHS_data["u"][final_indices]
+    # Apply downsampling
+    for k in ("time", "Δt", "RHS", "flow", "μ₀", "u")
+        maybe_downsample!(data, k, final_idx)
     end
 
-
+    # Optional boundary clipping
     if clip_bc
-        # Exclude outer cells (boundary) from each RHS entry
-        for (i, RHS) in enumerate(RHS_data["RHS"])
-            RHS_data["RHS"][i] = remove_ghosts(RHS)
-        end
-        if haskey(RHS_data, "μ₀")
-            for (j, mask) in enumerate(RHS_data["μ₀"])
-                RHS_data["μ₀"][j] = remove_ghosts(mask)
+        @inline function clip_time_series(ts)
+            H, W, C, T = size(ts)
+            temp = similar(ts, eltype(ts), H-2, W-2, C, T)
+            @inbounds for i in axes(ts, 4)
+                temp[:,:,:,i] = remove_ghosts(ts[:,:,:,i])
             end
+            return temp
         end
-        if haskey(RHS_data, "u")
-            for (j, u) in enumerate(RHS_data["u"])
-                RHS_data["u"][j] = remove_ghosts(u)
-            end
-        end
+
+        # replace entries in the dict with the clipped arrays
+        data["RHS"] = clip_time_series(data["RHS"])
+        haskey(data, "μ₀") && (data["μ₀"] = clip_time_series(data["μ₀"]))
+        haskey(data, "u")  && (data["u"]  = clip_time_series(data["u"]))
     end
 
     if verbose
-        @info "Downsampled to $(length(RHS_data["time"])) time steps."
-        @info "Input data size: $(size(RHS_data["RHS"][1]))"
+        @info "Downsampled to $(length(data["time"])) time steps."
+        sz = (haskey(data, "RHS") && !isempty(data["RHS"])) ? size(data["RHS"]) : "—"
+        @info "Input data size: $(sz)"
     end
 
+    return data
 end
+
+
 
 """
     mean_divergence(a)
@@ -124,70 +134,8 @@ function mean_divergence(a::AbstractArray)
     return mean(init)
 end
 
-function get_random_snapshots(path_or_RHS; n::Int=5, seed::Int=42,
-                              tmin=-1, tmax=-1, downsample=-1, clip_bc=true, verbose=false)
-    # load or accept RHS_data dict
-    RHS_data = if isa(path_or_RHS, AbstractString)
-        @load path_or_RHS RHS_data
-        # ensure we have a Dict with Any values so we can replace entries with Arrays
-        Dict{String,Any}(RHS_data)
-    elseif isa(path_or_RHS, Dict)
-        # make a writable copy with Any-typed values to allow in-place replacement
-        Dict{String,Any}(path_or_RHS)
-    else
-        throw(ArgumentError("path_or_RHS must be a filename or a Dict as loaded from JLD2"))
-    end
 
-    # downsample / clip in-place on our copy
-    downsample_RHS_data!(RHS_data; tmin=tmin, tmax=tmax, n_samples=downsample, clip_bc=clip_bc, verbose=verbose)
 
-    # build 4-D array (H,W,C,N)
-    get_4d_RHS!(RHS_data)
-
-    nsnaps = size(RHS_data["RHS"], 4)
-
-    if nsnaps == 0
-        throw(ArgumentError("No snapshots available in RHS_data"))
-    end
-
-    if n > nsnaps
-        @warn "Requested $n snapshots but only $nsnaps available — returning all"
-        n = nsnaps
-    end
-
-    rng = MersenneTwister(seed)
-    inds = randperm(rng, nsnaps)[1:n]
-    random_RHS = RHS_data["RHS"][:, :, :, inds]   # (H,W,C,n)
-    random_flow = try
-        RHS_data["flow"][inds]
-    catch e
-        @warn "flow key not present in this database: $e"
-        zeros(size(random_RHS))
-    end
-    return random_RHS, random_flow, collect(inds)
-end
-
-function get_4d_RHS!(RHS_data::Dict)
-    # build a 4-D array from whatever is stored under "RHS" and replace it in-place
-    arr = RHS_data["RHS"]
-    new = if isa(arr, AbstractArray) && ndims(arr) == 4
-        Float32.(arr)
-    else
-        Float32.(cat(arr...; dims=4))
-    end
-    RHS_data["RHS"] = new
-    return RHS_data["RHS"]
-end
-
-function get_4d!(arr::AbstractArray)
-    new = if isa(arr, AbstractArray) && ndims(arr) == 4
-        Float32.(arr)
-    else
-        Float32.(cat(arr...; dims=4))
-    end
-    arr = new
-    return arr
-end
 
 function field_corr(x, xhat)
     @assert size(x) == size(xhat)
