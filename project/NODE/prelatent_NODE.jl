@@ -34,11 +34,6 @@ idx_samples = round.(Int, range(1, stop=size(z, 1), length=4))
 z_samples = [vec(z[i, :]) for i in idx_samples]  # Vector of 8 one-dimensional arrays, each length 179
 
 
-
-
-# tsteps = range(tspan[1], tspan[2]; length = length(time))
-
-
 @show size(z), typeof(z)
 
 # define dudt
@@ -72,7 +67,7 @@ end
 callback_step = Ref(0)
 
 
-function callback(state, l;)
+function callback(state, l)
     # println(l)
     callback_step[] += 1
 
@@ -84,8 +79,8 @@ function callback(state, l;)
     p = plot()
     colors = [:black, :red, :blue, :green]
     for i in 1:4
-        plot!(p, t, z_samples[i]; color=colors[i])
-        plot!(p, t, z_pred_samples[i]; linestyle = :dash, color=colors[i])
+        plot!(p, t, z_samples[i]; color=colors[i], label = "data_$i")
+        plot!(p, t, z_pred_samples[i]; linestyle = :dash, color=colors[i], label = "pred_$i")
     end
     display(p)
     return false
@@ -102,5 +97,56 @@ optprob = Optimization.OptimizationProblem(optf, pinit)
 
 
 result_neuralode = Optimization.solve(
-    optprob, OptimizationOptimisers.Adam(0.05); callback = callback, maxiters = 300)
+    optprob, OptimizationOptimisers.Adam(0.05); callback = callback, maxiters = 2)
+
+# -------------------------
+# Save final plot & params
+# -------------------------
+using Dates
+out_dir = joinpath("data", "NODE_models", Dates.format(now(), "yyyy-mm-dd_HH-MM-SS"))
+mkpath(out_dir)
+
+# build final plot with optimized parameters
+optimized_params = result_neuralode.u
+z_pred_final = predict(optimized_params)
+z_pred_samples_final = [vec(z_pred_final[i, :]) for i in idx_samples]
+
+plt_final = plot()
+colors = [:black, :red, :blue, :green]
+for i in 1:4
+    plot!(plt_final, t, z_samples[i]; color = colors[i], label = "data_$i")
+    plot!(plt_final, t, z_pred_samples_final[i]; linestyle = :dash, color = colors[i], label = "pred_$i")
+end
+
+png_path = joinpath(out_dir, "latent_fit.png")
+savefig(plt_final, png_path)
+
+# save optimized parameters
+params_path = joinpath(out_dir, "optimized_params.jld2")
+@info "Saving plot -> $png_path and params -> $params_path"
+@save params_path optimized_params
+
+# Test: load saved params and use them to predict a trajectory
+try
+    saved = JLD2.load(params_path)
+    @info "Loaded keys from $params_path: $(collect(keys(saved)))"
+    p_loaded = haskey(saved, "optimized_params") ? saved["optimized_params"] : first(values(saved))
+
+    try
+        pred_loaded = predict(p_loaded)
+        @info "predict(p_loaded) succeeded, prediction size = $(size(pred_loaded))"
+    catch err1
+        @warn "predict(p_loaded) failed: $err1 — will try mapping into ComponentArray(ps)"
+        p_struct = ComponentArray(ps)
+        try
+            p_struct .= p_loaded
+            pred_mapped = predict(p_struct)
+            @info "predict(mapped params) succeeded, prediction size = $(size(pred_mapped))"
+        catch err2
+            @error "Mapping loaded params into ComponentArray and predicting failed: $err2"
+        end
+    end
+catch err
+    @error "Could not load params from $params_path: $err"
+end
 
