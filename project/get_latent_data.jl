@@ -18,24 +18,22 @@ function get_latent_data(checkpoint_path::String; save_path::Union{String,Nothin
     Flux.loadmodel!(enc, encoder_state)
     Flux.loadmodel!(dec, decoder_state)
 
-    @load args.data_path RHS_data
-    downsample_RHS_data!(RHS_data; clip_bc=args.clip_bc, verbose=true)
+    @load args.data_path data
+    preprocess_data!(data; clip_bc=args.clip_bc, verbose=true)
 
-    # ensure RHS is a 4-D array (H,W,C,N)
-    get_4d!(RHS_data)
     # ensure μ₀ is a 4-D array too if present
-    if haskey(RHS_data, "μ₀")
-        RHS_data["μ₀"] = isa(RHS_data["μ₀"], AbstractArray) && ndims(RHS_data["μ₀"]) == 4 ?
-                         Float32.(RHS_data["μ₀"]) : Float32.(cat(RHS_data["μ₀"]...; dims=4))
+    if haskey(data, "μ₀")
+        data["μ₀"] = isa(data["μ₀"], AbstractArray) && ndims(data["μ₀"]) == 4 ?
+                         Float32.(data["μ₀"]) : Float32.(cat(data["μ₀"]...; dims=4))
     end
 
-    nsnaps = size(RHS_data["RHS"], 4)
+    nsnaps = size(data["u"], 4)
     @info "Found $nsnaps snapshots"
 
     latent_snaps = Vector{Vector{Float32}}()
     for i in 1:nsnaps
-        x = RHS_data["u"][:, :, :, i]         # H×W×C
-        μ₀ = haskey(RHS_data, "μ₀") ? RHS_data["μ₀"][:, :, :, i] : zeros(Float32, size(x,1), size(x,2), 1)
+        x = data["u"][:, :, :, i]         # H×W×C
+        μ₀ = haskey(data, "μ₀") ? data["μ₀"][:, :, :, i] : zeros(Float32, size(x,1), size(x,2), 1)
 
         # make a (H,W,C,1) input batch
         if args.normalize
@@ -58,7 +56,7 @@ function get_latent_data(checkpoint_path::String; save_path::Union{String,Nothin
     return latent_snaps
 end
 
-checkpoint = "data/saved_models/100period_100e_4096n_64l_norm_pooling_ups_mu_L2/checkpoint.jld2"
+checkpoint = "data/saved_models/u_100period_100e_4096n_64l_norm_pooling_ups_mu_L1/checkpoint.jld2"
 save_path = "data/latent_data/128_u_biot_data_arr_force_period.jld2"
 kkr = get_latent_data(checkpoint; save_path=save_path)
 nothing

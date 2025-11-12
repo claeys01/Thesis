@@ -109,12 +109,12 @@ function (encoder::Encoder)(x)
     return z
 end
 
-function (decoder::Decoder)(z, μ₀)
+function (decoder::Decoder)(z)
     x̂ = decoder.layers(z)
-    return x̂ .* μ₀
+    return x̂
 end
 
-function reconstruct(enc::Encoder, dec::Decoder, x, μ₀)
+function reconstruct(enc::Encoder, dec::Decoder, x)
     z = enc(x)
-    return dec(z, μ₀)
+    return dec(z)
 end

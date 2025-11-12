@@ -6,6 +6,7 @@ using DiffEqFlux, ComponentArrays, Zygote, OrdinaryDiffEq,
 using Optimization, OptimizationOptimisers
 
 includet("Lux_AE.jl")
+includet("../utils/AE_normalizer.jl")
 includet("../custom.jl")
 
 
@@ -20,19 +21,15 @@ nt = 5          # training trajectory length (steps per loss)
 # Data loading / slicing
 # ---------------------------
 
-@load args.data_path RHS_data
-downsample_RHS_data!(RHS_data; n_samples=args.downsample, clip_bc=args.clip_bc)
+@load args.data_path data
+preprocess_data!(data; n_samples=args.downsample, clip_bc=args.clip_bc)
 
-u_vec = RHS_data["u"]
-μ₀ = RHS_data["μ₀"]
-time = RHS_data["time"]
+u, normalizer = normalize_batch(data["u"]; normalizer=nothing)
+μ₀ = data["μ₀"]
+time = data["time"]
 tspan = (time[1], time[end])
 println(tspan)
 
-
-
-u = cat(u_vec...; dims = 4)
-μ₀ = cat(μ₀...; dims=4)
 
 u_in = cat(u, μ₀; dims=3)
 u_0 = u_in[:,:,:,1:1]
@@ -108,22 +105,25 @@ adtype = Optimization.AutoZygote()
 optf = Optimization.OptimizationFunction((x, ps) -> loss_neuralode(x), adtype)
 optprob = Optimization.OptimizationProblem(optf, pinit)
 
-# result_neuralode = Optimization.solve(
-#     optprob, OptimizationOptimisers.Adam(0.05); callback = callback, maxiters = 300)
+result_neuralode = Optimization.solve(
+    optprob, OptimizationOptimisers.Adam(0.05); callback = callback, maxiters = 300)
 
-# quick checks for NaNs/Infs, shape and a direct dudt test
-latent, st_enc = encoder(u_0, ps, st)   # get the encoded initial latent
-println("tspan=", tspan, " any NaN in tspan? ", any(isnan, Tuple(tspan)))
-println("size(u_0)=", size(u_0))
-println("size(latent)=", size(latent))
-println("any NaN/Inf in latent? ", any(isnan, Array(latent)), any(isinf, Array(latent)))
-println("any NaN/Inf in params? ", any(x -> any(isnan, Array(x)) || any(isinf, Array(x)), values(ps)))
+# rng = Xoshiro(0)
+# ps_enc, st_enc = Lux.setup(rng, encoder.layers)
 
-# test dudt directly on that latent (convert to plain Array/vector if needed)
-z = Array(latent)                     # ensure plain Array/Float32
-println("dudt(z) -> size: ", size(dudt(z)))
-println("any NaN/Inf in dudt(z)? ", any(isnan, Array(dudt(z))), any(isinf, Array(dudt(z))))
+# # debug: check NaN/Inf and scales before calling NeuralODE
+# z, _ = encoder.layers(u_0, ps_enc, st_enc)       # latent initial condition
+# @show any(isnan, z), any(isinf, z), maximum(abs, z)
 
-# try random input to see if dudt can produce finite outputs
-r = randn(Float32, length(z))
-println("dudt(randn) any NaN? ", any(isnan, Array(dudt(r))), any(isinf, Array(dudt(r))))
+# p_node, st_node = Lux.setup(rng, dudt)
+# dz = dudt(z, p_node, st_node)[1]                  # single-step dudt output
+# @show any(isnan, dz), any(isinf, dz), maximum(abs, dz)
+
+# # try evaluate nn_ode once (loose tolerances) to see if it explodes
+# nn_ode_test = NeuralODE(dudt, tspan, Tsit5(); reltol=1e-6, abstol=1e-6)
+# try
+#     sol = nn_ode_test(z[:, :, :, 1:1], p_node, st_node)   # or pass shaped latent vec expected by your chain
+#     @show sol[end]
+# catch e
+#     @error "NeuralODE forward failed: $e"
+# end
