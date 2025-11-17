@@ -75,8 +75,11 @@ end
 if abspath(PROGRAM_FILE) == (@__FILE__) || isinteractive()
 
     sim = circle_shedding_biot(mem=Array)
-    t_end = 10
+    t_end = 50
     sim_step!(sim, t_end; verbose=true)
+    # flood(sim)
+    # sim_gif!(sim; duration=10, remeasure=true, clims=(-5, 5), 
+                    # ylims=(0, 130), xlims=(0,130), showaxis=false, background_color_outside=:match)
     
     # # sim_gif!(sim;duration=t_end,clims=(-5,5),plotbody=true)
 

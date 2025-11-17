@@ -1,9 +1,11 @@
-using JLD2
-using Revise
+using Lux
+# using Lux.GraphUtils
+using GraphViz
 
-includet("custom.jl")
+model = Chain(Dense(4 => 16, relu), Dense(16 => 2))
 
-@load "data/datasets/128_RHS_biot_data_arr_force_period.jld2" data
+# Produce GraphViz graph
+g = computational_graph(model)
 
-preprocess_data!(data; clip_bc=true)
-
+# Save as PNG
+GraphViz.output(PNG("model.png"), g)

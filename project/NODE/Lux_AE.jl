@@ -118,3 +118,4 @@ function reconstruct(enc::Encoder, dec::Decoder, x)
     z = enc(x)
     return dec(z)
 end
+
