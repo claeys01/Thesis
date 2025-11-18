@@ -80,14 +80,14 @@ function preprocess_data!(data; tmin=-1, tmax=-1, n_samples=-1, clip_bc=false, v
         end
 
         # replace entries in the dict with the clipped arrays
-        data["RHS"] = clip_time_series(data["RHS"])
+        haskey(data, "RHS") && (data["RHS"] = clip_time_series(data["RHS"]))
         haskey(data, "μ₀") && (data["μ₀"] = clip_time_series(data["μ₀"]))
         haskey(data, "u")  && (data["u"]  = clip_time_series(data["u"]))
     end
 
     if verbose
         @info "Downsampled to $(length(data["time"])) time steps."
-        sz = (haskey(data, "RHS") && !isempty(data["RHS"])) ? size(data["RHS"]) : "—"
+        sz = (haskey(data, "u") && !isempty(data["u"])) ? size(data["u"]) : "—"
         @info "Input data size: $(sz)"
     end
 

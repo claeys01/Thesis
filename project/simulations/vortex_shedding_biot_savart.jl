@@ -1,4 +1,5 @@
 using WaterLily
+# import WaterLily: CFL
 using BiotSavartBCs
 using Plots
 using Revise 
@@ -74,45 +75,28 @@ end
 
 if abspath(PROGRAM_FILE) == (@__FILE__) || isinteractive()
 
-    sim = circle_shedding_biot(mem=Array)
-    t_end = 50
-    sim_step!(sim, t_end; verbose=true)
-    # flood(sim)
-    # sim_gif!(sim; duration=10, remeasure=true, clims=(-5, 5), 
-                    # ylims=(0, 130), xlims=(0,130), showaxis=false, background_color_outside=:match)
+    # sim = circle_shedding_biot(mem=Array)
+    # # t_end = 50
+    # # CFL(a::Flow;Δt_max=0.1) = 0.1
+
+    # # sim_step!(sim, t_end; verbose=true)
+    # # sim_gif!(sim; duration=t_end, remeasure=true, clims=(-5, 5), 
+    #                 # ylims=(0, 130), xlims=(0,130), showaxis=false, background_color_outside=:match)
     
-    # # sim_gif!(sim;duration=t_end,clims=(-5,5),plotbody=true)
-
-    # # sim_step!(sim, t_end; verbose=false)
-
     # function get_forces!(sim,t)
-    #     sim_step!(sim,t,remeasure=false; verbose=true)
-    #     force = WaterLily.pressure_force(sim)
-    #     force./(0.5sim.L*sim.U^2) # scale the forces!
+    # sim_step!(sim,t,remeasure=false, verbose=true)
+    # force = WaterLily.pressure_force(sim)
+    # force./(0.5sim.L*sim.U^2) # scale the forces!
     # end
 
     # # Simulate through the time range and get forces
-    # time = 1:0.1:t_end # time scale is sim.L/sim.U
+    # time = 1:0.1:50 # time scale is sim.L/sim.U
     # forces = [get_forces!(sim,t) for t in time];
-    
-    # time = 1:0.1:t_end # time scale is sim.L/sim.U
-    # # @save "data/datasets/biot_forces.jld2" forces
-    # @load "data/datasets/biot_forces.jld2" forces;
-
+    # println(size(forces))
     # #Plot it
-    # drag, lift = first.(forces), last.(forces)
-    # plt = plot(time,[drag, lift],
+    # plot(time,[first.(forces) last.(forces)],
     #     labels=["drag" "lift"],
-    #     colors=[:red, :blue],
     #     xlabel="tU/L",
     #     ylabel="Pressure force coefficients")
-
-    # zero_idxs = zero_crossing(last.(forces); direction=:rising)
-    # println(zero_idxs)
-    
-    # for idx in zero_idxs
-    #     scatter!(plt, [time[idx]], [lift[idx]]; label=false, color=:black)
-    #     annotate!(time[idx], lift[idx], (idx, 5, :left))
-    # end
 
 end

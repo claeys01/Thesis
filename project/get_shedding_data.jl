@@ -13,10 +13,8 @@ t_end = 100.0
 
 function data_run(sim::AbstractSimulation, time_max, save_path; sample_instance=50, verbose=false, sample_single_period=false, single_period_direction=:rising)
     data = Dict{String,Any}(
-        "RHS"   => Any[],
         "time"  => Any[],
         "Δt"    => Any[],
-        "flow"  => Any[],
         "u"     => Any[],
         "μ₀"    => Any[],
         "force" => Any[],
@@ -29,17 +27,17 @@ function data_run(sim::AbstractSimulation, time_max, save_path; sample_instance=
             force = WaterLily.pressure_force(sim)
             force = force./(0.5sim.L*sim.U^2) # scale the forces!
             sample_counter += 1
-            print("Sampling RHS - ")
+            print("Sampling Data - ")
             push!(data["force"], force)
-            push!(data["flow"], sim.flow)                     # maybe keep reference if intended
+            # push!(data["flow"], sim.flow)                     # maybe keep reference if intended
             push!(data["u"], copy(sim.flow.u))               # make a snapshot copy
             push!(data["μ₀"], copy(sim.flow.μ₀))             # make a snapshot copy
-            push!(data["RHS"], copy(RHS(sim.flow)))         # ensure RHS is a separate array
+            # push!(data["RHS"], copy(RHS(sim.flow)))         # ensure RHS is a separate array
             push!(data["time"], Float32(round(sim_time(sim),digits=4)))
             push!(data["Δt"], Float32(round(sim.flow.Δt[end], digits=3)))
         end
     end
-    println("Sampled ", sample_counter," RHS")
+    println("Sampled ", sample_counter," Snapshots")
     for k in ["RHS", "u", "μ₀"]
         if haskey(data, k) && !isempty(data[k]) && isa(first(data[k]), AbstractArray)
             sample0 = first(data[k])
@@ -92,9 +90,9 @@ function data_run(sim::AbstractSimulation, time_max, save_path; sample_instance=
     return data
 end
 
-# data = data_run(sim_shedding, t_end, "data/datasets/128_RHS_biot_data_arr_force.jld2"; verbose=true, sample_single_period=true)
+data = data_run(sim_shedding, t_end, "data/datasets/U_128.jld2"; verbose=true, sample_single_period=true)
 
-@load "data/datasets/128_RHS_biot_data_arr_force_period.jld2" data
+# @load "data/datasets/128_RHS_biot_data_arr_force_period.jld2" data
 
 
 forces = data["force"]

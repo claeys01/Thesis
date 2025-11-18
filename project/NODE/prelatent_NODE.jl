@@ -6,30 +6,30 @@ using DiffEqFlux, ComponentArrays, Zygote, OrdinaryDiffEq,
 using Optimization, OptimizationOptimisers
 using Plots
 
-includet("Lux_AE.jl")
-includet("../utils/AE_normalizer.jl")
 includet("../custom.jl")
 
-
+includet("NODE_core.jl")
 # load hyperparamters
-args = LuxArgs()
+args = NodeArgs()
 args.seed > 0 && Random.seed!(args.seed)
 
-dense_mult = 2
-nt = 5          # training trajectory length (steps per loss)
 
 # ---------------------------
 # Data loading / slicing
 # ---------------------------
-@load "/home/matth/Thesis/data/latent_data/128_u_biot_data_arr_force_period.jld2" z
-@load args.data_path data
+@load args.period_latent_path z
+@load args.period_u_path data
 preprocess_data!(data; n_samples=args.downsample, clip_bc=args.clip_bc)
 
 z = Float32.(cat(z...;dims=2))
 t = Float32.(data["time"])
+t .-= t[1]
+# @show size(t_new) size(t)
 
 tspan = (t[1], t[end])
-z_0 = z[:,1]
+z0 = z[:,1]
+# z, t, tspan, z0 = get_NODE_data(args.period_latent_path, args.period_u_path)
+
 
 idx_samples = round.(Int, range(1, stop=size(z, 1), length=4))
 z_samples = [vec(z[i, :]) for i in idx_samples]  # Vector of 8 one-dimensional arrays, each length 179
@@ -39,13 +39,12 @@ z_samples = [vec(z[i, :]) for i in idx_samples]  # Vector of 8 one-dimensional a
 
 # define dudt
 dudt = Chain(
-    Dense(args.latent_dim, dense_mult * args.latent_dim, tanh),
-    Dense(dense_mult * args.latent_dim, args.latent_dim),
+    Dense(args.latent_dim, args.dense_mult * args.latent_dim, tanhshrink),
+    Dense(args.dense_mult * args.latent_dim, args.latent_dim),
 )
 
 # initalize model weights
 ps, st = Lux.setup(Xoshiro(0), dudt)
-# ensure all parameter arrays are Float64 to avoid mixed-precision matmul fallbacks
 
 
 # define latent NODE
@@ -53,7 +52,7 @@ nn_ode = NeuralODE(dudt, tspan, Tsit5(); saveat = t)
 
 
 function predict(p)
-    out = nn_ode(z_0, p, st)              # may be ODESolution or (ODESolution, newstate)
+    out = nn_ode(z0, p, st)              # may be ODESolution or (ODESolution, newstate)
     ode_sol = isa(out, Tuple) ? out[1] : out
     # build (latent_dim, n_timepoints) array matching `z`
     pred = hcat(ode_sol.u...) |> Array
@@ -70,22 +69,22 @@ end
 callback_step = Ref(0)
 
 
-function callback(state, l)
-    # println(l)
+function callback(state, l; plotting=true)
     callback_step[] += 1
 
     @info "solver callback call $(callback_step[]): loss = $(l)"
-    # @show typeof(state)
     z_pred = predict(state.u)
     z_pred_samples = [vec(z_pred[i, :]) for i in idx_samples]  # Vector of 4 one-dimensional arrays, each length 179
 
-    # p = plot()
-    # colors = [:black, :red, :blue, :green]
-    # for i in 1:4
-    #     plot!(p, t, z_samples[i]; color=colors[i], label = "data_$i")
-    #     plot!(p, t, z_pred_samples[i]; linestyle = :dash, color=colors[i], label = "pred_$i")
-    # end
-    # display(p)
+    if plotting
+        p = plot()
+        colors = [:black, :red, :blue, :green]
+        for i in 1:4
+            plot!(p, t, z_samples[i]; color=colors[i], label = "data_$i")
+            plot!(p, t, z_pred_samples[i]; linestyle = :dash, color=colors[i], label = "pred_$i")
+        end
+        display(p)
+    end
     return false
 end
 
@@ -100,7 +99,7 @@ optprob = Optimization.OptimizationProblem(optf, pinit)
 
 
 result_neuralode = Optimization.solve(
-    optprob, OptimizationOptimisers.Adam(0.05); callback = callback, maxiters = 10000)
+    optprob, OptimizationOptimisers.Adam(0.05); callback = callback, maxiters = 500)
 
 # -------------------------
 # Save final plot & params
