@@ -15,36 +15,36 @@ Base.@kwdef mutable struct NodeArgs
     η = 0.05                    # learning rate
     optimiser = OptimizationOptimisers.Adam
     maxiters = 250
-    solver=Tsit5()
-    reltol=1e-3
-    abstol=1e-5 
+    solver = Tsit5()
+    reltol = 1e-3
+    abstol = 1e-5
     seed = 42                   # random seed
-    latent_dim = 64
+    latent_dim = 16
     dense_mult = 2
     activation = tanhshrink
     n_reconstruct = 4
     downsample = -1
-    clip_bc=true
+    clip_bc = true
     use_gpu = false             # use GPU
-    save_path =          "data/models/NODE_models"   # results dir
-    period_latent_path = "data/latent_data/U_128_period_latent.jld2"
-    full_latent_path =   "data/latent_data/U_128_latent.jld2"
-    period_u_path =      "data/datasets/U_128_period.jld2"
-    full_u_path =        "data/datasets/U_128.jld2"
+    save_path = "data/models/NODE_models"   # results dir
+    period_latent_path = "data/latent_data/16/U_128_latent_period.jld2"
+    full_latent_path = "data/latent_data/16/U_128_latent.jld2"
+    period_u_path = "data/datasets/U_128_period.jld2"
+    full_u_path = "data/datasets/U_128.jld2"
 end
 
 function get_NODE_data(period_latent_path, data_path; downsample=-1, clip_bc=true)
     @load period_latent_path z
     @load data_path data
     # preprocess_data!(data; n_samples=downsample, clip_bc=clip_bc, verbose=false)
-    
-    z = Float32.(cat(z...;dims=2))
+
+    z = Float32.(cat(z...; dims=2))
     t = Float32.(data["time"])
     t .-= t[1]
 
     tspan = (t[1], t[end])
-    z0 = z[:,1]
-    @info "Instantiated latent NODE data" size(z)  size(t) tspan size(z0)
+    z0 = z[:, 1]
+    @info "Instantiated latent NODE data" size(z) size(t) tspan size(z0)
     return z, t, tspan, z0
 
 
@@ -56,23 +56,23 @@ mutable struct NODE
     solver::Any
     abstol::Float64
     reltol::Float64
-    t::Union{AbstractVector{<:Real}, Nothing}
+    t::Union{AbstractVector{<:Real},Nothing}
     p0::Any # network parameters
     st::Any # network state
 end
 
 # constructor 
-function NODE(latent_dim, dense_mult; tspan=(0.0f0, 1.0f0), solver=Tsit5(),abstol=1e-6, reltol=1e-6, t=nothing, activation=tanh, verbose=true)
-    
+function NODE(latent_dim, dense_mult; tspan=(0.0f0, 1.0f0), solver=Tsit5(), abstol=1e-6, reltol=1e-6, t=nothing, activation=tanh, verbose=true)
+
     nn = Chain(
-    Dense(latent_dim, dense_mult * latent_dim, activation),
-    Dense(dense_mult * latent_dim, latent_dim))
-    verbose && @info "NODE initialized" latent_dim=latent_dim dense_mult=dense_mult tspan=tspan solver=typeof(solver) reltol=reltol abstol=abstol t=t activation=activation
+        Dense(latent_dim, dense_mult * latent_dim, activation),
+        Dense(dense_mult * latent_dim, latent_dim))
+    verbose && @info "NODE initialized" latent_dim = latent_dim dense_mult = dense_mult tspan = tspan solver = typeof(solver) reltol = reltol abstol = abstol t = t activation = activation
     return NODE(nn, tspan, solver, abstol, reltol, t, nothing, nothing)
 end
 
 
-function setup_lux!(node::NODE; rng = Xoshiro(0), verbose=true)
+function setup_lux!(node::NODE; rng=Xoshiro(0), verbose=true)
     ps, st = Lux.setup(rng, node.dudt)
     node.p0 = ps
     node.st = st
@@ -90,7 +90,6 @@ function predict(node::NODE, z0; p=nothing, t=nothing)
     p_used = p === nothing ? node.p0 : p
     nnode = NeuralODE(node.dudt, tspan, solver; saveat=t, abstol=node.abstol, reltol=node.reltol)
     sol = nnode(z0, p_used, node.st)
-   
 
     if isa(sol, Tuple)
         sol = sol[1]
@@ -129,7 +128,7 @@ function save_node(path::AbstractString, node::NODE, args::NodeArgs)
     args_copy = deepcopy(args)
     node_tspan = node.tspan
     node_t = node.t
-    @save path node_p0=node.p0 node_st=node.st node_args=args_copy node_tspan node_t
+    @save path node_p0 = node.p0 node_st = node.st node_args = args_copy node_tspan node_t
     @info "Saved NODE to $path"
 end
 
@@ -153,8 +152,8 @@ function plot_node_trajectory(node::NODE, z::AbstractMatrix, z0; p=nothing, t=no
     p = plot()
     colors = [:black, :red, :blue, :green, :purple, :orange, :yellow]
     for i in 1:n_reconstruct
-        plot!(p, node.t, z_samples[i]; color=colors[i], label = "data_$i")
-        plot!(p, node.t, ẑ_samples[i]; linestyle = :dash, color=colors[i], label = "pred_$i")
+        plot!(p, node.t, z_samples[i]; color=colors[i], label="data_$i")
+        plot!(p, node.t, ẑ_samples[i]; linestyle=:dash, color=colors[i], label="pred_$i")
     end
     return p
 end

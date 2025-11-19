@@ -4,14 +4,15 @@ using Plots
 includet("NODE_core.jl")
 
 function extrapolate_node(; kws...)
-    path = "data/saved_models/best_node/node_params.jld2"
+    path = "data/saved_models/NODE/16/U128_l16_tanhshrink_Tsit5.jld2/node_params.jld2"
     node, args = load_node(path)
-    z_full = load("data/latent_data/U_128_latent.jld2", "z")
+    z_full = load("data/latent_data/16/U_128_latent.jld2", "z")
     @load args.full_u_path data
 
     z_full = Float32.(cat(z_full...;dims=2))
     @show size(z_full)
     sample_period = 726:1083
+    println(sample_period[end])
     z_full = z_full[:,  sample_period]
     t_full = data["time"][sample_period]
     t_full .-= t_full[1]
@@ -21,7 +22,7 @@ function extrapolate_node(; kws...)
     node_extr = deepcopy(node)
 
     extr = 44
-    Δt_extr = 0.005
+    Δt_extr = 0.00504
     for i in 1:extr
         append!(node_extr.t, node_extr.t[end]+i*Δt_extr)
     end
@@ -32,6 +33,15 @@ function extrapolate_node(; kws...)
 
     pred_extr = predict_array(node_extr, z0)
     pred = predict_array(node, z0)
+    
+    period_pred = pred_extr[:, end]
+    @show size(period_pred)
+    pred_path = "data/latent_data/period_predictions/period_pred.jld2"
+    JLD2.save(pred_path, "period_pred", period_pred,
+                "pred_idx", sample_period[end])
+    
+
+    # @save "data/latent_data/period_predictions/period"
     
     @show size(pred) size(pred_extr)
 
@@ -57,6 +67,7 @@ function extrapolate_node(; kws...)
     plot!(p, [NaN], [NaN], label="pred (trained)",       linestyle=:dash,    color=:black, lw=2)
     plot!(p, [NaN], [NaN], label="extr (extrapolated)",  linestyle=:dashdot, color=:black, lw=2)
     display(p)
+    savefig(p, "figs/node_predictions/latent_period_pred.png")
     nothing
 end
 

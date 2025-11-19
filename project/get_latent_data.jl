@@ -19,8 +19,7 @@ function get_latent_data(checkpoint_path::String; save_path::Union{String,Nothin
     Flux.loadmodel!(dec, decoder_state)
 
     # @load args.data_path data
-    # @load checkpoint.data_path data
-    @load "/home/matth/Thesis/data/datasets/U_128_period.jld2" data
+    @load "/home/matth/Thesis/data/datasets/U_128.jld2" data
     preprocess_data!(data; clip_bc=args.clip_bc, verbose=true)
 
     # ensure μ₀ is a 4-D array too if present
@@ -58,7 +57,7 @@ function get_latent_data(checkpoint_path::String; save_path::Union{String,Nothin
     return latent_snaps
 end
 
-checkpoint = "data/saved_models/u_100period_100e_4096n_64l_norm_pooling_ups_mu_L1/checkpoint.jld2"
-save_path = "data/latent_data/U_128_latent_period.jld2"
+checkpoint = "data/saved_models/u/256h_16l/u_100period_100e_4096n_256h_16l_norm_pooling_ups_mu_L1/checkpoint.jld2"
+save_path = "data/latent_data/16/U_128_latent.jld2"
 kkr = get_latent_data(checkpoint; save_path=save_path)
 nothing

@@ -39,8 +39,8 @@ function train(; kws...)
 
 
     # # initialize encoder and decoder
-    encoder = Flux.f32(Encoder(args.input_dim, args.latent_dim; C_next=args.C_conv, padding=args.padding, stride=args.stride)) |> device
-    decoder = Flux.f32(Decoder(args.output_dim, args.latent_dim; C_next=args.C_conv)) |> device
+    encoder = Flux.f32(Encoder(args.input_dim,  args.latent_dim; C_next=args.C_conv, hidden_dim=args.hidden_dim, padding=args.padding, stride=args.stride)) |> device
+    decoder = Flux.f32(Decoder(args.output_dim, args.latent_dim; C_next=args.C_conv, hidden_dim=args.hidden_dim)) |> device
 
 
     # define optimizer
@@ -65,7 +65,7 @@ function train(; kws...)
     @info "Start Training, total $(args.epochs) epochs"
     val_mean = 1
     for epoch = 1:args.epochs
-        @info "Epoch $(epoch)"
+        @info "Epoch $(epoch)/$(args.epochs)"
         train_progress = Progress(length(train_loader); desc="Training")
         # ---- TRAIN ----
         for (x_in, x_target, μ₀) in train_loader

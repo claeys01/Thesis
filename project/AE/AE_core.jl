@@ -12,13 +12,13 @@ Base.@kwdef mutable struct Args
     λ = 1e-4                    # regularization paramater
     λdiv = 0                    # divergence loss weight
     λmask = 0                   # weight of body mask loss
-    loss = :L2                  # loss function for reconstruction loss (:L1, :L2, :charb)
+    loss = :L1                  # loss function for reconstruction loss (:L1, :L2, :charb)
     batch_size = 32             # batch size
     downsample = 100             # amount of data used for training 
-    epochs = 10                # number of epochs
+    epochs = 100                # number of epochs
     seed = 42                   # random seed
     n_reconstruct = 2           # sampling size for output   
-    field = "u" 
+    field = "u"
     use_gpu = false             # use GPU
     clip_bc = true              # removes the ghost cells from the snapshot
     input_dim = (128, 128, 4)   # flow field size with μ₀ concatenated
@@ -26,7 +26,8 @@ Base.@kwdef mutable struct Args
     split = 0.2
     stride = 1
     padding = 1
-    latent_dim = 8^2            # latent dimension
+    latent_dim = 16            # latent dimension
+    hidden_dim = 256 
     C_conv = 8                  # first amount of channels for convs
     verbose_freq = 5            # logging for every verbose_freq iterations
     normalize = true            # normalise training data
@@ -65,8 +66,10 @@ function get_data(batch_size, path; tmin=-1, tmax=-1, n_samples=500,
     train_idx = perm[(nval+1):end]
 
     if normalize
-        Xin_train = cat(X_norm[:, :, :, train_idx], μ₀[:, :, :, train_idx]; dims=3) # (u,v,mask)
-        Xin_val = cat(X_norm[:, :, :, val_idx], μ₀[:, :, :, val_idx]; dims=3)
+        Xin_train = cat(X_norm[:, :, :, train_idx], 
+                        μ₀[:, :, :, train_idx]; dims=3) # (u,v,mask)
+        Xin_val = cat(X_norm[:, :, :, val_idx], 
+                        μ₀[:, :, :, val_idx]; dims=3)
 
         Xtarget_train = X_norm[:, :, :, train_idx]  # (u,v)
         Xtarget_val = X_norm[:, :, :, val_idx]
@@ -74,8 +77,10 @@ function get_data(batch_size, path; tmin=-1, tmax=-1, n_samples=500,
         μ₀_train = μ₀[:, :, :, train_idx]
         μ₀_val = μ₀[:, :, :, val_idx]
     else
-        Xin_train = cat(X[:, :, :, train_idx], μ₀[:, :, :, train_idx]; dims=3)
-        Xin_val = cat(X[:, :, :, val_idx], μ₀[:, :, :, val_idx]; dims=3)
+        Xin_train = cat(X[:, :, :, train_idx], 
+                        μ₀[:, :, :, train_idx]; dims=3)
+        Xin_val = cat(X[:, :, :, val_idx], 
+                        μ₀[:, :, :, val_idx]; dims=3)
 
         Xtarget_train = X[:, :, :, train_idx]
         Xtarget_val = X[:, :, :, val_idx]
@@ -100,7 +105,7 @@ end
 
 Flux.@layer Encoder
 
-Encoder(input_size::Tuple{Int,Int,Int}, latent_dim::Int; C_next::Int=4, padding=1, stride=2, verbose::Bool=true) = begin
+Encoder(input_size::Tuple{Int,Int,Int}, latent_dim::Int; hidden_dim=256, C_next::Int=4, padding=1, stride=2, verbose::Bool=true) = begin
     H, W, C = input_size
 
     convpart = Chain(
@@ -117,10 +122,12 @@ Encoder(input_size::Tuple{Int,Int,Int}, latent_dim::Int; C_next::Int=4, padding=
     dummy = zeros(Float32, H, W, C, 1)
     flat = convpart(dummy)
     dense_in = size(flat, 1)
-    if verbose
-        @info "Initialize Encoder with $(dense_in) connected nodes and $(latent_dim) latent dimensions"
-    end
-    return Encoder(Chain(convpart, Dense(dense_in, latent_dim)))
+    verbose && @info "Initialize Encoder with $(dense_in) → $(hidden_dim) → $(latent_dim) bottleneck"
+    return Encoder(Chain(
+            convpart,
+            Dense(dense_in, hidden_dim), relu,
+            Dense(hidden_dim, latent_dim)      # latent_dim = 16 later
+        ))
 end
 
 
@@ -136,15 +143,16 @@ function upsample2(x)
     H, W, _, _ = size(x)
     return NNlib.upsample_bilinear(x; size=(2H, 2W))
 end
-Decoder(output_size::Tuple{Int,Int,Int}, latent_dim::Int; C_next::Int=4, verbose::Bool=true) = begin
+Decoder(output_size::Tuple{Int,Int,Int}, latent_dim::Int; hidden_dim=256, C_next::Int=4, verbose::Bool=true) = begin
     H, W, C = output_size
     h_lat, w_lat = div(H, 16), div(W, 16)
     channels_mid = 8 * C_next
     dense_len = h_lat * w_lat * channels_mid
-    verbose && @info "Initialize Decoder (upsample+conv) with $(dense_len) nodes, $(latent_dim) latent dims"
+    verbose && @info "Initialize Decoder (upsample+conv) with $(latent_dim) → $(hidden_dim) → $(dense_len)"
 
     return Decoder(Chain(
-        Dense(latent_dim, dense_len),
+        Dense(latent_dim, hidden_dim), gelu,
+        Dense(hidden_dim, dense_len),
         x -> reshape(x, h_lat, w_lat, channels_mid, size(x, 2)),
 
         # stage 1: H/16 → H/8
