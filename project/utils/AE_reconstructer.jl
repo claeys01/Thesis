@@ -112,7 +112,7 @@ end
 
 if abspath(PROGRAM_FILE) == (@__FILE__) || isinteractive()
     checkpoint = "data/models/2025-11-11_16-20-27/checkpoint.jld2"
-    visualize_reconstructions(checkpoint)
+    # visualize_reconstructions(checkpoint)
 
 end
 

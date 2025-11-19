@@ -15,7 +15,7 @@ Base.@kwdef mutable struct Args
     loss = :L2                  # loss function for reconstruction loss (:L1, :L2, :charb)
     batch_size = 32             # batch size
     downsample = 100             # amount of data used for training 
-    epochs = 100                # number of epochs
+    epochs = 10                # number of epochs
     seed = 42                   # random seed
     n_reconstruct = 2           # sampling size for output   
     field = "u" 
@@ -31,7 +31,7 @@ Base.@kwdef mutable struct Args
     verbose_freq = 5            # logging for every verbose_freq iterations
     normalize = true            # normalise training data
     save_path = "data/models"   # results path
-    data_path = "data/datasets/128_RHS_biot_data_arr_force_period.jld2"
+    data_path = "data/datasets/U_128_period.jld2"
 end
 
 
