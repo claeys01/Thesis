@@ -16,6 +16,7 @@ deps/usr/
 deps/src/
 /home/matth/Thesis/deps/AutoEncoderToolkit
 data/models/
+data/NODE_models/
 loss_trajectory*
 data/RHS*
 data/datasets/
