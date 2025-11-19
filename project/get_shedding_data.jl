@@ -13,10 +13,8 @@ t_end = 100.0
 
 function data_run(sim::AbstractSimulation, time_max, save_path; sample_instance=50, verbose=false, sample_single_period=false, single_period_direction=:rising)
     data = Dict{String,Any}(
-        "RHS"   => Any[],
         "time"  => Any[],
         "Δt"    => Any[],
-        "flow"  => Any[],
         "u"     => Any[],
         "μ₀"    => Any[],
         "force" => Any[],
@@ -29,18 +27,32 @@ function data_run(sim::AbstractSimulation, time_max, save_path; sample_instance=
             force = WaterLily.pressure_force(sim)
             force = force./(0.5sim.L*sim.U^2) # scale the forces!
             sample_counter += 1
-            print("Sampling RHS - ")
+            print("Sampling Data - ")
             push!(data["force"], force)
-            push!(data["flow"], sim.flow)
-            push!(data["u"], sim.flow.u)
-            push!(data["μ₀"], sim.flow.μ₀)
-            push!(data["RHS"], RHS(sim.flow))
+            # push!(data["flow"], sim.flow)                     # maybe keep reference if intended
+            push!(data["u"], copy(sim.flow.u))               # make a snapshot copy
+            push!(data["μ₀"], copy(sim.flow.μ₀))             # make a snapshot copy
+            # push!(data["RHS"], copy(RHS(sim.flow)))         # ensure RHS is a separate array
             push!(data["time"], Float32(round(sim_time(sim),digits=4)))
             push!(data["Δt"], Float32(round(sim.flow.Δt[end], digits=3)))
         end
     end
-    println("Sampled ", sample_counter," RHS")
-
+    println("Sampled ", sample_counter," Snapshots")
+    for k in ["RHS", "u", "μ₀"]
+        if haskey(data, k) && !isempty(data[k]) && isa(first(data[k]), AbstractArray)
+            sample0 = first(data[k])
+            if ndims(sample0) >= 2
+                dims = 4
+                try
+                    data[k] = cat(data[k]...; dims=dims)
+                    @info "Stacked samples for $(k) into size $(size(data[k]))"
+                catch e
+                    @warn "Failed to stack samples for $(k): $e"
+                end
+            end
+        end
+    end
+    
     @info "Saved $(sample_counter) snapshots to $(save_path)"
     if sample_single_period
         split_path = split(save_path, ".")
@@ -51,12 +63,17 @@ function data_run(sim::AbstractSimulation, time_max, save_path; sample_instance=
             # ensure valid mid index
             if mid < length(zero_idxs)
                 single_period = zero_idxs[mid] : zero_idxs[mid+1]
+                println(single_period)
                 period_data = Dict()
                 for key in keys(data)
-                    period_data[key] = data[key][single_period]
+                    if key in ["RHS", "u", "μ₀"]
+                        period_data[key] = data[key][:,:,:,single_period]
+                    else
+                        period_data[key] = data[key][single_period]
+                    end
                 end
                 # save the single-period dictionary and indices
-                @save single_period_save RHS_data = period_data
+                @save single_period_save data = period_data
                 @info "Saved data from a single period to $(single_period_save)"
 
                 # also attach to returned data for convenience
@@ -69,17 +86,18 @@ function data_run(sim::AbstractSimulation, time_max, save_path; sample_instance=
         end
     end
 
-    @save save_path RHS_data = data
+    @save save_path data
 
     return data
 end
 
-RHS_data = data_run(sim_shedding, t_end, "data/datasets/128_RHS_biot_data_arr_force.jld2"; verbose=true, sample_single_period=true)
+data = data_run(sim_shedding, t_end, "data/datasets/U_128.jld2"; verbose=true, sample_single_period=true)
 
-# @load "data/RHS_biot_data_arr_force.jld2" RHS_data
+# @load "data/datasets/U_128.jld2" data
 
-forces = RHS_data["force"]
-time = RHS_data["time"]
+
+forces = data["force"]
+time = data["time"]
 zero_idxs = zero_crossing(last.(forces); direction=:rising)
 drag, lift = first.(forces), last.(forces)
 
@@ -96,8 +114,9 @@ for idx in zero_idxs
 end
 
 mid = length(zero_idxs) ÷ 2
+# println(zero_idxs)
 single_period = zero_idxs[mid] : zero_idxs[mid+1]
-period_data = RHS_data["single_period"]
+period_data = data["single_period"]
 plot!(period_data["time"], last.(period_data["force"]); 
     linestyle =:dash, lw=2, label="sampled period", color=:green)
 
