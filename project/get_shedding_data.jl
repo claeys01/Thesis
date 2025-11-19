@@ -63,6 +63,7 @@ function data_run(sim::AbstractSimulation, time_max, save_path; sample_instance=
             # ensure valid mid index
             if mid < length(zero_idxs)
                 single_period = zero_idxs[mid] : zero_idxs[mid+1]
+                println(single_period)
                 period_data = Dict()
                 for key in keys(data)
                     if key in ["RHS", "u", "μ₀"]
@@ -92,7 +93,7 @@ end
 
 data = data_run(sim_shedding, t_end, "data/datasets/U_128.jld2"; verbose=true, sample_single_period=true)
 
-# @load "data/datasets/128_RHS_biot_data_arr_force_period.jld2" data
+# @load "data/datasets/U_128.jld2" data
 
 
 forces = data["force"]
@@ -112,14 +113,14 @@ for idx in zero_idxs
     annotate!(time[idx], lift[idx], (idx, 5, :left))
 end
 
-# mid = length(zero_idxs) ÷ 2
-# # println(zero_idxs)
-# single_period = zero_idxs[mid] : zero_idxs[mid+1]
-# period_data = data["single_period"]
-# plot!(period_data["time"], last.(period_data["force"]); 
-#     linestyle =:dash, lw=2, label="sampled period", color=:green)
+mid = length(zero_idxs) ÷ 2
+# println(zero_idxs)
+single_period = zero_idxs[mid] : zero_idxs[mid+1]
+period_data = data["single_period"]
+plot!(period_data["time"], last.(period_data["force"]); 
+    linestyle =:dash, lw=2, label="sampled period", color=:green)
 
 
 display(plt)
-# savefig(plt, "figs/period_sample.png")
+savefig(plt, "figs/period_sample.png")
 

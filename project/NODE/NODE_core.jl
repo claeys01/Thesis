@@ -15,24 +15,28 @@ Base.@kwdef mutable struct NodeArgs
     η = 0.05                    # learning rate
     optimiser = OptimizationOptimisers.Adam
     maxiters = 250
+    solver=Tsit5()
+    reltol=1e-3
+    abstol=1e-5 
     seed = 42                   # random seed
     latent_dim = 64
     dense_mult = 2
     activation = tanhshrink
+    n_reconstruct = 4
     downsample = -1
     clip_bc=true
     use_gpu = false             # use GPU
     save_path =          "data/models/NODE_models"   # results dir
     period_latent_path = "data/latent_data/U_128_period_latent.jld2"
-    full_latent_path =   "data/latent_data/U_128_period_latent.jld2"
+    full_latent_path =   "data/latent_data/U_128_latent.jld2"
     period_u_path =      "data/datasets/U_128_period.jld2"
-    full_u_path =        "data/datasets/U_128_latent.jld2"
+    full_u_path =        "data/datasets/U_128.jld2"
 end
 
 function get_NODE_data(period_latent_path, data_path; downsample=-1, clip_bc=true)
     @load period_latent_path z
     @load data_path data
-    preprocess_data!(data; n_samples=downsample, clip_bc=clip_bc, verbose=false)
+    # preprocess_data!(data; n_samples=downsample, clip_bc=clip_bc, verbose=false)
     
     z = Float32.(cat(z...;dims=2))
     t = Float32.(data["time"])
@@ -50,19 +54,21 @@ mutable struct NODE
     dudt::Any
     tspan::Tuple{<:Real,<:Real}
     solver::Any
+    abstol::Float64
+    reltol::Float64
     t::Union{AbstractVector{<:Real}, Nothing}
     p0::Any # network parameters
     st::Any # network state
 end
 
 # constructor 
-function NODE(latent_dim, dense_mult; tspan=(0.0f0, 1.0f0), solver=Tsit5(), t=nothing, activation=tanh, verbose=true)
+function NODE(latent_dim, dense_mult; tspan=(0.0f0, 1.0f0), solver=Tsit5(),abstol=1e-6, reltol=1e-6, t=nothing, activation=tanh, verbose=true)
     
     nn = Chain(
     Dense(latent_dim, dense_mult * latent_dim, activation),
     Dense(dense_mult * latent_dim, latent_dim))
-    verbose && @info "NODE initialized" latent_dim=latent_dim dense_mult=dense_mult tspan=tspan solver=typeof(solver) t=t activation=activation
-    return NODE(nn, tspan, solver, t, nothing, nothing)
+    verbose && @info "NODE initialized" latent_dim=latent_dim dense_mult=dense_mult tspan=tspan solver=typeof(solver) reltol=reltol abstol=abstol t=t activation=activation
+    return NODE(nn, tspan, solver, abstol, reltol, t, nothing, nothing)
 end
 
 
@@ -76,13 +82,13 @@ end
 
 # Build a NeuralODE from the (possibly reconstructed) model and solve for given initial state z0 and params p.
 # - If setup_method == :lux, `p` is expected to be the ComponentArray returned by Lux.setup and st is used.
-function predict(node::NODE, z0; p=nothing, t=nothing, abstol=1e-6, reltol=1e-6)
+function predict(node::NODE, z0; p=nothing, t=nothing)
     tspan = node.tspan
     solver = node.solver
     t = t === nothing ? node.t : t
 
     p_used = p === nothing ? node.p0 : p
-    nnode = NeuralODE(node.dudt, tspan, solver; saveat=t, abstol=abstol, reltol=reltol)
+    nnode = NeuralODE(node.dudt, tspan, solver; saveat=t, abstol=node.abstol, reltol=node.reltol)
     sol = nnode(z0, p_used, node.st)
    
 
@@ -95,8 +101,8 @@ end
 
 
 # Convenience: produce a (latent_dim, n_timepoints) Array prediction like in prelatent_NODE.jl
-function predict_array(node::NODE, z0; p=nothing, t=nothing, abstol=1e-6, reltol=1e-6)
-    sol = predict(node, z0; p=p, t=t, abstol=abstol, reltol=reltol)
+function predict_array(node::NODE, z0; p=nothing, t=nothing)
+    sol = predict(node, z0; p=p, t=t)
     return hcat(sol.u...) |> Array
 end
 
@@ -129,7 +135,7 @@ end
 
 function load_node(path::AbstractString)
     @load path node_p0 node_st node_args node_tspan node_t
-    node = NODE(node_args.latent_dim, node_args.dense_mult; activation=node_args.activation)
+    node = NODE(node_args.latent_dim, node_args.dense_mult; activation=node_args.activation, verbose=false)
     setup_lux!(node, verbose=false)   # create a matching structure
     node.p0 = node_p0
     node.st = node_st

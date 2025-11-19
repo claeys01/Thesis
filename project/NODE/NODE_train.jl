@@ -8,12 +8,13 @@ using ProgressMeter
 
 includet("NODE_core.jl")
 
-# remove the old global callback/counter; they'll be created per-run below
 
 function train_NODE(args; kws...)
 
     z, t, tspan, z0 = get_NODE_data(args.period_latent_path, args.period_u_path)
-    node = NODE(args.latent_dim, args.dense_mult; tspan=tspan, t=t, activation=args.activation)
+    node = NODE(args.latent_dim, args.dense_mult; 
+                tspan=tspan, t=t, activation=args.activation, 
+                solver=args.solver, abstol=args.abstol, reltol=args.reltol)
     setup_lux!(node)
 
     @inline loss_function(x) = mse_loss(node, z, z0; p=x)
@@ -38,7 +39,7 @@ function train_NODE(args; kws...)
 
     result_neuralode = solve(optprob, args.optimiser(args.η); callback = callback, maxiters = args.maxiters)
 
-    # finish!(pb)
+    finish!(pb)
     
     node.p0 = result_neuralode.u
 
