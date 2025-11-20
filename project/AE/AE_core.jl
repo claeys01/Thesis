@@ -1,6 +1,5 @@
 using Flux
 using NNlib
-using WaterLily
 using Statistics
 using Zygote
 using MLUtils: DataLoader
@@ -27,7 +26,7 @@ Base.@kwdef mutable struct Args
     stride = 1
     padding = 1
     latent_dim = 16            # latent dimension
-    hidden_dim = 256 
+    hidden_dim = 256
     C_conv = 8                  # first amount of channels for convs
     verbose_freq = 5            # logging for every verbose_freq iterations
     normalize = true            # normalise training data
@@ -66,10 +65,10 @@ function get_data(batch_size, path; tmin=-1, tmax=-1, n_samples=500,
     train_idx = perm[(nval+1):end]
 
     if normalize
-        Xin_train = cat(X_norm[:, :, :, train_idx], 
-                        μ₀[:, :, :, train_idx]; dims=3) # (u,v,mask)
-        Xin_val = cat(X_norm[:, :, :, val_idx], 
-                        μ₀[:, :, :, val_idx]; dims=3)
+        Xin_train = cat(X_norm[:, :, :, train_idx],
+            μ₀[:, :, :, train_idx]; dims=3) # (u,v,mask)
+        Xin_val = cat(X_norm[:, :, :, val_idx],
+            μ₀[:, :, :, val_idx]; dims=3)
 
         Xtarget_train = X_norm[:, :, :, train_idx]  # (u,v)
         Xtarget_val = X_norm[:, :, :, val_idx]
@@ -77,10 +76,10 @@ function get_data(batch_size, path; tmin=-1, tmax=-1, n_samples=500,
         μ₀_train = μ₀[:, :, :, train_idx]
         μ₀_val = μ₀[:, :, :, val_idx]
     else
-        Xin_train = cat(X[:, :, :, train_idx], 
-                        μ₀[:, :, :, train_idx]; dims=3)
-        Xin_val = cat(X[:, :, :, val_idx], 
-                        μ₀[:, :, :, val_idx]; dims=3)
+        Xin_train = cat(X[:, :, :, train_idx],
+            μ₀[:, :, :, train_idx]; dims=3)
+        Xin_val = cat(X[:, :, :, val_idx],
+            μ₀[:, :, :, val_idx]; dims=3)
 
         Xtarget_train = X[:, :, :, train_idx]
         Xtarget_val = X[:, :, :, val_idx]
@@ -124,12 +123,11 @@ Encoder(input_size::Tuple{Int,Int,Int}, latent_dim::Int; hidden_dim=256, C_next:
     dense_in = size(flat, 1)
     verbose && @info "Initialize Encoder with $(dense_in) → $(hidden_dim) → $(latent_dim) bottleneck"
     return Encoder(Chain(
-            convpart,
-            Dense(dense_in, hidden_dim), relu,
-            Dense(hidden_dim, latent_dim)      # latent_dim = 16 later
-        ))
+        convpart,
+        Dense(dense_in, hidden_dim), relu,
+        Dense(hidden_dim, latent_dim)      # latent_dim = 16 later
+    ))
 end
-
 
 
 struct Decoder
