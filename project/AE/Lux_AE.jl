@@ -16,7 +16,7 @@ Base.@kwdef mutable struct LuxArgs
     loss = :L1                  # loss function for reconstruction loss (:L1, :L2, :charb)
     batch_size = 32             # batch size
     downsample = 100             # amount of data used for training 
-    epochs = 100                # number of epochs
+    epochs = 10                # number of epochs
     seed = 42                   # random seed
     n_reconstruct = 2           # sampling size for output   
     field = "u"
@@ -30,14 +30,13 @@ Base.@kwdef mutable struct LuxArgs
     latent_dim = 16            # latent dimension
     hidden_dim = 256
     C_conv = 8                  # first amount of channels for convs
-    verbose_freq = 5            # logging for every verbose_freq iterations
     normalize = true            # normalise training data
-    save_path = "data/models"   # results path
+    save_path = "data/Lux_models"   # results path
     data_path = "data/datasets/U_128_period.jld2"
 end
 
-function get_data(batch_size, path; tmin=-1, tmax=-1, n_samples=500,
-    normalize=false, clip_bc=true, split=0.2, field="u")
+function get_data(batch_size, path; tmin=-1, tmax=-1, n_samples=500, 
+    clip_bc=true, split=0.2, field="u")
 
     @load path data
     preprocess_data!(data; tmin=tmin, tmax=tmax,
@@ -51,7 +50,7 @@ function get_data(batch_size, path; tmin=-1, tmax=-1, n_samples=500,
     μ₀ = Float32.(μ₀)
 
     # normalizer from X only (physics channels)
-    X_norm, normalizer = normalize_batch(X; normalizer=nothing)
+    _, normalizer = normalize_batch(X; normalizer=nothing)
 
     # indices
     N = size(X, 4)
@@ -65,29 +64,18 @@ function get_data(batch_size, path; tmin=-1, tmax=-1, n_samples=500,
     val_idx = perm[1:nval]
     train_idx = perm[(nval+1):end]
 
-    if normalize
-        Xin_train = cat(X_norm[:, :, :, train_idx],
-            μ₀[:, :, :, train_idx]; dims=3) # (u,v,mask)
-        Xin_val = cat(X_norm[:, :, :, val_idx],
-            μ₀[:, :, :, val_idx]; dims=3)
-
-        Xtarget_train = X_norm[:, :, :, train_idx]  # (u,v)
-        Xtarget_val = X_norm[:, :, :, val_idx]
-
-        μ₀_train = μ₀[:, :, :, train_idx]
-        μ₀_val = μ₀[:, :, :, val_idx]
-    else
-        Xin_train = cat(X[:, :, :, train_idx],
+     Xin_train = cat(X[:, :, :, train_idx],
             μ₀[:, :, :, train_idx]; dims=3)
-        Xin_val = cat(X[:, :, :, val_idx],
-            μ₀[:, :, :, val_idx]; dims=3)
+    Xin_val = cat(X[:, :, :, val_idx],
+        μ₀[:, :, :, val_idx]; dims=3)
 
-        Xtarget_train = X[:, :, :, train_idx]
-        Xtarget_val = X[:, :, :, val_idx]
+    Xtarget_train = X[:, :, :, train_idx]
+    Xtarget_val = X[:, :, :, val_idx]
 
-        μ₀_train = μ₀[:, :, :, train_idx]
-        μ₀_val = μ₀[:, :, :, val_idx]
-    end
+    μ₀_train = μ₀[:, :, :, train_idx]
+    μ₀_val = μ₀[:, :, :, val_idx]
+
+    
 
     train_loader = DataLoader((Xin_train, Xtarget_train, μ₀_train),
         batchsize=batch_size, shuffle=true)
@@ -97,9 +85,8 @@ function get_data(batch_size, path; tmin=-1, tmax=-1, n_samples=500,
     return train_loader, val_loader, normalizer
 end
 
-
-struct Encoder{M} <: AbstractLuxContainerLayer{(:layers,)}
-    layers <: AbstractLuxLayer
+struct Encoder{L} <: AbstractLuxWrapperLayer{:layers}
+    layers::L
 end
 
 
@@ -108,13 +95,13 @@ Encoder(input_size::Tuple{Int,Int,Int}, latent_dim::Int; hidden_dim=256, C_next:
 
     convpart = Chain(
         # NOTE: no activation argument in Lux.Conv; add relu separately
-        Conv((3, 3), C => C_next; pad=padding, stride=stride), relu,
+        Conv((3, 3), C => C_next, identity; pad=padding, stride=stride), relu,
         MaxPool((2, 2)),
-        Conv((3, 3), C_next => 2C_next; pad=padding, stride=stride), relu,
+        Conv((3, 3), C_next => 2C_next, identity; pad=padding, stride=stride), relu,
         MaxPool((2, 2)),
-        Conv((3, 3), 2C_next => 4C_next; pad=padding, stride=stride), relu,
+        Conv((3, 3), 2C_next => 4C_next, identity; pad=padding, stride=stride), relu,
         MaxPool((2, 2)),
-        Conv((3, 3), 4C_next => 8C_next; pad=padding, stride=stride), relu,
+        Conv((3, 3), 4C_next => 8C_next, identity; pad=padding, stride=stride), relu,
         MaxPool((2, 2)),
         FlattenLayer()  # instantiate
     )
@@ -137,14 +124,13 @@ Encoder(input_size::Tuple{Int,Int,Int}, latent_dim::Int; hidden_dim=256, C_next:
     return Encoder(layers)
 end
 
-function (encoder::Encoder)(x, ps, st) # needs x_in, parameters and state
-    z = encoder.layers(x, ps.layers, st.layers)
-    return z
+function (encoder::Encoder)(x, ps, st)
+    z, st_new = encoder.layers(x, ps, st)
+    return z, st_new
 end
 
-
-struct Decoder{M} <: AbstractLuxContainerLayer{(:layers,)}
-    layers <: AbstractLuxLayer
+struct Decoder{L} <: AbstractLuxWrapperLayer{:layers}
+    layers::L
 end
 
 
@@ -188,8 +174,8 @@ Decoder(output_size::Tuple{Int,Int,Int}, latent_dim::Int; hidden_dim=256, C_next
 end
 
 function (dec::Decoder)(z, ps, st)
-    x̂, st_layers = dec.layers(z, ps.layers, st.layers)
-    return x̂, (layers = st_layers,)
+    x̂, st_new = dec.layers(z, ps, st)
+    return x̂, st_new
 end
 
 struct AE{E, D} <: AbstractLuxContainerLayer{(:encoder, :decoder)}

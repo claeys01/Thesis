@@ -1,7 +1,7 @@
 using JLD2, Plots
 using Printf
 
-# includet("../AE/AE_core.jl")
+includet("../AE/Lux_AE.jl")
 
 default(
     # fontfamily = "Computer Modern",         # looks LaTeX-y if you have it
@@ -34,7 +34,7 @@ function plot_losses(loss_trajectory_path::AbstractString, checkpoint_path::Abst
     val_corrs      = get(losses, "val_corrs", Vector{Float32}[])
 
     checkpoint = JLD2.load(checkpoint_path)
-    args = Args(; checkpoint["args"]...)
+    args = LuxArgs(; checkpoint["args"]...)
 
     # fallback x axis if missing
     if isempty(iters) && !isempty(train_losses)

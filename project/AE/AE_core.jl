@@ -28,7 +28,6 @@ Base.@kwdef mutable struct Args
     latent_dim = 16            # latent dimension
     hidden_dim = 256
     C_conv = 8                  # first amount of channels for convs
-    verbose_freq = 5            # logging for every verbose_freq iterations
     normalize = true            # normalise training data
     save_path = "data/models"   # results path
     data_path = "data/datasets/U_128_period.jld2"

@@ -11,8 +11,8 @@ using DrWatson: struct2dict
 
 includet("../custom.jl")
 includet("Lux_AE.jl")
-# includet("../utils/AE_reconstructer.jl")
-# includet("../utils/AE_loss_plot.jl")
+includet("../utils/Lux_AE_reconstructer.jl")
+includet("../utils/Lux_AE_loss_plot.jl")
 
 
 
@@ -38,13 +38,13 @@ function train(; kws...)
     @info "Training on $device"
 
     # # initialize encoder and decoder
-    encoder = Encoder(args.input_dim,  args.latent_dim; C_next=args.C_conv, hidden_dim=args.hidden_dim, padding=args.padding, stride=args.stride) |> device
-    decoder = Decoder(args.output_dim, args.latent_dim; C_next=args.C_conv, hidden_dim=args.hidden_dim) |> device
+    encoder = Encoder(args.input_dim,  args.latent_dim; hidden_dim=args.hidden_dim, C_next=args.C_conv, padding=args.padding, stride=args.stride)
+    decoder = Decoder(args.output_dim, args.latent_dim; hidden_dim=args.hidden_dim, C_next=args.C_conv) 
 
     ae = AE(encoder, decoder)
 
     rng = Xoshiro(args.seed)
-    ps, st = Lux.setup(rng, ae)
+    ps, st = Lux.setup(rng, ae) .|> device
 
     # define optimizer
     opt = AdamW(; eta=args.η, lambda=args.λ)
@@ -75,8 +75,6 @@ function train(; kws...)
         train_progress = Progress(length(train_loader); desc="Training")
         # ---- TRAIN ----
         for batch in train_loader
-            # println(size(x_in))
-            # loss_tuple, grad_enc, grad_dec = training_step(ae, ps, st, x_in, x_target, μ₀, device, args, normalizer)
             _, loss, stats, train_state = Training.single_train_step!(
                 args.Autodiff, loss_func, batch, train_state; return_gradients=Val(false)
             )
@@ -131,12 +129,19 @@ function train(; kws...)
     loss_trajectory_path = joinpath(save_folder, "loss_trajectory.jld2")
 
 
-    let encoder = cpu(encoder), decoder = cpu(decoder), args = struct2dict(args)
-        JLD2.save(filepath, "encoder", Flux.state(encoder),
-            "decoder", Flux.state(decoder),
+    let cpu = cpu_device()
+        ps = cpu(train_state.parameters)
+        st = cpu(train_state.states)
+        args = struct2dict(args)
+        JLD2.save(filepath,
+            "ps", ps,
+            "st", st,
             "normalizer", normalizer,
-            "args", args)
-        JLD2.save(loss_trajectory_path, "train_losses", train_losses,
+            "args", args,
+        )
+
+        JLD2.save(loss_trajectory_path, 
+            "train_losses", train_losses,
             "rec_losses", rec_losses,
             "div_losses", div_losses,
             "inside_losses", inside_losses,
@@ -173,27 +178,27 @@ function train(; kws...)
 end
 
 function make_loss_function(args, device, normalizer)
-    function loss_function(m::AE, ps, st, batch)
+    function loss_function(m, ps, st, batch)
         x_in, x_target, μ₀ = batch
 
         # Move to GPU/CPU
-        x_in     = device(x_in)
-        x_target = device(x_target)
-        μ₀       = device(μ₀)
+        x_in_dev = device(x_in)
+        x_target_dev = device(x_target)
+        μ₀_dev = device(μ₀)
 
         # Optional normalization
         if args.normalize
-            uvmask = x_in
+            uvmask = x_in_dev
             uvc = uvmask[:, :, 1:2, :]
             uvc_norm, _ = normalize_batch(uvc; normalizer=normalizer)
-            x_in = cat(uvc_norm, uvmask[:, :, 3:4, :]; dims=3)
-            x_target, _ = normalize_batch(x_target; normalizer=normalizer)
+            x_in_dev = cat(uvc_norm, uvmask[:, :, 3:4, :]; dims=3)
+            x_target_dev, _ = normalize_batch(x_target_dev; normalizer=normalizer)
         end
 
         # Call your existing loss
         return total_loss(
             m, ps, st,
-            x_in, x_target, μ₀;
+            x_in_dev, x_target_dev, μ₀_dev;
             loss=args.loss,
             λdiv=args.λdiv,
             λmask=args.λmask,
@@ -201,40 +206,6 @@ function make_loss_function(args, device, normalizer)
     end
     return loss_function
 end
-
-function training_step(ae, ps, st, x_in, x_target, μ₀, device, args, normalizer)
-    # # Move to GPU/CPU
-    x_in_dev = device(x_in)
-    x_target_dev = device(x_target)
-    μ₀_dev = device(μ₀)
-
-    # # Optional normalization
-    if args.normalize
-        # x_in_dev = (u,v,mask)
-        # normalize u,v, leave mask alone:
-        uvmask = x_in_dev
-        uvc = uvmask[:, :, 1:2, :]                # u,v
-        uvc_norm, _ = normalize_batch(uvc; normalizer=normalizer)
-
-        x_in_dev = cat(uvc_norm, uvmask[:, :, 3:4, :]; dims=3)
-        x_target_dev, _ = normalize_batch(x_target_dev; normalizer=normalizer)
-
-    end
-    # println(size(x_target_dev))
-    loss_tuple, (grad_enc, grad_dec) = Flux.withgradient(encoder, decoder) do enc, dec
-        total_loss(enc, dec,
-            x_in_dev,
-            x_target_dev,
-            μ₀_dev;
-            loss=args.loss,
-            λdiv=args.λdiv,
-            λmask=args.λmask)
-    end
-
-
-    return loss_tuple, grad_enc, grad_dec
-end
-
 
 
 if abspath(PROGRAM_FILE) == (@__FILE__) || isinteractive()
