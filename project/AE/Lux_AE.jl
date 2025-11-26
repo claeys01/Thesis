@@ -16,7 +16,7 @@ Base.@kwdef mutable struct LuxArgs
     loss = :L1                  # loss function for reconstruction loss (:L1, :L2, :charb)
     batch_size = 32             # batch size
     downsample = 100             # amount of data used for training 
-    epochs = 10                # number of epochs
+    epochs = 100                # number of epochs
     seed = 42                   # random seed
     n_reconstruct = 2           # sampling size for output   
     field = "u"
@@ -75,8 +75,6 @@ function get_data(batch_size, path; tmin=-1, tmax=-1, n_samples=500,
     μ₀_train = μ₀[:, :, :, train_idx]
     μ₀_val = μ₀[:, :, :, val_idx]
 
-    
-
     train_loader = DataLoader((Xin_train, Xtarget_train, μ₀_train),
         batchsize=batch_size, shuffle=true)
     val_loader = DataLoader((Xin_val, Xtarget_val, μ₀_val),
@@ -95,13 +93,13 @@ Encoder(input_size::Tuple{Int,Int,Int}, latent_dim::Int; hidden_dim=256, C_next:
 
     convpart = Chain(
         # NOTE: no activation argument in Lux.Conv; add relu separately
-        Conv((3, 3), C => C_next, identity; pad=padding, stride=stride), relu,
+        Conv((3, 3), C => C_next, identity; pad=padding, stride=stride, cross_correlation=true), relu,
         MaxPool((2, 2)),
-        Conv((3, 3), C_next => 2C_next, identity; pad=padding, stride=stride), relu,
+        Conv((3, 3), C_next => 2C_next, identity; pad=padding, stride=stride, cross_correlation=true), relu,
         MaxPool((2, 2)),
-        Conv((3, 3), 2C_next => 4C_next, identity; pad=padding, stride=stride), relu,
+        Conv((3, 3), 2C_next => 4C_next, identity; pad=padding, stride=stride, cross_correlation=true), relu,
         MaxPool((2, 2)),
-        Conv((3, 3), 4C_next => 8C_next, identity; pad=padding, stride=stride), relu,
+        Conv((3, 3), 4C_next => 8C_next, identity; pad=padding, stride=stride, cross_correlation=true), relu,
         MaxPool((2, 2)),
         FlattenLayer()  # instantiate
     )
@@ -195,7 +193,7 @@ function (m::AE)(x, ps, st)
 end
 
 # losses
-recon_loss(x, x̂) = mean(abs2, x̂ .- x)                # MSE
+# recon_loss(x, x̂) = mean(abs2, x̂ .- x)                # MSE
 div_loss_L2(u) = mean(abs2, divergence_field(u))     # L2 of divergence field
 
 function recon_loss(x, x̂; loss=:L2)

@@ -75,12 +75,14 @@ function train(; kws...)
         train_progress = Progress(length(train_loader); desc="Training")
         # ---- TRAIN ----
         for batch in train_loader
+            x_in, x_target, μ₀ = batch
             _, loss, stats, train_state = Training.single_train_step!(
                 args.Autodiff, loss_func, batch, train_state; return_gradients=Val(false)
             )
             Lrec, Linside, L2div, corrs = stats
 
-
+            # x_lux, _ = ae(x_in_dev, train_state.parameters, train_state.states)                         # Lux version, same F32/device
+            # @show mean(x_lux)
             # record
             iter += 1
             push!(iters, iter)
@@ -113,7 +115,6 @@ function train(; kws...)
             n_val += 1
             val_corr_total .+= val_corr
         end
-        # println(val_)
         val_mean = Float32(val_sum / max(n_val, 1))
         val_corr_mean = vec((val_corr_total / max(n_val, 1)))
         push!(val_losses, val_mean)

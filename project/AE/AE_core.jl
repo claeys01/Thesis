@@ -35,7 +35,7 @@ end
 
 
 function get_data(batch_size, path; tmin=-1, tmax=-1, n_samples=500,
-    normalize=false, clip_bc=true, split=0.2, field="u")
+     clip_bc=true, split=0.2, field="u")
 
     @load path data
     preprocess_data!(data; tmin=tmin, tmax=tmax,
@@ -49,7 +49,7 @@ function get_data(batch_size, path; tmin=-1, tmax=-1, n_samples=500,
     μ₀ = Float32.(μ₀)
 
     # normalizer from X only (physics channels)
-    X_norm, normalizer = normalize_batch(X; normalizer=nothing)
+    _, normalizer = normalize_batch(X; normalizer=nothing)
 
     # indices
     N = size(X, 4)
@@ -62,30 +62,16 @@ function get_data(batch_size, path; tmin=-1, tmax=-1, n_samples=500,
     perm = randperm(N)
     val_idx = perm[1:nval]
     train_idx = perm[(nval+1):end]
-
-    if normalize
-        Xin_train = cat(X_norm[:, :, :, train_idx],
-            μ₀[:, :, :, train_idx]; dims=3) # (u,v,mask)
-        Xin_val = cat(X_norm[:, :, :, val_idx],
-            μ₀[:, :, :, val_idx]; dims=3)
-
-        Xtarget_train = X_norm[:, :, :, train_idx]  # (u,v)
-        Xtarget_val = X_norm[:, :, :, val_idx]
-
-        μ₀_train = μ₀[:, :, :, train_idx]
-        μ₀_val = μ₀[:, :, :, val_idx]
-    else
-        Xin_train = cat(X[:, :, :, train_idx],
+    Xin_train = cat(X[:, :, :, train_idx],
             μ₀[:, :, :, train_idx]; dims=3)
-        Xin_val = cat(X[:, :, :, val_idx],
-            μ₀[:, :, :, val_idx]; dims=3)
+    Xin_val = cat(X[:, :, :, val_idx],
+        μ₀[:, :, :, val_idx]; dims=3)
 
-        Xtarget_train = X[:, :, :, train_idx]
-        Xtarget_val = X[:, :, :, val_idx]
+    Xtarget_train = X[:, :, :, train_idx]
+    Xtarget_val = X[:, :, :, val_idx]
 
-        μ₀_train = μ₀[:, :, :, train_idx]
-        μ₀_val = μ₀[:, :, :, val_idx]
-    end
+    μ₀_train = μ₀[:, :, :, train_idx]
+    μ₀_val = μ₀[:, :, :, val_idx]
 
     train_loader = DataLoader((Xin_train, Xtarget_train, μ₀_train),
         batchsize=batch_size, shuffle=true)
@@ -235,7 +221,7 @@ end
 
 
 # losses
-recon_loss(ŷ, x) = mean(abs2, ŷ .- x)                # MSE
+# recon_loss(ŷ, x) = mean(abs2, ŷ .- x)                # MSE
 div_loss_L2(u) = mean(abs2, divergence_field(u))     # L2 of divergence field
 
 function recon_loss(x, x̂; loss=:L2)
@@ -268,21 +254,6 @@ function masked_loss(x, x̂, μ₀; loss=:L2)
     Lrec = Lrec_charbonnier_mask(x, x̂, outside; eps=1f-4)
     Linside = mean(abs, (x̂ .- x) .* boundary)
     return Lrec, Linside
-end
-
-
-
-"""
-    field_corr(x, xhat)
-
-Return Pearson correlation coefficient between x and xhat.
-Both can be any N-D array of equal size.
-"""
-function field_corr(x, x̂)
-    @assert size(x) == size(xhat)
-    a = vec(x)      # flatten to 1D
-    b = vec(x̂)
-    return cor(a, b)  # Pearson r
 end
 
 
