@@ -3,15 +3,15 @@ using Plots
 
 includet("NODE_core.jl")
 
-function extrapolate_node(; kws...)
-    path = "data/saved_models/NODE/16/U128_l16_tanhshrink_Tsit5.jld2/node_params.jld2"
-    node, args = load_node(path)
-    z_full = load("data/latent_data/16/U_128_latent.jld2", "z")
+function extrapolate_node(params_path; kws...)
+    
+    node, args = load_node(params_path)
+    z_full = load(args.full_latent_path, "z")
     @load args.full_u_path data
 
     z_full = Float32.(cat(z_full...;dims=2))
     @show size(z_full)
-    sample_period = 726:1083
+    sample_period = 726:1083 # this is still hardcoded, need to alter
     println(sample_period[end])
     z_full = z_full[:,  sample_period]
     t_full = data["time"][sample_period]
@@ -41,7 +41,6 @@ function extrapolate_node(; kws...)
                 "pred_idx", sample_period[end])
     
 
-    # @save "data/latent_data/period_predictions/period"
     
     @show size(pred) size(pred_extr)
 
@@ -74,6 +73,8 @@ end
 
 
 if abspath(PROGRAM_FILE) == (@__FILE__) || isinteractive()
-    extrapolate_node()
+    params_path = "data/saved_models/NODE/16/U128_l16_tanhshrink_Tsit5/node_params.jld2"
+    z_full_path = "data/latent_data/16/U_128_latent.jld2"
+    # extrapolate_node(params_path)
 end
 

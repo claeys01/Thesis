@@ -94,52 +94,27 @@ function preprocess_data!(data; tmin=-1, tmax=-1, n_samples=-1, clip_bc=false, v
     return data
 end
 
+ispow2(n::Integer) = n > 0 && (n & (n - 1)) == 0
 
-
-"""
-    mean_divergence(a)
-
-Compute the mean divergence of a staggered vector field `a` whose components
-are stored on the last axis (e.g. Nx×Ny×2). Returns the mean over interior cells.
-"""
-function mean_divergence(a::AbstractArray)
-    nd = ndims(a)
-    spatial_dim = nd - 1
-    if spatial_dim <= 0
-        throw(ArgumentError("mean_divergence: expected array with component axis; got ndims=$nd"))
+function strain_field(u)
+    dims = size(u)                    
+    if !ispow2(dims[1]) 
+        u = remove_ghosts(u)
     end
-    ncomp = size(a, nd)
-    if ncomp < spatial_dim
-        throw(ArgumentError("mean_divergence: expected last axis to contain ≥ $spatial_dim components, got $ncomp"))
-    end
+    Tp = eltype(u)
+    D = ndims(u) - 1
+    dims = size(u)                    
+    Sfield = zeros(Tp, dims..., D) 
+    spatial = Tuple(size(u)[1:end-1])
+    @loop Sfield[I,:,:] .= S(I, u) over I ∈ CartesianIndices(spatial)
 
-    spat_sizes = Tuple(size(a)[1:spatial_dim])
-    init = zeros(eltype(a), spat_sizes...)   # scalar field to hold divergence
-
-    # compute divergence on interior cells only (consistent with library's conventions)
-    @inside init[I] = WaterLily.div(I, a)
-
-    # If there are no interior cells (small arrays) fall back to computing over all valid indices
-    if sum(!iszero, init) == 0 && length(init) > 0
-        # compute directly over CartesianIndices(init) but skipping boundaries
-        for I in CartesianIndices(init)
-            try
-                init[I] = WaterLily.div(I, a)
-            catch
-                # ignore indices where div cannot be evaluated
-            end
-        end
-    end
-
-    return mean(init)
+    @show size(Sfield)
+    return Sfield   
 end
 
-
-
-
-function field_corr(x, xhat)
-    @assert size(x) == size(xhat)
-    a = vec(x)      # flatten to 1D
-    b = vec(xhat)
-    return cor(a, b)  # Pearson r
+function kinetic_energy_diffusion(u::AbstractArray; ν::Real=1.0)
+    S = strain_field(u)
+    ε = 2f0 * ν .* sum(S .^ 2, dims = (3, 4))  # sum over i,j
+    ε = dropdims(ε, dims = (3, 4))
+    return ε
 end

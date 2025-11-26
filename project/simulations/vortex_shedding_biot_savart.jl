@@ -1,5 +1,5 @@
 using WaterLily
-# import WaterLily: CFL
+import WaterLily: S
 using BiotSavartBCs
 using Plots
 using Revise 
@@ -8,8 +8,8 @@ using JLD2
 includet("../custom.jl")
 
 function circle_shedding_biot(;Re=250, U=1, n = 2^7,m = 2^7, mem=Array)
-    # n = 2^7
-    # m = 2^7
+    n = 2^7
+    m = 2^7
     radius = Float32(m / 16) # radius of the circle relative to the height of the domain
     center = (Float32(n/4), Float32(m/2)) # location of the circle relative to the height of the domain
 
@@ -73,10 +73,19 @@ function get_forces!(sim,t)
 end
 
 
+
+
 if abspath(PROGRAM_FILE) == (@__FILE__) || isinteractive()
 
-    # sim = circle_shedding_biot(mem=Array)
-    # # t_end = 50
+    sim = circle_shedding_biot(mem=Array)
+    t_end = 5
+    # sim_step!(sim, t_end)
+    # u = sim.flow.u
+    # u = remove_ghosts(u)[:,:,:,end]
+    # strain = strain_field(u)
+    # @show strain[1,1,:,:]
+    # ε = kinetic_energy_diffusion(u; sim.flow.ν)
+    # @show size(ε)
     # # CFL(a::Flow;Δt_max=0.1) = 0.1
 
     # # sim_step!(sim, t_end; verbose=true)
