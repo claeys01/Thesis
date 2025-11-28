@@ -27,10 +27,10 @@ Base.@kwdef mutable struct NodeArgs
     clip_bc = true
     use_gpu = false             # use GPU
     save_path = "data/models/NODE_models"   # results dir
-    period_latent_path = "data/latent_data/16/U_128_latent_period.jld2"
-    full_latent_path = "data/latent_data/16/U_128_latent.jld2"
-    period_u_path = "data/datasets/U_128_period.jld2"
-    full_u_path = "data/datasets/U_128.jld2"
+    period_latent_path = "data/latent_data/16/RE2500/U_128_latent_period.jld2"
+    full_latent_path = "data/latent_data/16/RE2500/U_128_latent_full.jld2"
+    period_u_path = "data/datasets/RE2500/U_128_period.jld2"
+    full_u_path = "data/datasets/RE2500/U_128_full.jld2"
 end
 
 function get_NODE_data(period_latent_path, data_path; downsample=-1, clip_bc=true)

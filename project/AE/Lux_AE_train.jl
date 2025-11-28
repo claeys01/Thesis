@@ -15,7 +15,6 @@ includet("../utils/Lux_AE_reconstructer.jl")
 includet("../utils/Lux_AE_loss_plot.jl")
 
 
-
 function train(; kws...)
 
     # load hyperparamters
@@ -28,7 +27,6 @@ function train(; kws...)
 
     if args.use_gpu
         device = gpu_device()
-
     else
         device = cpu_device()
     end
@@ -38,8 +36,8 @@ function train(; kws...)
     @info "Training on $device"
 
     # # initialize encoder and decoder
-    encoder = Encoder(args.input_dim,  args.latent_dim; hidden_dim=args.hidden_dim, C_next=args.C_conv, padding=args.padding, stride=args.stride)
-    decoder = Decoder(args.output_dim, args.latent_dim; hidden_dim=args.hidden_dim, C_next=args.C_conv) 
+    encoder = Encoder(args.input_dim, args.latent_dim; hidden_dim=args.hidden_dim, C_next=args.C_conv, padding=args.padding, stride=args.stride)
+    decoder = Decoder(args.output_dim, args.latent_dim; hidden_dim=args.hidden_dim, C_next=args.C_conv)
 
     ae = AE(encoder, decoder)
 
@@ -81,8 +79,6 @@ function train(; kws...)
             )
             Lrec, Linside, L2div, corrs = stats
 
-            # x_lux, _ = ae(x_in_dev, train_state.parameters, train_state.states)                         # Lux version, same F32/device
-            # @show mean(x_lux)
             # record
             iter += 1
             push!(iters, iter)
@@ -91,7 +87,6 @@ function train(; kws...)
             push!(div_losses, Float32(L2div))
             push!(inside_losses, Float32(Linside))
             push!(train_corrs, corrs)
-
 
             # progress meter
             next!(train_progress; showvalues=[(:loss, loss)])
@@ -104,12 +99,10 @@ function train(; kws...)
         n_val = 0
         val_corr_total = zeros(Float32, 2)
 
-
         for val_batch in validation_loader
             _, val_loss, val_stats, train_state = Training.single_train_step!(
                 args.Autodiff, loss_func, val_batch, train_state; return_gradients=Val(false)
             )
-
             _, _, _, val_corr = val_stats
             val_sum += val_loss
             n_val += 1
@@ -141,7 +134,7 @@ function train(; kws...)
             "args", args,
         )
 
-        JLD2.save(loss_trajectory_path, 
+        JLD2.save(loss_trajectory_path,
             "train_losses", train_losses,
             "rec_losses", rec_losses,
             "div_losses", div_losses,
@@ -165,7 +158,6 @@ function train(; kws...)
     catch e
         @warn "Failed to save reconstruction plot: $e"
     end
-
 
     try
         # plot and save loss evolution

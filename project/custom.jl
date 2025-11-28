@@ -97,18 +97,17 @@ end
 ispow2(n::Integer) = n > 0 && (n & (n - 1)) == 0
 
 function strain_field(u)
-    dims = size(u)                    
-    if !ispow2(dims[1]) 
-        u = remove_ghosts(u)
+    all_dims = size(u)                    
+    if !ispow2(all_dims[1]) 
+        u = dropdims(remove_ghosts(u), dims = 4)
     end
     Tp = eltype(u)
     D = ndims(u) - 1
-    dims = size(u)                    
-    Sfield = zeros(Tp, dims..., D) 
+    dims= size(u)
     spatial = Tuple(size(u)[1:end-1])
+    Sfield = zeros(Tp, dims..., D) 
     @loop Sfield[I,:,:] .= S(I, u) over I ∈ CartesianIndices(spatial)
 
-    @show size(Sfield)
     return Sfield   
 end
 

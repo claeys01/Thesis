@@ -52,7 +52,7 @@ function train_NODE(args; kws...)
 
     p = plot_node_trajectory(node, z, z0)
     png_path = joinpath(out_dir, "trajectories.png")
-    @info "Saved trajectory plot to " png_path
+    @info "Saved trajectory plot to $png_path"
 
     savefig(p, png_path)
 

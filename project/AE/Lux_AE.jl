@@ -22,8 +22,8 @@ Base.@kwdef mutable struct LuxArgs
     field = "u"
     use_gpu = false             # use GPU
     clip_bc = true              # removes the ghost cells from the snapshot
-    input_dim = (128, 128, 4)   # flow field size with μ₀ concatenated
-    output_dim = (128, 128, 2)  # size of reconstructed RHS field
+    input_dim = (2^8, 2^8, 4)   # flow field size with μ₀ concatenated
+    output_dim = (2^8, 2^8, 2)  # size of reconstructed RHS field
     split = 0.2
     stride = 1
     padding = 1
@@ -32,7 +32,8 @@ Base.@kwdef mutable struct LuxArgs
     C_conv = 8                  # first amount of channels for convs
     normalize = true            # normalise training data
     save_path = "data/Lux_models"   # results path
-    data_path = "data/datasets/U_128_period.jld2"
+    data_path = "data/datasets/2e8/RE2500/U_128_period.jld2"
+    full_data_path = "data/datasets/2e8/RE2500/U_128_full.jld2"
 end
 
 function get_data(batch_size, path; tmin=-1, tmax=-1, n_samples=500, 
@@ -281,4 +282,41 @@ function total_loss(m::AE, ps, st,
     L = Lrec + λdiv * L2div + λmask * Linside
 
     return L, st2, (Lrec, Linside, L2div, corrs)
+end
+
+
+"""
+    load_trained_AE(checkpoint_path; device=cpu_device(), return_params=false)
+
+Load a saved Lux checkpoint (expects keys "ps","st","args", "normalizer" optional).
+Returns (encoder, decoder, ae) by default. If `return_params=true` returns
+(encoder, decoder, ae, ps, st) where `ps` and `st` have been moved to `device`.
+"""
+function load_trained_AE(checkpoint_path::String; device=cpu_device(), return_params::Bool=false)
+    checkpoint = JLD2.load(checkpoint_path)
+
+    ps = get(checkpoint, "ps", nothing)
+    st = get(checkpoint, "st", nothing)
+    args_dict = checkpoint["args"]
+    args = LuxArgs(; args_dict...)
+
+    # infer device from saved args if caller left default cpu_device()
+    if device === cpu_device() && hasproperty(args, :use_gpu)
+        device = args.use_gpu ? gpu_device() : cpu_device()
+    end
+
+    # reinstantiate model architecture
+    enc = Encoder(args.input_dim, args.latent_dim; hidden_dim=args.hidden_dim, C_next=args.C_conv, padding=args.padding, stride=args.stride, verbose=false)
+    dec = Decoder(args.output_dim, args.latent_dim; hidden_dim=args.hidden_dim, C_next=args.C_conv, verbose=false)
+    ae = AE(enc, dec)
+
+    # move parameter/state trees to device if present
+    if ps !== nothing
+        ps = device(ps)
+    end
+    if st !== nothing
+        st = device(st)
+    end
+
+    return return_params ? (enc, dec, ae, ps, st) : (enc, dec, ae)
 end
