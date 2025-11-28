@@ -32,8 +32,8 @@ Base.@kwdef mutable struct LuxArgs
     C_conv = 8                  # first amount of channels for convs
     normalize = true            # normalise training data
     save_path = "data/Lux_models"   # results path
-    data_path = "data/datasets/2e8/RE2500/U_128_period.jld2"
-    full_data_path = "data/datasets/2e8/RE2500/U_128_full.jld2"
+    data_path = "data/datasets/RE2500/2e8/U_128_period.jld2"
+    full_data_path = "data/datasets/RE2500/2e8/U_128_full.jld2"
 end
 
 function get_data(batch_size, path; tmin=-1, tmax=-1, n_samples=500, 

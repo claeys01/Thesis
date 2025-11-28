@@ -30,7 +30,7 @@ function train_NODE(args; kws...)
     callback = function (state, l; plotting=true)
         cb_step[] += 1
         if plotting
-            p = plot_node_trajectory(node, z, z0; p=state.u)
+            p = plot_node_trajectory(node, z, z0; p=state.u, loss=l)
             display(p)
         end
         next!(pb; showvalues=[(:step, cb_step[]) (:loss, l)])

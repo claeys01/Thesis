@@ -8,7 +8,7 @@ includet("../utils/AE_normalizer.jl")
 
 
 function get_latent_data(checkpoint_path::String; save_path::Union{String,Tuple{String,String},Nothing}=nothing)
-    enc, dec, ae, ps, st = load_trained_AE(checkpoint_path; return_params=true)
+    enc, _, _, ps, st = load_trained_AE(checkpoint_path; return_params=true)
     
     checkpoint = JLD2.load(checkpoint_path)
     args_dict = checkpoint["args"]
@@ -85,7 +85,7 @@ function get_latent_data(checkpoint_path::String; save_path::Union{String,Tuple{
     return period_latent, full_latent
 end
 
-checkpoint = "data/saved_models/u/Lux/256h_16l/RE2500/u_100period_100e_4096n_256h_16l_norm_pooling_ups_mu_L1/checkpoint.jld2"
-save_path = "data/latent_data/16/RE2500/U_128_latent.jld2"
+checkpoint = "data/Lux_models/2025-11-28_15-24-32/checkpoint.jld2"
+save_path = "data/latent_data/16/RE2500/2e8/U_128_latent.jld2"
 kkr_period, kkr_full = get_latent_data(checkpoint; save_path=save_path)
 nothing

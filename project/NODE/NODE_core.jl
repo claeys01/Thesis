@@ -27,10 +27,10 @@ Base.@kwdef mutable struct NodeArgs
     clip_bc = true
     use_gpu = false             # use GPU
     save_path = "data/models/NODE_models"   # results dir
-    period_latent_path = "data/latent_data/16/RE2500/U_128_latent_period.jld2"
-    full_latent_path = "data/latent_data/16/RE2500/U_128_latent_full.jld2"
-    period_u_path = "data/datasets/RE2500/U_128_period.jld2"
-    full_u_path = "data/datasets/RE2500/U_128_full.jld2"
+    period_latent_path = "data/latent_data/16/RE2500/2e8/U_128_latent_period.jld2"
+    full_latent_path = "data/latent_data/16/RE2500/2e8/U_128_latent_full.jld2"
+    period_u_path = "data/datasets/RE2500/2e8/U_128_period.jld2"
+    full_u_path = "data/datasets/RE2500/2e8/U_128_full.jld2"
 end
 
 function get_NODE_data(period_latent_path, data_path; downsample=-1, clip_bc=true)
@@ -63,7 +63,6 @@ end
 
 # constructor 
 function NODE(latent_dim, dense_mult; tspan=(0.0f0, 1.0f0), solver=Tsit5(), abstol=1e-6, reltol=1e-6, t=nothing, activation=tanh, verbose=true)
-
     nn = Chain(
         Dense(latent_dim, dense_mult * latent_dim, activation),
         Dense(dense_mult * latent_dim, latent_dim))
@@ -83,12 +82,10 @@ end
 # Build a NeuralODE from the (possibly reconstructed) model and solve for given initial state z0 and params p.
 # - If setup_method == :lux, `p` is expected to be the ComponentArray returned by Lux.setup and st is used.
 function predict(node::NODE, z0; p=nothing, t=nothing)
-    tspan = node.tspan
-    solver = node.solver
     t = t === nothing ? node.t : t
 
     p_used = p === nothing ? node.p0 : p
-    nnode = NeuralODE(node.dudt, tspan, solver; saveat=t, abstol=node.abstol, reltol=node.reltol)
+    nnode = NeuralODE(node.dudt, node.tspan, node.solver; saveat=t, abstol=node.abstol, reltol=node.reltol)
     sol = nnode(z0, p_used, node.st)
 
     if isa(sol, Tuple)
@@ -102,7 +99,7 @@ end
 # Convenience: produce a (latent_dim, n_timepoints) Array prediction like in prelatent_NODE.jl
 function predict_array(node::NODE, z0; p=nothing, t=nothing)
     sol = predict(node, z0; p=p, t=t)
-    return hcat(sol.u...) |> Array
+    return Array(sol)
 end
 
 # Mean-squared error loss between data `z` and NODE prediction (z shaped like (latent_dim, n_t))
@@ -144,12 +141,15 @@ function load_node(path::AbstractString)
     return node, node_args
 end
 
-function plot_node_trajectory(node::NODE, z::AbstractMatrix, z0; p=nothing, t=nothing, n_reconstruct=4)
+function plot_node_trajectory(node::NODE, z::AbstractMatrix, z0; p=nothing, t=nothing, n_reconstruct=4, loss=nothing)
     idx_samples = round.(Int, range(1, stop=size(z, 1), length=n_reconstruct))
     z_samples = [vec(z[i, :]) for i in idx_samples]  # Vector of 8 one-dimensional arrays, each length 179
     ẑ = predict_array(node, z0; p=p, t=t)
     ẑ_samples = [vec(ẑ[i, :]) for i in idx_samples]  # Vector of 4 one-dimensional arrays, each length 179
     p = plot()
+    if !isnothing(loss)
+        title!(p, "loss = $(loss)")
+    end
     colors = [:black, :red, :blue, :green, :purple, :orange, :yellow]
     for i in 1:n_reconstruct
         plot!(p, node.t, z_samples[i]; color=colors[i], label="data_$i")
