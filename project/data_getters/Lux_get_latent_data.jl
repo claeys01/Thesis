@@ -16,8 +16,11 @@ function get_latent_data(checkpoint_path::String; save_path::Union{String,Tuple{
     normalizer = checkpoint["normalizer"]
 
 
-    period_data = load(args.data_path, "data")
-    full_data = load(args.full_data_path, "data")
+    # period_data = load(args.data_path, "data")
+    # full_data = load(args.full_data_path, "data")
+    period_data = load("data/datasets/RE2500/2e8/U_128_period.jld2", "data")
+    full_data = load("data/datasets/RE2500/2e8/U_128_full.jld2", "data")
+
 
     preprocess_data!(period_data; clip_bc=args.clip_bc, verbose=true)
     preprocess_data!(full_data; clip_bc=args.clip_bc, verbose=true)
@@ -62,6 +65,8 @@ function get_latent_data(checkpoint_path::String; save_path::Union{String,Tuple{
     @info "Computing latents for full_data"
     full_latent = compute_latents(full_data)
 
+
+
     # handle saving: save_path can be nothing, a single string (creates two files with suffixes),
     # or a tuple of two filenames (period_path, full_path)
     if save_path !== nothing
@@ -85,7 +90,7 @@ function get_latent_data(checkpoint_path::String; save_path::Union{String,Tuple{
     return period_latent, full_latent
 end
 
-checkpoint = "data/Lux_models/2025-11-28_15-24-32/checkpoint.jld2"
+checkpoint = "data/saved_models/u/Lux/256h_16l/RE2500/2e8/2e8_u_100period_100e_4096n_256h_16l_norm_pooling_ups_mu_L1/checkpoint.jld2"
 save_path = "data/latent_data/16/RE2500/2e8/U_128_latent.jld2"
-kkr_period, kkr_full = get_latent_data(checkpoint; save_path=save_path)
+kkr_period, kkr_full = get_latent_data(checkpoint; save_path=nothing)
 nothing

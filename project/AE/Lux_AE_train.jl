@@ -53,6 +53,13 @@ function train(; kws...)
 
     loss_func = make_loss_function(args, device, normalizer)
 
+    # create test data (whole simulation)
+    if args.test_loss
+        test_data, test_normalizer = get_data(-1, args.full_data_path; n_samples=args.test_downsample, clip_bc=args.clip_bc, split=-1, field="u", verbose=false, single_batch=true)
+        test_loss_func = make_loss_function(args, device, test_normalizer)
+    end
+
+
     # record losses
     train_losses = Float32[]
     val_losses = Float32[]
@@ -63,6 +70,9 @@ function train(; kws...)
     val_iters = Int[]
     train_corrs = Vector{Float32}[]
     val_corrs = Vector{Float32}[]
+    test_losses = Float32[]
+    test_corrs = Vector{Float32}[]
+
     iter = 0
 
     # training
@@ -73,7 +83,6 @@ function train(; kws...)
         train_progress = Progress(length(train_loader); desc="Training")
         # ---- TRAIN ----
         for batch in train_loader
-            x_in, x_target, μ₀ = batch
             _, loss, stats, train_state = Training.single_train_step!(
                 args.Autodiff, loss_func, batch, train_state; return_gradients=Val(false)
             )
@@ -95,13 +104,14 @@ function train(; kws...)
         finish!(train_progress)
 
         # ---- VALIDATION (epoch-level) ----
+
         val_sum = 0.0
         n_val = 0
         val_corr_total = zeros(Float32, 2)
-
+        val_state = deepcopy(train_state)
         for val_batch in validation_loader
-            _, val_loss, val_stats, train_state = Training.single_train_step!(
-                args.Autodiff, loss_func, val_batch, train_state; return_gradients=Val(false)
+            _, val_loss, val_stats, _ = Training.single_train_step!(
+                args.Autodiff, loss_func, val_batch, val_state; return_gradients=Val(false)
             )
             _, _, _, val_corr = val_stats
             val_sum += val_loss
@@ -113,6 +123,16 @@ function train(; kws...)
         push!(val_losses, val_mean)
         push!(val_iters, iter)      # <— align the validation point to the last train iter of this epoch
         push!(val_corrs, val_corr_mean)
+
+        # ----- TEST (On whole dataset)
+        if args.test_loss
+            test_loss, _, test_stats = test_loss_func(ae, train_state.parameters, train_state.states, test_data)
+            _, _, _, test_corr = test_stats
+            push!(test_losses, test_loss)
+            push!(test_corrs, test_corr)
+        end
+
+        # @show test_loss
     end
 
     # save model
@@ -143,8 +163,15 @@ function train(; kws...)
             "val_losses", val_losses,
             "val_iters", val_iters,
             "train_corrs", train_corrs,
-            "val_corrs", val_corrs)
+            "val_corrs", val_corrs,
+            "test_losses", test_losses, 
+            "test_corrs", test_corrs)
 
+        # if args.test_loss 
+            # JLD2.save(loss_trajectory_path,
+            # "test_losses", test_losses, 
+            # "test_corrs", test_corrs)
+        # end
         @info "Model saved: $(filepath)"
     end
 

@@ -15,10 +15,12 @@ Base.@kwdef mutable struct LuxArgs
     λmask = 0                   # weight of body mask loss
     loss = :L1                  # loss function for reconstruction loss (:L1, :L2, :charb)
     batch_size = 32             # batch size
-    downsample = 100             # amount of data used for training 
-    epochs = 100                # number of epochs
+    downsample = -1             # amount of data used for training 
+    epochs = 50                # number of epochs
     seed = 42                   # random seed
     n_reconstruct = 2           # sampling size for output   
+    test_loss = true
+    test_downsample = 300
     field = "u"
     use_gpu = false             # use GPU
     clip_bc = true              # removes the ghost cells from the snapshot
@@ -36,12 +38,21 @@ Base.@kwdef mutable struct LuxArgs
     full_data_path = "data/datasets/RE2500/2e8/U_128_full.jld2"
 end
 
+function get_data_in(X, μ₀; idx=nothing)
+    if isnothing(idx)
+        Xin = cat(X, μ₀; dims=3)
+    else
+        Xin, X, μ₀ = cat(X[:, :, :, idx], μ₀[:, :, :, idx]; dims=3), X[:, :, :, idx], μ₀[:, :, :, idx]
+    end
+    return (Xin, X, μ₀)
+end
+
 function get_data(batch_size, path; tmin=-1, tmax=-1, n_samples=500, 
-    clip_bc=true, split=0.2, field="u")
+    clip_bc=true, split=0.2, field="u", verbose=true, single_batch=false)
 
     @load path data
     preprocess_data!(data; tmin=tmin, tmax=tmax,
-        n_samples=n_samples, clip_bc=clip_bc)
+        n_samples=n_samples, clip_bc=clip_bc, verbose=verbose)
 
     # X :: (H,W,2,N)
     X = data[field]
@@ -53,6 +64,12 @@ function get_data(batch_size, path; tmin=-1, tmax=-1, n_samples=500,
     # normalizer from X only (physics channels)
     _, normalizer = normalize_batch(X; normalizer=nothing)
 
+    # if caller only wants a single full-batch, return immediately
+    if single_batch
+        @info "Created test data of whole simulation with $(size(X, 4))"
+        return get_data_in(X, μ₀), normalizer
+    end
+
     # indices
     N = size(X, 4)
     if N < 2
@@ -60,21 +77,13 @@ function get_data(batch_size, path; tmin=-1, tmax=-1, n_samples=500,
     end
     nval = max(1, Int(round(split * N)))
     nval = min(nval, N - 1)
-    @info "Data_split into $(N-nval) training and $(nval) validation snapshots"
+    verbose && @info "Data_split into $(N-nval) training and $(nval) validation snapshots"
     perm = randperm(N)
     val_idx = perm[1:nval]
     train_idx = perm[(nval+1):end]
 
-     Xin_train = cat(X[:, :, :, train_idx],
-            μ₀[:, :, :, train_idx]; dims=3)
-    Xin_val = cat(X[:, :, :, val_idx],
-        μ₀[:, :, :, val_idx]; dims=3)
-
-    Xtarget_train = X[:, :, :, train_idx]
-    Xtarget_val = X[:, :, :, val_idx]
-
-    μ₀_train = μ₀[:, :, :, train_idx]
-    μ₀_val = μ₀[:, :, :, val_idx]
+    (Xin_train, Xtarget_train, μ₀_train) = get_data_in(X, μ₀; idx=train_idx)
+    (Xin_val, Xtarget_val, μ₀_val) = get_data_in(X, μ₀; idx=val_idx)
 
     train_loader = DataLoader((Xin_train, Xtarget_train, μ₀_train),
         batchsize=batch_size, shuffle=true)
@@ -83,6 +92,7 @@ function get_data(batch_size, path; tmin=-1, tmax=-1, n_samples=500,
 
     return train_loader, val_loader, normalizer
 end
+
 
 struct Encoder{L} <: AbstractLuxWrapperLayer{:layers}
     layers::L

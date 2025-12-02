@@ -96,12 +96,18 @@ function data_run(sim::AbstractSimulation, time_max, save_path; sample_instance=
     return data
 end
 
-save_dir = "data/datasets/2e8/RE2500/"
+save_dir = "data/datasets/RE2500/2e8/"
 data_path = joinpath(save_dir, "U_128.jld2")
 
-data = data_run(sim_shedding, t_end, "data/datasets/2e8/RE2500/U_128.jld2"; verbose=true, sample_single_period=true)
+root, ext = splitext(data_path)
+period_path = string(root, "_period", ext)
+full_path   = string(root, "_full",   ext)
 
-# @load data_path data
+
+# data = data_run(sim_shedding, t_end, data_path; verbose=true, sample_single_period=true)
+
+@load full_path data
+
 
 
 forces = data["force"]
@@ -118,7 +124,7 @@ zero_idxs = zero_crossing(last.(forces); direction=:rising)
 
 for idx in zero_idxs
     scatter!(plt, [time[idx]], [lift[idx]]; label=false, color=:black)
-    annotate!(time[idx], lift[idx], (idx, 5, :left))
+    # annotate!(time[idx], lift[idx], (idx, 5, :left))
 end
 
 mid = length(zero_idxs) ÷ 2
@@ -128,6 +134,8 @@ period_data = data["single_period"]
 plot!(period_data["time"], last.(period_data["force"]); 
     linestyle =:dash, lw=2, label="sampled period", color=:green)
 
+plot!(period_data["time"], first.(period_data["force"]); 
+    linestyle =:dash, lw=2, label="", color=:green)
 
 display(plt)
 fig_path= joinpath(save_dir,"period_sample.png")
