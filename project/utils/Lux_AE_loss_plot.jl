@@ -208,6 +208,6 @@ end
 checkpoint = "data/Lux_models/2025-12-01_17-16-32/checkpoint.jld2"
 losses = "data/Lux_models/2025-12-01_17-16-32/loss_trajectory.jld2"
 
-p = plot_losses(losses, checkpoint)
+# p = plot_losses(losses, checkpoint)
 # display(p)
 # savefig(p, "data/Lux_models/2025-12-01_17-16-32/loss_evolution.png")

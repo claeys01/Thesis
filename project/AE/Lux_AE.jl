@@ -16,10 +16,11 @@ Base.@kwdef mutable struct LuxArgs
     loss = :L1                  # loss function for reconstruction loss (:L1, :L2, :charb)
     batch_size = 32             # batch size
     downsample = -1             # amount of data used for training 
+    n_periods = 3               # amount of shedding periods to use for training data
     epochs = 50                # number of epochs
     seed = 42                   # random seed
     n_reconstruct = 2           # sampling size for output   
-    test_loss = true
+    test_loss = false
     test_downsample = 300
     field = "u"
     use_gpu = false             # use GPU
@@ -48,13 +49,17 @@ function get_data_in(X, μ₀; idx=nothing)
 end
 
 function get_data(batch_size, path; tmin=-1, tmax=-1, n_samples=500, 
-    clip_bc=true, split=0.2, field="u", verbose=true, single_batch=false)
+    clip_bc=true, split=0.2, field="u", verbose=true, single_batch=false, n_periods=1)
 
     @load path data
     preprocess_data!(data; tmin=tmin, tmax=tmax,
         n_samples=n_samples, clip_bc=clip_bc, verbose=verbose)
 
     # X :: (H,W,2,N)
+
+    # for i in 1:n_periods
+    #     @show data["reordered_ranges"][i]
+    # end
     X = data[field]
     X = Float32.(X)
 

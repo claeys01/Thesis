@@ -11,6 +11,29 @@ n=2^8
 sim_shedding = circle_shedding_biot(mem=Array, Re=2500, n=n, m=n)
 t_end = 100.0
 
+function reorder_center_out(arr)
+    n = length(arr)
+    mid = (firstindex(arr) + lastindex(arr)) ÷ 2
+    out = eltype(arr)[]
+
+    push!(out, arr[mid])
+
+    for k in 1:max(mid - firstindex(arr), lastindex(arr) - mid)
+        left  = mid - k
+        right = mid + k
+
+        if left >= firstindex(arr)
+            push!(out, arr[left])
+        end
+        if right <= lastindex(arr)
+            push!(out, arr[right])
+        end
+    end
+
+    return out
+end
+
+
 function data_run(sim::AbstractSimulation, time_max, save_path; sample_instance=50, verbose=false, sample_single_period=false, single_period_direction=:rising)
     data = Dict{String,Any}(
         "time"  => Float32[],
@@ -26,7 +49,6 @@ function data_run(sim::AbstractSimulation, time_max, save_path; sample_instance=
     full_path   = string(root, "_full",   ext)
     while sim_time(sim) < time_max
         sim_step!(sim)
-        
         verbose && sim_info(sim)
         if sim_time(sim) > sample_instance
             force = WaterLily.pressure_force(sim)
@@ -58,10 +80,11 @@ function data_run(sim::AbstractSimulation, time_max, save_path; sample_instance=
             end
         end
     end
+
+    zero_idxs = zero_crossing(last.(data["force"]); direction=single_period_direction)
     
     @info "Saved $(sample_counter) snapshots to $(save_path)"
     if sample_single_period
-        zero_idxs = zero_crossing(last.(data["force"]); direction=single_period_direction)
         if length(zero_idxs) >= 2
             mid = length(zero_idxs) ÷ 2
             # ensure valid mid index
@@ -69,7 +92,7 @@ function data_run(sim::AbstractSimulation, time_max, save_path; sample_instance=
                 single_period = zero_idxs[mid] : zero_idxs[mid+1]
                 println(single_period)
                 period_data = Dict()
-                period_data["single_period"] = single_period
+                period_data["single_period_idx"] = single_period
                 for key in keys(data)
                     if key in ["RHS", "u", "μ₀"]
                         period_data[key] = data[key][:,:,:,single_period]
@@ -90,7 +113,10 @@ function data_run(sim::AbstractSimulation, time_max, save_path; sample_instance=
             @warn "Not enough zero crossings to extract a single period"
         end
     end
-
+    period_ranges = [(zero_idxs[i-1]+1):zero_idxs[i] for i in 2:length(zero_idxs)]
+    reordered_ranges = reorder_center_out(period_ranges)
+    data["period_ranges"] = period_ranges
+    data["reordered_ranges"] = reordered_ranges
     @save full_path data
 
     return data
@@ -104,10 +130,9 @@ period_path = string(root, "_period", ext)
 full_path   = string(root, "_full",   ext)
 
 
-# data = data_run(sim_shedding, t_end, data_path; verbose=true, sample_single_period=true)
+data = data_run(sim_shedding, t_end, data_path; verbose=true, sample_single_period=true)
 
-@load full_path data
-
+# @load full_path data
 
 
 forces = data["force"]
@@ -124,7 +149,7 @@ zero_idxs = zero_crossing(last.(forces); direction=:rising)
 
 for idx in zero_idxs
     scatter!(plt, [time[idx]], [lift[idx]]; label=false, color=:black)
-    # annotate!(time[idx], lift[idx], (idx, 5, :left))
+    annotate!(time[idx], lift[idx]+0.1, (idx, 5, :left))
 end
 
 mid = length(zero_idxs) ÷ 2

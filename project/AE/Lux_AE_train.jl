@@ -23,7 +23,7 @@ function train(; kws...)
 
     # load RHS data and normalizer
     train_loader, validation_loader, normalizer = get_data(args.batch_size, args.data_path;
-        n_samples=args.downsample, clip_bc=args.clip_bc, split=args.split)
+        n_samples=args.downsample, clip_bc=args.clip_bc, split=args.split, n_periods=args.n_periods)
 
     if args.use_gpu
         device = gpu_device()

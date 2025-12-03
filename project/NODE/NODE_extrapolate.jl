@@ -10,9 +10,9 @@ function extrapolate_node(params_path; kws...)
     full_data = load(args.full_u_path, "data")
     period_data = load(args.period_u_path, "data")
 
-    @show period_data["single_period"]
+    @show period_data["single_period_idx"]
     
-    period_range = period_data["single_period"]
+    period_range = period_data["single_period_idx"]
     period_length = period_range[end] - period_range[1]
 
     extrapolation_range = first(period_range) : (last(period_range) + 2*period_length)
