@@ -22,8 +22,11 @@ function train(; kws...)
     args.seed > 0 && Random.seed!(args.seed)
 
     # load RHS data and normalizer
-    train_loader, validation_loader, normalizer = get_data(args.batch_size, args.data_path;
-        n_samples=args.downsample, clip_bc=args.clip_bc, split=args.split, n_periods=args.n_periods)
+
+    # train_loader, validation_loader, normalizer = get_data(args.batch_size, args.data_path;
+    #     n_samples=args.downsample, clip_bc=args.clip_bc, split=args.split, n_periods=args.n_periods)
+
+    train_loader, val_loader, test_loader, X, μ₀, normalizer = get_data(args.batch_size, args.full_data_path; n_training=300, split=0.2, t_training=20.854)
 
     if args.use_gpu
         device = gpu_device()
@@ -54,12 +57,6 @@ function train(; kws...)
     loss_func = make_loss_function(args, device, normalizer)
 
     # create test data (whole simulation)
-    if args.test_loss
-        test_data, test_normalizer = get_data(-1, args.full_data_path; n_samples=args.test_downsample, clip_bc=args.clip_bc, split=-1, field="u", verbose=false, single_batch=true)
-        test_loss_func = make_loss_function(args, device, test_normalizer)
-    end
-
-
     # record losses
     train_losses = Float32[]
     val_losses = Float32[]
@@ -164,13 +161,13 @@ function train(; kws...)
             "val_iters", val_iters,
             "train_corrs", train_corrs,
             "val_corrs", val_corrs,
-            "test_losses", test_losses, 
+            "test_losses", test_losses,
             "test_corrs", test_corrs)
 
         # if args.test_loss 
-            # JLD2.save(loss_trajectory_path,
-            # "test_losses", test_losses, 
-            # "test_corrs", test_corrs)
+        # JLD2.save(loss_trajectory_path,
+        # "test_losses", test_losses, 
+        # "test_corrs", test_corrs)
         # end
         @info "Model saved: $(filepath)"
     end

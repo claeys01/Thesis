@@ -28,42 +28,7 @@ function circle_shedding_biot(;Re=250, U=1, n = 2^7,m = 2^7, mem=Array)
 end
 
 
-function zero_crossing(y; direction=:both, eps=0.0)
-    @assert direction in (:both, :rising, :falling)
-    n = length(y)
-    idx = Int[]
-    # treat tiny values as exact zeros if eps>0
-    yproc = copy(y)
-    if eps > 0.0
-        for i in eachindex(yproc)
-            if abs(yproc[i]) <= eps
-                yproc[i] = zero(yproc[i])
-            end
-        end
-    end
 
-    for i in 1:n-1
-        a, b = yproc[i], yproc[i+1]
-        if a*b < 0 || a == 0 || b == 0
-            dir = if a < 0 && b > 0
-                :rising
-            elseif a > 0 && b < 0
-                :falling
-            elseif a == 0 && b != 0
-                b > 0 ? :rising : :falling
-            elseif b == 0 && a != 0
-                a > 0 ? :falling : :rising 
-            else
-                # flat at zero
-                nothing
-            end
-            if dir !== nothing && (direction == :both || dir == direction)
-                push!(idx, i)
-            end
-        end
-    end
-    return idx
-end
 
 function get_forces!(sim,t)
     sim_step!(sim,t,remeasure=false; verbose=true)

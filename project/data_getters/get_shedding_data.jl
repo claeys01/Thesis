@@ -6,6 +6,9 @@ using JLD2
 # includet("simulations/vortex_shedding.jl")
 includet("../simulations/vortex_shedding_biot_savart.jl")
 includet("../custom.jl")
+includet("../utils/SimDataTypes.jl")
+
+using .SimDataTypes
 
 n=2^8
 sim_shedding = circle_shedding_biot(mem=Array, Re=2500, n=n, m=n)
@@ -33,16 +36,30 @@ function reorder_center_out(arr)
     return out
 end
 
+# Base.@kwdef mutable struct SimData
+#     time::Vector{Float32}
+#     Δt::Vector{Float32}
+#     u::Array{Float32,4}                  # (H, W, C, T)
+#     μ₀::Array{Float32,2}                 # (nμ, T)
+#     force::Vector{NTuple{2,Float32}}     # (Cd, Cl)
+#     ε::Vector{Float32}                   # dissipation per snapshot
+#     period_ranges::Vector{UnitRange{Int}}
+#     reordered_ranges::Vector{UnitRange{Int}}
+#     single_period_idx::UnitRange{Int}
+# end
+
 
 function data_run(sim::AbstractSimulation, time_max, save_path; sample_instance=50, verbose=false, sample_single_period=false, single_period_direction=:rising)
-    data = Dict{String,Any}(
-        "time"  => Float32[],
-        "Δt"    => Float32[],
-        "u"     => AbstractArray[],
-        "μ₀"    => AbstractArray[],
-        "force" => Any[],
-        "ε"     => Float32[],
-    )
+  
+
+    # Temporary storage while sampling
+    time   = Float32[]
+    Δt     = Float32[]
+    u_list = Vector{Array{Float32,3}}()          # assuming u is 3D per snapshot
+    μ₀_list = Vector{Array{Float32,3}}()         # adjust if needed
+    force  = Vector{Vector{Float32}}()
+    ε      = Float32[]
+
     sample_counter = 0
     root, ext = splitext(save_path)
     period_path = string(root, "_period", ext)
@@ -51,75 +68,74 @@ function data_run(sim::AbstractSimulation, time_max, save_path; sample_instance=
         sim_step!(sim)
         verbose && sim_info(sim)
         if sim_time(sim) > sample_instance
-            force = WaterLily.pressure_force(sim)
-            force = force./(0.5sim.L*sim.U^2) # scale the forces!
+            raw_force = WaterLily.pressure_force(sim)
+            scaled_force = Float32.(raw_force./(0.5sim.L*sim.U^2)) # scale the forces!
             sample_counter += 1
             print("Sampling Data - ")
-            push!(data["force"], force)
-            # push!(data["flow"], sim.flow)                     # maybe keep reference if intended
-            push!(data["u"], copy(sim.flow.u))               # make a snapshot copy
-            push!(data["μ₀"], copy(sim.flow.μ₀))             # make a snapshot copy
-            # push!(data["RHS"], copy(RHS(sim.flow)))         # ensure RHS is a separate array
-            push!(data["ε"], mean(kinetic_energy_diffusion(copy(sim.flow.u); ν=copy(sim.flow.ν))))
-            push!(data["time"], Float32(round(sim_time(sim),digits=4)))
-            push!(data["Δt"], Float32(round(sim.flow.Δt[end], digits=3)))
+            push!(force, scaled_force)
+            push!(u_list, copy(sim.flow.u))               # make a snapshot copy
+            push!(μ₀_list, copy(sim.flow.μ₀))             # make a snapshot copy
+            push!(ε, mean(kinetic_energy_diffusion(copy(sim.flow.u); ν=copy(sim.flow.ν))))
+            push!(time, Float32(round(sim_time(sim),digits=4)))
+            push!(Δt, Float32(round(sim.flow.Δt[end], digits=3)))
         end
     end
     println("Sampled ", sample_counter," Snapshots")
-    for k in ["RHS", "u", "μ₀"]
-        if haskey(data, k) && !isempty(data[k]) && isa(first(data[k]), AbstractArray)
-            sample0 = first(data[k])
-            if ndims(sample0) >= 2
-                dims = 4
-                try
-                    data[k] = cat(data[k]...; dims=dims)
-                    @info "Stacked samples for $(k) into size $(size(data[k]))"
-                catch e
-                    @warn "Failed to stack samples for $(k): $e"
-                end
-            end
-        end
+
+    # Stack snapshots into dense arrays
+    # u_list :: Vector{Array{T,3}} -> u :: Array{T,4}
+    u = cat(u_list...; dims = 4)  # (nx, ny, nchan, Nsnap)
+
+    # μ₀_list :: Vector{Array{T,1}} -> μ₀ :: Array{T,4} (nx, ny, nchan, Nsnap)
+    μ₀ = cat(μ₀_list...; dims = 4)
+
+    # zero crossings based on lift (second component)
+    lift = last.(force)
+    zero_idxs = zero_crossing(lift; direction = single_period_direction)
+
+    if isempty(zero_idxs)
+        @warn "No zero crossings found; period information will be empty"
     end
 
-    zero_idxs = zero_crossing(last.(data["force"]); direction=single_period_direction)
-    
+    time .-= time[1]
+
     @info "Saved $(sample_counter) snapshots to $(save_path)"
-    if sample_single_period
-        if length(zero_idxs) >= 2
-            mid = length(zero_idxs) ÷ 2
-            # ensure valid mid index
-            if mid < length(zero_idxs)
-                single_period = zero_idxs[mid] : zero_idxs[mid+1]
-                println(single_period)
-                period_data = Dict()
-                period_data["single_period_idx"] = single_period
-                for key in keys(data)
-                    if key in ["RHS", "u", "μ₀"]
-                        period_data[key] = data[key][:,:,:,single_period]
-                    else
-                        period_data[key] = data[key][single_period]
-                    end
-                end
-                # save the single-period dictionary and indices
-                @save period_path data = period_data
-                @info "Saved data from a single period to $(period_path)"
+   if sample_single_period && length(zero_idxs) >= 2
+        mid = length(zero_idxs) ÷ 2
+        if mid < length(zero_idxs)
+            single_period_idx = zero_idxs[mid] : zero_idxs[mid + 1]
+            @info "Single period indices: $single_period_idx"
 
-                # also attach to returned data for convenience
-                data["single_period"] = period_data
-            else
-                @warn "Unable to determine single period: not enough zero crossings in the middle"
-            end
+            # Optional: save just the single-period subset as a separate file
+            period_data = (
+                time   = time[single_period_idx],
+                Δt     = Δt[single_period_idx],
+                u      = u[:, :, :, single_period_idx],
+                μ₀     = μ₀[:, :, :, single_period_idx],
+                force  = force[single_period_idx],
+                ε      = ε[single_period_idx],
+                single_period_idx = single_period_idx,
+            )
+            @save period_path period_data
+            @info "Saved data from a single period to $(period_path)"
         else
-            @warn "Not enough zero crossings to extract a single period"
+            @warn "Unable to determine single period: not enough zero crossings in the middle"
         end
     end
-    period_ranges = [(zero_idxs[i-1]+1):zero_idxs[i] for i in 2:length(zero_idxs)]
-    reordered_ranges = reorder_center_out(period_ranges)
-    data["period_ranges"] = period_ranges
-    data["reordered_ranges"] = reordered_ranges
-    @save full_path data
 
-    return data
+    # Build period_ranges + reordered_ranges
+    period_ranges = length(zero_idxs) >= 2 ?
+        [(zero_idxs[i - 1] + 1):zero_idxs[i] for i in 2:length(zero_idxs)] :
+        UnitRange{Int}[]
+
+    reordered_ranges = reorder_center_out(period_ranges)
+    simdata = SimData(time, Δt, u, μ₀, force, ε,
+                      period_ranges, reordered_ranges, single_period_idx)
+
+    @save full_path simdata
+    @info "Saved $(sample_counter) snapshots to $(full_path)"
+
+    return simdata
 end
 
 save_dir = "data/datasets/RE2500/2e8/"
@@ -130,39 +146,54 @@ period_path = string(root, "_period", ext)
 full_path   = string(root, "_full",   ext)
 
 
-data = data_run(sim_shedding, t_end, data_path; verbose=true, sample_single_period=true)
+simdata = data_run(sim_shedding, t_end, data_path; verbose=true, sample_single_period=true)
 
-# @load full_path data
+# @load full_path simdata
 
 
-forces = data["force"]
-time = data["time"]
-zero_idxs = zero_crossing(last.(forces); direction=:rising)
-drag, lift = first.(forces), last.(forces)
+function plot_sampled_period(simdata::Any, period_path::AbstractString, save_dir::AbstractString)
+    forces = simdata.force
+    time = simdata.time
+    drag = first.(forces)
+    lift = last.(forces)
 
-plt = plot(time,[drag, lift],
-    labels=["drag" "lift"],
-    colors=[:red, :blue],
-    xlabel="tU/L",
-    ylabel="Pressure force coefficients")
-zero_idxs = zero_crossing(last.(forces); direction=:rising)
+    zero_idxs = zero_crossing(lift; direction=:rising)
 
-for idx in zero_idxs
-    scatter!(plt, [time[idx]], [lift[idx]]; label=false, color=:black)
-    annotate!(time[idx], lift[idx]+0.1, (idx, 5, :left))
+    plt = plot(time, [drag, lift],
+        labels=["drag" "lift"],
+        colors=[:red, :blue],
+        xlabel="tU/L",
+        ylabel="Pressure force coefficients")
+
+    for idx in zero_idxs
+        scatter!(plt, [time[idx]], [lift[idx]]; label=false, color=:black)
+        annotate!(plt, time[idx], lift[idx] + 0.1, text(string(idx), 8, :left))
+    end
+
+    mid = length(zero_idxs) ÷ 2
+    single_period = (length(zero_idxs) >= 2 && mid < length(zero_idxs)) ? (zero_idxs[mid] : zero_idxs[mid+1]) : nothing
+
+    if isfile(period_path)
+        @load period_path period_data
+        if period_data !== nothing
+            plot!(plt, period_data.time, last.(period_data.force);
+                linestyle=:dash, lw=2, label="sampled period", color=:green)
+            plot!(plt, period_data.time, first.(period_data.force);
+                linestyle=:dash, lw=2, label="", color=:green)
+        else
+            @warn "period file did not contain `period_data`: $period_path"
+        end
+    else
+        @warn "period file not found: $period_path"
+    end
+
+    display(plt)
+    fig_path = joinpath(save_dir, "period_sample.png")
+    savefig(plt, fig_path)
+
+    return (plt = plt, fig_path = fig_path, zero_idxs = zero_idxs, single_period = single_period)
 end
 
-mid = length(zero_idxs) ÷ 2
-# println(zero_idxs)
-single_period = zero_idxs[mid] : zero_idxs[mid+1]
-period_data = data["single_period"]
-plot!(period_data["time"], last.(period_data["force"]); 
-    linestyle =:dash, lw=2, label="sampled period", color=:green)
-
-plot!(period_data["time"], first.(period_data["force"]); 
-    linestyle =:dash, lw=2, label="", color=:green)
-
-display(plt)
-fig_path= joinpath(save_dir,"period_sample.png")
-savefig(plt, fig_path)
+# Example call (keeps previous behavior)
+plot_sampled_period(simdata, period_path, save_dir)
 

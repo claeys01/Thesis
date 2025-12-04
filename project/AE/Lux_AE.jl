@@ -6,6 +6,9 @@ using Zygote
 
 
 includet("../utils/AE_normalizer.jl")
+includet("../custom.jl")
+includet("../utils/SimDataTypes.jl")
+using .SimDataTypes
 
 Base.@kwdef mutable struct LuxArgs
     η = 5e-3                    # learning rate
@@ -48,55 +51,72 @@ function get_data_in(X, μ₀; idx=nothing)
     return (Xin, X, μ₀)
 end
 
-function get_data(batch_size, path; tmin=-1, tmax=-1, n_samples=500, 
-    clip_bc=true, split=0.2, field="u", verbose=true, single_batch=false, n_periods=1)
 
-    @load path data
-    preprocess_data!(data; tmin=tmin, tmax=tmax,
-        n_samples=n_samples, clip_bc=clip_bc, verbose=verbose)
+function load_simdata(path)
+    @load path simdata
+    return simdata::SimData
+end
 
-    # X :: (H,W,2,N)
+function downsample_equal(v::AbstractVector, M::Integer)
+    N = length(v)
+    M ≤ N || @warn "Cannot downsample to $M entries from $N points, returning $N points"
+    M = clamp(M, 1, N)
+    idx = round.(Int, range(1, N, length = M))
+    return v[idx]
+end
 
-    # for i in 1:n_periods
-    #     @show data["reordered_ranges"][i]
-    # end
-    X = data[field]
-    X = Float32.(X)
 
-    μ₀ = data["μ₀"]
-    μ₀ = Float32.(μ₀)
+function get_data(batch_size, path;t_training=10, n_training=500, split=0.2, verbose=true)
+
+
+    simdata = load_simdata(path)
+    preprocess_data!(simdata; verbose=verbose)
+
+    # X :: (H,W,C,N)
+    X  = simdata.u
+    μ₀ = simdata.μ₀
 
     # normalizer from X only (physics channels)
     _, normalizer = normalize_batch(X; normalizer=nothing)
 
-    # if caller only wants a single full-batch, return immediately
-    if single_batch
-        @info "Created test data of whole simulation with $(size(X, 4))"
-        return get_data_in(X, μ₀), normalizer
-    end
 
-    # indices
     N = size(X, 4)
+
     if N < 2
         error("get_data: need at least 2 samples to create train/validation split (got $N)")
     end
-    nval = max(1, Int(round(split * N)))
-    nval = min(nval, N - 1)
-    verbose && @info "Data_split into $(N-nval) training and $(nval) validation snapshots"
-    perm = randperm(N)
-    val_idx = perm[1:nval]
-    train_idx = perm[(nval+1):end]
+    
+    train_idxs_full = findall(t -> t < t_training, simdata.time)
+    train_idx_combined = downsample_equal(train_idxs_full, n_training)
+    
+    # Split into train / val by downsampling evenly from the combined pool
+    n_val = clamp(round(Int, length(train_idx_combined) * split), 0, length(train_idx_combined))
 
-    (Xin_train, Xtarget_train, μ₀_train) = get_data_in(X, μ₀; idx=train_idx)
-    (Xin_val, Xtarget_val, μ₀_val) = get_data_in(X, μ₀; idx=val_idx)
+    if n_val == 0
+        @warn "No validation data created"
+        val_idx = Int[]
+        train_idx = train_idx_combined
+    else
+        # Downsample evenly to get validation indices
+        val_idx = downsample_equal(train_idx_combined, n_val)
+        # Remove validation indices from train
+        train_idx = setdiff(train_idx_combined, val_idx)
+    end
 
-    train_loader = DataLoader((Xin_train, Xtarget_train, μ₀_train),
-        batchsize=batch_size, shuffle=true)
-    val_loader = DataLoader((Xin_val, Xtarget_val, μ₀_val),
-        batchsize=batch_size, shuffle=true)
+    test_idx = collect(last(train_idx_combined)+1 : N)
 
-    return train_loader, val_loader, normalizer
+    plt = train_force_plot(simdata; train_idx=train_idx, val_idx=val_idx, test_idx=test_idx)
+    display(plt)
+
+    # DataLoaders over indices only (lightweight)
+    train_loader = DataLoader(train_idx; batchsize=batch_size, shuffle=true)
+    val_loader   = DataLoader(val_idx;   batchsize=batch_size, shuffle=false)
+    test_loader  = DataLoader(test_idx;  batchsize=batch_size, shuffle=false)
+
+    # return X, μ₀, normalizer 
+    return train_loader, val_loader, test_loader, X, μ₀, normalizer
 end
+
 
 
 struct Encoder{L} <: AbstractLuxWrapperLayer{:layers}
