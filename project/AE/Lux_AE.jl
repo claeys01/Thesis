@@ -20,6 +20,7 @@ Base.@kwdef mutable struct LuxArgs
     batch_size = 30             # batch size
     train_downsample = 300      # amount of data used for training 
     test_downsample = 300
+    split = 0.2
     n_periods = 3               # amount of shedding periods to use for training data
     epochs = 10                 # number of epochs
     seed = 42                   # random seed
@@ -30,12 +31,14 @@ Base.@kwdef mutable struct LuxArgs
     clip_bc = true              # removes the ghost cells from the snapshot
     input_dim = (2^8, 2^8, 4)   # flow field size with μ₀ concatenated
     output_dim = (2^8, 2^8, 2)  # size of reconstructed RHS field
-    split = 0.2
-    stride = 1
-    padding = 1
-    latent_dim = 16            # latent dimension
-    hidden_dim = 256
-    C_conv = 8                  # first amount of channels for convs
+    conv_kernel = 3             # DO NOT CHANGE
+    pool_kernel = 2             # DO NOT CHANGE  
+    n_conv = 6                  # number of convolutional layers
+    n_dense = 3                 # number of dense layers in bottleneck
+    latent_dim = 16             # latent dimension
+    stride = 1                  # stride for convolutions
+    padding = 1                 # padding for convolutions
+    C_base = 8                  # first amount of channels for convs
     normalize = true            # normalise training data
     save_path = "data/Lux_models"   # results path
     data_path = "data/datasets/RE2500/2e8/U_128_period.jld2"
@@ -124,40 +127,129 @@ struct Encoder{L} <: AbstractLuxWrapperLayer{:layers}
     layers::L
 end
 
-
-Encoder(input_size::Tuple{Int,Int,Int}, latent_dim::Int; hidden_dim=256, C_next::Int=4, padding=1, stride=2, verbose::Bool=true) = begin
-    H, W, C = input_size
-
-    convpart = Chain(
-        Conv((3, 3), C => C_next, identity; pad=padding, stride=stride, cross_correlation=true), relu,
-        MaxPool((2, 2)),
-        Conv((3, 3), C_next => 2C_next, identity; pad=padding, stride=stride, cross_correlation=true), relu,
-        MaxPool((2, 2)),
-        Conv((3, 3), 2C_next => 4C_next, identity; pad=padding, stride=stride, cross_correlation=true), relu,
-        MaxPool((2, 2)),
-        Conv((3, 3), 4C_next => 8C_next, identity; pad=padding, stride=stride, cross_correlation=true), relu,
-        MaxPool((2, 2)),
-        FlattenLayer()  # instantiate
-        # more pooling and Conv
+# Helper functions for parametric construction
+function enc_layer(k, p, Cin, Cout, pad, stride)
+    return Chain(
+        Conv((k, k), Cin => Cout, identity; pad, stride, cross_correlation=true),
+        relu,
+        MaxPool((p, p))
     )
-    dummy = zeros(Float32, H, W, C, 1)
+end
 
-    # initialize convpart params/state and run forward to infer flattened size
+function dec_layer(k, p, Cin, Cout, pad, stride)
+    return Chain(
+        x -> NNlib.upsample_bilinear(x; size=(size(x,1)*p, size(x,2)*p)),
+        Conv((k, k), Cin => Cout; pad, stride),
+        gelu
+    )
+end
+
+Encoder(args::LuxArgs; verbose=true) = Encoder_parametric(args.input_dim, args.latent_dim;
+                            n_conv=args.n_conv, n_dense=args.n_dense, C_base=args.C_base,
+                            conv_kernel=args.conv_kernel, pool_kernel=args.pool_kernel,
+                            padding=args.padding, stride=args.stride, verbose=verbose)
+
+# Parametric encoder constructor
+function Encoder_parametric(input_size::Tuple{Int,Int,Int}, latent_dim::Int;
+                           n_conv=4, n_dense=3, C_base=8, conv_kernel=3,
+                           pool_kernel=2, padding=1, stride=2, verbose=true)
+    H, W, C_in = input_size
+    # Build convolutional layers
+    enc_layers = []
+    enc_channels = []
+    
+    push!(enc_layers, enc_layer(conv_kernel, pool_kernel, C_in, C_base, padding, stride))
+    push!(enc_channels, (C_in, C_base))
+    
+    for i in 1:(n_conv - 1)
+        C1 = C_base * 2^(i - 1)
+        C2 = C_base * 2^i
+        push!(enc_channels, (C1, C2))
+        push!(enc_layers, enc_layer(conv_kernel, pool_kernel, C1, C2, padding, stride))
+    end
+    
+    # Calculate output size after convolutions
     rng = Xoshiro(0)
-    ps_conv, st_conv = Lux.setup(rng, convpart)
-    flat, st_conv = convpart(dummy, ps_conv, st_conv)
-    dense_in = size(flat, 1)
+    dummy = zeros(Float32, H, W, C_in, 1)
+    temp_conv = Chain(enc_layers...)
+    temp_p, temp_st = Lux.setup(rng, temp_conv)
+    temp_out, _ = temp_conv(dummy, temp_p, temp_st)
+    dense_in = length(vec(temp_out))
+    
+    # Build dense layers
+    dense_layers = Any[FlattenLayer()]
+    dense_nodes = []
+    
+    for k in 0:(n_dense - 2)
+        nodes = Int.(2 .^ (log2(dense_in) .- 2 .* (k, k+1)))
+        if nodes[end] ≤ latent_dim
+            break
+        end
+        push!(dense_nodes, nodes)
+        push!(dense_layers, Dense(nodes...))
+        push!(dense_layers, gelu)
+    end
+    
+    final_nodes = (isempty(dense_nodes) ? dense_in : dense_nodes[end][end], latent_dim)
+    push!(dense_nodes, final_nodes)
+    push!(dense_layers, Dense(final_nodes...))
+    
+    if verbose
+        enc_channel_str = join(["$(c[1])→$(c[2])" for c in enc_channels], " -> ")
+        dense_str = join(["$(c[1])→$(c[2])" for c in dense_nodes], " -> ")
 
-    verbose && @info "Initialize Encoder with $(dense_in) → $(hidden_dim) → $(latent_dim) bottleneck"
-
-    layers = Chain(
-        convpart,
-        Dense(dense_in, hidden_dim), gelu,
-        Dense(hidden_dim, latent_dim)      # latent_dim = 16 later
-    )
-
+        dims = [input_size]
+        for j in 1:length(enc_layers)
+            sub = Chain(enc_layers[1:j]...)
+            p, st = Lux.setup(rng, sub)
+            out, st = sub(dummy, p, st)
+            push!(dims, size(out)[1:3])
+        end
+        dims_str = join(["$dim" for dim in dims], " -> ")
+        @info "Parametric Encoder built:"
+        @info "  Conv: $enc_channel_str"
+        @info "  Sizes: $dims_str"
+        @info "  Dense: $dense_str"
+    end
+    layers = Chain(enc_layers..., dense_layers...)
     return Encoder(layers)
 end
+    
+
+
+# Encoder(input_size::Tuple{Int,Int,Int}, latent_dim::Int; hidden_dim=256, C_next::Int=4, padding=1, stride=2, verbose::Bool=true) = begin
+#     H, W, C = input_size
+
+#     convpart = Chain(
+#         Conv((3, 3), C => C_next, identity; pad=padding, stride=stride, cross_correlation=true), relu,
+#         MaxPool((2, 2)),
+#         Conv((3, 3), C_next => 2C_next, identity; pad=padding, stride=stride, cross_correlation=true), relu,
+#         MaxPool((2, 2)),
+#         Conv((3, 3), 2C_next => 4C_next, identity; pad=padding, stride=stride, cross_correlation=true), relu,
+#         MaxPool((2, 2)),
+#         Conv((3, 3), 4C_next => 8C_next, identity; pad=padding, stride=stride, cross_correlation=true), relu,
+#         MaxPool((2, 2)),
+#         FlattenLayer()  # instantiate
+#         # more pooling and Conv
+#     )
+#     dummy = zeros(Float32, H, W, C, 1)
+
+#     # initialize convpart params/state and run forward to infer flattened size
+#     rng = Xoshiro(0)
+#     ps_conv, st_conv = Lux.setup(rng, convpart)
+#     flat, st_conv = convpart(dummy, ps_conv, st_conv)
+#     dense_in = size(flat, 1)
+
+#     verbose && @info "Initialize Encoder with $(dense_in) → $(hidden_dim) → $(latent_dim) bottleneck"
+
+#     layers = Chain(
+#         convpart,
+#         Dense(dense_in, hidden_dim), gelu,
+#         Dense(hidden_dim, latent_dim)      # latent_dim = 16 later
+#     )
+
+#     return Encoder(layers)
+# end
 
 function (encoder::Encoder)(x, ps, st)
     z, st_new = encoder.layers(x, ps, st)
@@ -174,39 +266,129 @@ function upsample2(x)
     return NNlib.upsample_bilinear(x; size=(2H, 2W))
 end
 
+Decoder(args::LuxArgs; verbose=true) = Decoder_parametric(args.output_dim, args.latent_dim;
+                         n_conv=args.n_conv, n_dense=args.n_dense, C_base=args.C_base,
+                        conv_kernel=args.conv_kernel, pool_kernel=args.pool_kernel,
+                        padding=args.padding, stride=args.stride, verbose=verbose)
 
-Decoder(output_size::Tuple{Int,Int,Int}, latent_dim::Int; hidden_dim=256, C_next::Int=4, verbose::Bool=true) = begin
-    H, W, C = output_size
-    h_lat, w_lat = div(H, 16), div(W, 16)
-    channels_mid = 8 * C_next
-    dense_len = h_lat * w_lat * channels_mid
+function Decoder_parametric(output_size::Tuple{Int,Int,Int}, latent_dim::Int;
+                           n_conv=4, n_dense=3, C_base=8, conv_kernel=3,
+                           pool_kernel=2, padding=1, stride=1, verbose=true)
+    H, W, C_out = output_size
+    
+    # Calculate compression ratio from encoder
+    # This should match the encoder's final spatial size
+    cr = 2^n_conv
+    h_lat, w_lat = div(H, cr), div(W, cr)
+    channels_mid = C_base * 2^(n_conv - 1)
+    
+    # Build dense layers (reverse of encoder)
+    dense_layers = []
+    dense_out = h_lat * w_lat * channels_mid
+    
+    # Calculate dense layer sizes
+    dense_nodes = []
+    for k in 0:(n_dense - 2)
+        nodes = Int.(2 .^ (log2(dense_out) .- 2 .* (k, k+1)))
+        if nodes[end] ≤ latent_dim
+            break
+        end
+        push!(dense_nodes, nodes)
+    end
+    final_nodes = (dense_nodes[end][end], latent_dim)
+    push!(dense_nodes, final_nodes)
+    dense_nodes = reverse(reverse.(dense_nodes))
 
-    layers = Chain(
-        Dense(latent_dim, hidden_dim), gelu,
-        Dense(hidden_dim, dense_len),
-        x -> reshape(x, h_lat, w_lat, channels_mid, size(x, 2)),
+    
+    # Build dense chain
+    for (i, (n_in, n_out)) in enumerate(dense_nodes)
+        push!(dense_layers, Dense(n_in, n_out))
+        if i < length(dense_nodes)
+            push!(dense_layers, gelu)
+        end
+    end
+    
+    # Reshape layer
+    reshape_layer = x -> reshape(x, h_lat, w_lat, channels_mid, size(x, 2))
+    rng = Xoshiro(0)
+    latent = zeros(Float32, h_lat, w_lat, channels_mid, 1)
 
-        # stage 1: H/16 → H/8
-        x -> upsample2(x),
-        Conv((3, 3), 8C_next => 4C_next; pad=1), gelu,
+    # Build deconvolutional layers
+    dec_layers = Any[reshape_layer]
+    dec_channels = []
+    
+    C1_dec = C_base * 2^(n_conv - 1)
+    C2_dec = C_base * 2^(n_conv - 2)
+    
+    for i in 1:n_conv
+        push!(dec_channels, (C1_dec, C2_dec))
+        push!(dec_layers, dec_layer(conv_kernel, pool_kernel, C1_dec, C2_dec, padding, stride))
+        C1_dec, C2_dec = C2_dec, max(1, Int(C2_dec ÷ 2))
+    end
+    
+    # Final output layer
+    C_last = dec_channels[end][end]
+    push!(dec_channels, (C_last, C_out))
+    push!(dec_layers, Conv((conv_kernel, conv_kernel), C_last => C_out; pad=padding))
+    
+    # Smoothing layer
+    push!(dec_channels, (C_out, C_out))
+    push!(dec_layers, Conv((conv_kernel, conv_kernel), C_out => C_out; pad=padding))
+    
+    if verbose
+        dec_channel_str = join(["$(c[1])→$(c[2])" for c in dec_channels], " -> ")
+        dense_str = join(["$(c[1])→$(c[2])" for c in dense_nodes], " -> ")
+        dims = [size(latent)[1:3]]
+        for j in 2:length(dec_layers)
+            sub = Chain(dec_layers[2:j]...)
+            p, st = Lux.setup(rng, sub)
+            out, st = sub(latent, p, st)
+            push!(dims, size(out)[1:3])
+        end
+        dims_str = join(["$dim" for dim in dims], " -> ")
 
-        # stage 2: H/8 → H/4
-        x -> upsample2(x),
-        Conv((3, 3), 4C_next => 2C_next; pad=1), gelu,
-
-        # stage 3: H/4 → H/2
-        x -> upsample2(x),
-        Conv((3, 3), 2C_next => 1C_next; pad=1), gelu,
-
-        # stage 4: H/2 → H
-        x -> upsample2(x),
-        Conv((3, 3), C_next => C; pad=1),     # linear output (no relu!)
-        Conv((3, 3), C => C; pad=1)           # small anti-alias / smoothing
-    )
-    verbose && @info "Initialize Decoder (upsample+conv) with $(latent_dim) → $(hidden_dim) → $(dense_len)"
-
+        @info "Parametric Decoder built:"
+        @info "  Dense: $dense_str"
+        @info "  Sizes: $dims_str"
+        @info "  Conv: $dec_channel_str"
+    end
+    
+    layers = Chain(dense_layers..., dec_layers...)
     return Decoder(layers)
 end
+
+# Decoder(output_size::Tuple{Int,Int,Int}, latent_dim::Int; hidden_dim=256, C_next::Int=4, verbose::Bool=true) = begin
+#     H, W, C = output_size
+#     h_lat, w_lat = div(H, 16), div(W, 16)
+#     channels_mid = 8 * C_next
+#     dense_len = h_lat * w_lat * channels_mid
+
+#     layers = Chain(
+#         Dense(latent_dim, hidden_dim), gelu,
+#         Dense(hidden_dim, dense_len),
+#         x -> reshape(x, h_lat, w_lat, channels_mid, size(x, 2)),
+
+#         # stage 1: H/16 → H/8
+#         x -> upsample2(x),
+#         Conv((3, 3), 8C_next => 4C_next; pad=1), gelu,
+
+#         # stage 2: H/8 → H/4
+#         x -> upsample2(x),
+#         Conv((3, 3), 4C_next => 2C_next; pad=1), gelu,
+
+#         # stage 3: H/4 → H/2
+#         x -> upsample2(x),
+#         Conv((3, 3), 2C_next => 1C_next; pad=1), gelu,
+
+#         # stage 4: H/2 → H
+#         x -> upsample2(x),
+#         Conv((3, 3), C_next => C; pad=1),     # linear output (no relu!)
+#         Conv((3, 3), C => C; pad=1)           # small anti-alias / smoothing
+#     )
+#     verbose && @info "Initialize Decoder (upsample+conv) with $(latent_dim) → $(hidden_dim) → $(dense_len)"
+
+#     return Decoder(layers)
+# end
 
 function (dec::Decoder)(z, ps, st)
     x̂, st_new = dec.layers(z, ps, st)

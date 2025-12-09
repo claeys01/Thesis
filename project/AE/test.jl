@@ -1,26 +1,23 @@
-using JLD2
 using Lux
+using NNlib
+using Revise
 using Random
-using ProgressMeter
-using Plots
-using Dates
-using Optimisers
-using Enzyme
-using Zygote
-using DrWatson: struct2dict
 
-includet("../custom.jl")
 includet("Lux_AE.jl")
-includet("../utils/Lux_AE_reconstructer.jl")
-includet("../utils/Lux_AE_loss_plot.jl")
 
-train_loader, _, normalizer = get_data(1000, "data/datasets/RE2500/2e8/U_128_full.jld2";
-                                                        n_samples=1000, clip_bc=true, split=-1, field="u", verbose=false)
+args = LuxArgs()
+rng = Xoshiro(0)
 
-@show size(train_loader)
+# Architecture hyperparameters
+# n_conv = 6
+# n_dense = 3
+# C_base = 8
+# conv_kernel = 3
+# pool_kernel = 2
+# latent_dim = 16
 
-for batch in train_loader
-    x_in, x_target, μ₀ = batch
 
-    @show size(x_in)
-end
+enc = Encoder(args, verbose=true)
+dec = Decoder(args, verbose=true)
+ae = AE(enc, dec)
+nothing
