@@ -17,14 +17,14 @@ Base.@kwdef mutable struct LuxArgs
     λdiv = 0                    # divergence loss weight
     λmask = 0                   # weight of body mask loss
     loss = :L1                  # loss function for reconstruction loss (:L1, :L2, :charb)
-    batch_size = 32             # batch size
-    downsample = -1             # amount of data used for training 
+    batch_size = 30             # batch size
+    train_downsample = 300      # amount of data used for training 
+    test_downsample = 300
     n_periods = 3               # amount of shedding periods to use for training data
-    epochs = 50                # number of epochs
+    epochs = 10                 # number of epochs
     seed = 42                   # random seed
     n_reconstruct = 2           # sampling size for output   
-    test_loss = false
-    test_downsample = 300
+    test_loss = true
     field = "u"
     use_gpu = false             # use GPU
     clip_bc = true              # removes the ghost cells from the snapshot
@@ -46,9 +46,11 @@ function get_data_in(X, μ₀; idx=nothing)
     if isnothing(idx)
         Xin = cat(X, μ₀; dims=3)
     else
-        Xin, X, μ₀ = cat(X[:, :, :, idx], μ₀[:, :, :, idx]; dims=3), X[:, :, :, idx], μ₀[:, :, :, idx]
+        Xtarget = X[:, :, :, idx]
+        μbatch = μ₀[:, :, :, idx]
+        Xin = cat(Xtarget, μbatch; dims=3)
     end
-    return (Xin, X, μ₀)
+    return (Xin, Xtarget, μbatch)
 end
 
 
@@ -66,8 +68,7 @@ function downsample_equal(v::AbstractVector, M::Integer)
 end
 
 
-function get_data(batch_size, path;t_training=10, n_training=500, split=0.2, verbose=true)
-
+function get_data(batch_size, path;t_training=10, n_training=500, n_test=500, split=0.2, verbose=true)
 
     simdata = load_simdata(path)
     preprocess_data!(simdata; verbose=verbose)
@@ -103,7 +104,7 @@ function get_data(batch_size, path;t_training=10, n_training=500, split=0.2, ver
         train_idx = setdiff(train_idx_combined, val_idx)
     end
 
-    test_idx = collect(last(train_idx_combined)+1 : N)
+    test_idx = downsample_equal(collect(last(train_idx_combined)+1 : N), n_test)
 
     plt = train_force_plot(simdata; train_idx=train_idx, val_idx=val_idx, test_idx=test_idx)
     display(plt)
@@ -128,7 +129,6 @@ Encoder(input_size::Tuple{Int,Int,Int}, latent_dim::Int; hidden_dim=256, C_next:
     H, W, C = input_size
 
     convpart = Chain(
-        # NOTE: no activation argument in Lux.Conv; add relu separately
         Conv((3, 3), C => C_next, identity; pad=padding, stride=stride, cross_correlation=true), relu,
         MaxPool((2, 2)),
         Conv((3, 3), C_next => 2C_next, identity; pad=padding, stride=stride, cross_correlation=true), relu,
@@ -138,6 +138,7 @@ Encoder(input_size::Tuple{Int,Int,Int}, latent_dim::Int; hidden_dim=256, C_next:
         Conv((3, 3), 4C_next => 8C_next, identity; pad=padding, stride=stride, cross_correlation=true), relu,
         MaxPool((2, 2)),
         FlattenLayer()  # instantiate
+        # more pooling and Conv
     )
     dummy = zeros(Float32, H, W, C, 1)
 
@@ -151,7 +152,7 @@ Encoder(input_size::Tuple{Int,Int,Int}, latent_dim::Int; hidden_dim=256, C_next:
 
     layers = Chain(
         convpart,
-        Dense(dense_in, hidden_dim), relu,
+        Dense(dense_in, hidden_dim), gelu,
         Dense(hidden_dim, latent_dim)      # latent_dim = 16 later
     )
 
@@ -179,7 +180,6 @@ Decoder(output_size::Tuple{Int,Int,Int}, latent_dim::Int; hidden_dim=256, C_next
     h_lat, w_lat = div(H, 16), div(W, 16)
     channels_mid = 8 * C_next
     dense_len = h_lat * w_lat * channels_mid
-    verbose && @info "Initialize Decoder (upsample+conv) with $(latent_dim) → $(hidden_dim) → $(dense_len)"
 
     layers = Chain(
         Dense(latent_dim, hidden_dim), gelu,
@@ -203,6 +203,7 @@ Decoder(output_size::Tuple{Int,Int,Int}, latent_dim::Int; hidden_dim=256, C_next
         Conv((3, 3), C_next => C; pad=1),     # linear output (no relu!)
         Conv((3, 3), C => C; pad=1)           # small anti-alias / smoothing
     )
+    verbose && @info "Initialize Decoder (upsample+conv) with $(latent_dim) → $(hidden_dim) → $(dense_len)"
 
     return Decoder(layers)
 end

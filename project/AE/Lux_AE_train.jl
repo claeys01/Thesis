@@ -26,7 +26,16 @@ function train(; kws...)
     # train_loader, validation_loader, normalizer = get_data(args.batch_size, args.data_path;
     #     n_samples=args.downsample, clip_bc=args.clip_bc, split=args.split, n_periods=args.n_periods)
 
-    train_loader, val_loader, test_loader, X, μ₀, normalizer = get_data(args.batch_size, args.full_data_path; n_training=300, split=0.2, t_training=20.854)
+    train_loader, validation_loader, test_loader,
+    X, μ₀, normalizer =
+        get_data(
+            args.batch_size,
+            args.full_data_path;
+            n_training = args.train_downsample,
+            n_test = args.test_downsample,
+            split = 0.2,
+            t_training = 20.854,
+        )
 
     if args.use_gpu
         device = gpu_device()
@@ -56,17 +65,19 @@ function train(; kws...)
 
     loss_func = make_loss_function(args, device, normalizer)
 
-    # create test data (whole simulation)
-    # record losses
-    train_losses = Float32[]
-    val_losses = Float32[]
-    rec_losses = Float32[]
-    div_losses = Float32[]
-    inside_losses = Float32[]
-    iters = Int[]
-    val_iters = Int[]
-    train_corrs = Vector{Float32}[]
-    val_corrs = Vector{Float32}[]
+    # Pre-allocate loss arrays
+    max_iters = args.epochs * length(train_loader)
+    train_losses = Vector{Float32}(undef, max_iters)
+    rec_losses = Vector{Float32}(undef, max_iters)
+    div_losses = Vector{Float32}(undef, max_iters)
+    inside_losses = Vector{Float32}(undef, max_iters)
+    iters = Vector{Int}(undef, max_iters)
+    train_corrs = Vector{Vector{Float32}}(undef, max_iters)
+    
+    val_losses = Vector{Float32}(undef, args.epochs)
+    val_iters = Vector{Int}(undef, args.epochs)
+    val_corrs = Vector{Vector{Float32}}(undef, args.epochs)
+    
     test_losses = Float32[]
     test_corrs = Vector{Float32}[]
 
@@ -79,7 +90,8 @@ function train(; kws...)
         @info "Epoch $(epoch)/$(args.epochs)"
         train_progress = Progress(length(train_loader); desc="Training")
         # ---- TRAIN ----
-        for batch in train_loader
+        for train_idx in train_loader
+            batch = get_data_in(X, μ₀; idx=train_idx)
             _, loss, stats, train_state = Training.single_train_step!(
                 args.Autodiff, loss_func, batch, train_state; return_gradients=Val(false)
             )
@@ -87,12 +99,12 @@ function train(; kws...)
 
             # record
             iter += 1
-            push!(iters, iter)
-            push!(train_losses, Float32(loss))
-            push!(rec_losses, Float32(Lrec))
-            push!(div_losses, Float32(L2div))
-            push!(inside_losses, Float32(Linside))
-            push!(train_corrs, corrs)
+            iters[iter] = iter
+            train_losses[iter] = Float32(loss)
+            rec_losses[iter] = Float32(Lrec)
+            div_losses[iter] = Float32(L2div)
+            inside_losses[iter] = Float32(Linside)
+            train_corrs[iter] = corrs
 
             # progress meter
             next!(train_progress; showvalues=[(:loss, loss)])
@@ -101,15 +113,13 @@ function train(; kws...)
         finish!(train_progress)
 
         # ---- VALIDATION (epoch-level) ----
-
         val_sum = 0.0
         n_val = 0
         val_corr_total = zeros(Float32, 2)
-        val_state = deepcopy(train_state)
-        for val_batch in validation_loader
-            _, val_loss, val_stats, _ = Training.single_train_step!(
-                args.Autodiff, loss_func, val_batch, val_state; return_gradients=Val(false)
-            )
+        for val_idx in validation_loader
+            val_batch = get_data_in(X, μ₀; idx=val_idx)
+            # Forward pass only (no gradients)
+            val_loss, val_st, val_stats = loss_func(ae, train_state.parameters, train_state.states, val_batch)
             _, _, _, val_corr = val_stats
             val_sum += val_loss
             n_val += 1
@@ -117,16 +127,30 @@ function train(; kws...)
         end
         val_mean = Float32(val_sum / max(n_val, 1))
         val_corr_mean = vec((val_corr_total / max(n_val, 1)))
-        push!(val_losses, val_mean)
-        push!(val_iters, iter)      # <— align the validation point to the last train iter of this epoch
-        push!(val_corrs, val_corr_mean)
+        val_losses[epoch] = val_mean
+        val_iters[epoch] = iter
+        val_corrs[epoch] = val_corr_mean
 
         # ----- TEST (On whole dataset)
         if args.test_loss
-            test_loss, _, test_stats = test_loss_func(ae, train_state.parameters, train_state.states, test_data)
-            _, _, _, test_corr = test_stats
-            push!(test_losses, test_loss)
-            push!(test_corrs, test_corr)
+            test_progress = Progress(length(test_loader); desc="Test", color=:red)
+            test_sum = 0.0
+            n_test = 0
+            test_corr_total = zeros(Float32, 2)
+            for test_idx in test_loader
+                test_batch = get_data_in(X, μ₀; idx=test_idx)
+                # Forward pass only
+                test_loss, test_st, test_stats = loss_func(ae, train_state.parameters, train_state.states, test_batch)
+                _, _, _, test_corr = test_stats
+                test_sum += test_loss
+                n_test += 1
+                test_corr_total .+= test_corr
+                next!(test_progress; showvalues=[(:test_loss, test_loss)])
+            end
+            test_mean = Float32(test_sum / max(n_test, 1))
+            test_corr_mean = vec((test_corr_total / max(n_test, 1)))
+            push!(test_losses, test_mean)
+            push!(test_corrs, test_corr_mean)
         end
 
         # @show test_loss

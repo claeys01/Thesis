@@ -162,7 +162,6 @@ function train_force_plot(simdata::Any; train_idx=nothing, val_idx=nothing, test
     end
     # Annotate zero crossings
     for (i, idx) in enumerate(zero_idxs)
-        println(i % 2)
         shift = i % 2
         scatter!(plt, [time[idx]], [lift[idx]]; label=false, color=:black, markersize=3)
         annotate!(plt, time[idx], lift[idx] + 0.1 -(shift*0.2) , text(string(round(time[idx],digits = 3)), 8, :right))
