@@ -9,6 +9,9 @@ using Enzyme
 using Zygote
 using DrWatson: struct2dict
 
+using TimerOutputs
+const to = TimerOutput()
+
 includet("../custom.jl")
 includet("Lux_AE.jl")
 includet("../utils/Lux_AE_reconstructer.jl")
@@ -22,20 +25,16 @@ function train(; kws...)
     args.seed > 0 && Random.seed!(args.seed)
 
     # load RHS data and normalizer
-
-    # train_loader, validation_loader, normalizer = get_data(args.batch_size, args.data_path;
-    #     n_samples=args.downsample, clip_bc=args.clip_bc, split=args.split, n_periods=args.n_periods)
-
     train_loader, validation_loader, test_loader,
-    X, μ₀, normalizer =
-        get_data(
+    X, μ₀, normalizer = @timeit to "get_data" get_data(
             args.batch_size,
             args.full_data_path;
             n_training = args.train_downsample,
             n_test = args.test_downsample,
             split = 0.2,
-            t_training = 20.854,
+            t_training = args.t_training,
         )
+        
 
     if args.use_gpu
         device = gpu_device()
@@ -48,11 +47,9 @@ function train(; kws...)
     @info "Training on $device"
 
     # # initialize encoder and decoder
-    encoder = Encoder(args.input_dim, args.latent_dim; hidden_dim=args.hidden_dim, C_next=args.C_conv, padding=args.padding, stride=args.stride)
-    decoder = Decoder(args.output_dim, args.latent_dim; hidden_dim=args.hidden_dim, C_next=args.C_conv)
-
-    ae = AE(encoder, decoder)
-
+    enc = Encoder(args, verbose=true)
+    dec = Decoder(args, verbose=true)
+    ae = AE(enc, dec)
     rng = Xoshiro(args.seed)
     ps, st = Lux.setup(rng, ae) .|> device
 
@@ -86,74 +83,83 @@ function train(; kws...)
     # training
     @info "Start Training, total $(args.epochs) epochs"
     val_mean = 1
+    
     for epoch = 1:args.epochs
-        @info "Epoch $(epoch)/$(args.epochs)"
-        train_progress = Progress(length(train_loader); desc="Training")
-        # ---- TRAIN ----
-        for train_idx in train_loader
-            batch = get_data_in(X, μ₀; idx=train_idx)
-            _, loss, stats, train_state = Training.single_train_step!(
-                args.Autodiff, loss_func, batch, train_state; return_gradients=Val(false)
-            )
-            Lrec, Linside, L2div, corrs = stats
+        @timeit to "epoch" begin
+            @info "Epoch $(epoch)/$(args.epochs)"
+            
+            train_progress = Progress(length(train_loader); desc="Training")
+            # ---- TRAIN ----
+            @timeit to "train" begin
+                for train_idx in train_loader
+                    batch = @timeit to "get training batch" get_data_in(X, μ₀; idx=train_idx)
+                    _, loss, stats, train_state = @timeit to "single_train_step!" Training.single_train_step!(
+                        args.Autodiff, loss_func, batch, train_state; return_gradients=Val(false)
+                    )
+                    Lrec, Linside, L2div, corrs = stats
 
-            # record
-            iter += 1
-            iters[iter] = iter
-            train_losses[iter] = Float32(loss)
-            rec_losses[iter] = Float32(Lrec)
-            div_losses[iter] = Float32(L2div)
-            inside_losses[iter] = Float32(Linside)
-            train_corrs[iter] = corrs
+                    # record
+                    iter += 1
+                    iters[iter] = iter
+                    train_losses[iter] = Float32(loss)
+                    rec_losses[iter] = Float32(Lrec)
+                    div_losses[iter] = Float32(L2div)
+                    inside_losses[iter] = Float32(Linside)
+                    train_corrs[iter] = corrs
 
-            # progress meter
-            next!(train_progress; showvalues=[(:loss, loss)])
-        end
-
-        finish!(train_progress)
-
-        # ---- VALIDATION (epoch-level) ----
-        val_sum = 0.0
-        n_val = 0
-        val_corr_total = zeros(Float32, 2)
-        for val_idx in validation_loader
-            val_batch = get_data_in(X, μ₀; idx=val_idx)
-            # Forward pass only (no gradients)
-            val_loss, val_st, val_stats = loss_func(ae, train_state.parameters, train_state.states, val_batch)
-            _, _, _, val_corr = val_stats
-            val_sum += val_loss
-            n_val += 1
-            val_corr_total .+= val_corr
-        end
-        val_mean = Float32(val_sum / max(n_val, 1))
-        val_corr_mean = vec((val_corr_total / max(n_val, 1)))
-        val_losses[epoch] = val_mean
-        val_iters[epoch] = iter
-        val_corrs[epoch] = val_corr_mean
-
-        # ----- TEST (On whole dataset)
-        if args.test_loss
-            test_progress = Progress(length(test_loader); desc="Test", color=:red)
-            test_sum = 0.0
-            n_test = 0
-            test_corr_total = zeros(Float32, 2)
-            for test_idx in test_loader
-                test_batch = get_data_in(X, μ₀; idx=test_idx)
-                # Forward pass only
-                test_loss, test_st, test_stats = loss_func(ae, train_state.parameters, train_state.states, test_batch)
-                _, _, _, test_corr = test_stats
-                test_sum += test_loss
-                n_test += 1
-                test_corr_total .+= test_corr
-                next!(test_progress; showvalues=[(:test_loss, test_loss)])
+                    # progress meter
+                    next!(train_progress; showvalues=[(:loss, loss)])
+                end
             end
-            test_mean = Float32(test_sum / max(n_test, 1))
-            test_corr_mean = vec((test_corr_total / max(n_test, 1)))
-            push!(test_losses, test_mean)
-            push!(test_corrs, test_corr_mean)
-        end
+            finish!(train_progress)
 
-        # @show test_loss
+            # ---- VALIDATION (epoch-level) ----
+            val_sum = 0.0
+            n_val = 0
+            val_corr_total = zeros(Float32, 2)
+            @timeit to "validation" begin
+                for val_idx in validation_loader
+                    val_batch = @timeit to "get validation data" get_data_in(X, μ₀; idx=val_idx)
+                    # Forward pass only (no gradients)
+                    val_loss, val_st, val_stats = @timeit to "validation loss" loss_func(ae, train_state.parameters, train_state.states, val_batch)
+                    _, _, _, val_corr = val_stats
+                    val_sum += val_loss
+                    n_val += 1
+                    val_corr_total .+= val_corr
+                end
+                val_mean = Float32(val_sum / max(n_val, 1))
+                val_corr_mean = vec((val_corr_total / max(n_val, 1)))
+                val_losses[epoch] = val_mean
+                val_iters[epoch] = iter
+                val_corrs[epoch] = val_corr_mean
+            end
+
+            # ----- TEST (On whole dataset)
+            if args.test_loss
+                @timeit to "test" begin
+                    test_progress = Progress(length(test_loader); desc="Test", color=:red)
+                    test_sum = 0.0
+                    n_test = 0
+                    test_corr_total = zeros(Float32, 2)
+                    for test_idx in test_loader
+                        test_batch = @timeit to "get test batch" get_data_in(X, μ₀; idx=test_idx)
+                        # Forward pass only
+                        test_loss, test_st, test_stats = @timeit to "get test loss" loss_func(ae, train_state.parameters, train_state.states, test_batch)
+                        _, _, _, test_corr = test_stats
+                        test_sum += test_loss
+                        n_test += 1
+                        test_corr_total .+= test_corr
+                        next!(test_progress; showvalues=[(:test_loss, test_loss)])
+                    end
+                    test_mean = Float32(test_sum / max(n_test, 1))
+                    test_corr_mean = vec((test_corr_total / max(n_test, 1)))
+                    push!(test_losses, test_mean)
+                    push!(test_corrs, test_corr_mean)
+                end
+            end
+
+            # @show test_loss
+        end
     end
 
     # save model
@@ -187,18 +193,11 @@ function train(; kws...)
             "val_corrs", val_corrs,
             "test_losses", test_losses,
             "test_corrs", test_corrs)
-
-        # if args.test_loss 
-        # JLD2.save(loss_trajectory_path,
-        # "test_losses", test_losses, 
-        # "test_corrs", test_corrs)
-        # end
         @info "Model saved: $(filepath)"
     end
 
     #plot and save reconstruction of 2 random snapshots
     try
-        # reconstruction = visualize_reconstructions(;encoder=encoder, decoder=decoder, args=args)
         reconstruction = visualize_reconstructions(filepath)
         reconstruct_path = joinpath(save_folder, "reconstruction.png")
         savefig(reconstruction, reconstruct_path)
@@ -216,6 +215,7 @@ function train(; kws...)
     catch e
         @warn "Failed to save loss plot: $e"
     end
+    show(to)
 end
 
 function make_loss_function(args, device, normalizer)
@@ -246,6 +246,7 @@ function make_loss_function(args, device, normalizer)
         )
     end
     return loss_function
+
 end
 
 

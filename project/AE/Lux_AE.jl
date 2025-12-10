@@ -17,12 +17,13 @@ Base.@kwdef mutable struct LuxArgs
     λdiv = 0                    # divergence loss weight
     λmask = 0                   # weight of body mask loss
     loss = :L1                  # loss function for reconstruction loss (:L1, :L2, :charb)
-    batch_size = 30             # batch size
-    train_downsample = 300      # amount of data used for training 
-    test_downsample = 300
+    batch_size = 64             # batch size
+    t_training = 16.603
+    train_downsample = 5*64      # amount of data used for training 
+    test_downsample = 3*64
     split = 0.2
     n_periods = 3               # amount of shedding periods to use for training data
-    epochs = 10                 # number of epochs
+    epochs = 50                 # number of epochs
     seed = 42                   # random seed
     n_reconstruct = 2           # sampling size for output   
     test_loss = true
@@ -33,7 +34,7 @@ Base.@kwdef mutable struct LuxArgs
     output_dim = (2^8, 2^8, 2)  # size of reconstructed RHS field
     conv_kernel = 3             # DO NOT CHANGE
     pool_kernel = 2             # DO NOT CHANGE  
-    n_conv = 6                  # number of convolutional layers
+    n_conv = 4                  # number of convolutional layers
     n_dense = 3                 # number of dense layers in bottleneck
     latent_dim = 16             # latent dimension
     stride = 1                  # stride for convolutions
@@ -462,6 +463,45 @@ end
 
 Zygote.@nograd batch_corrs
 
+# function total_loss(m::AE, ps, st, 
+#     x_in::AbstractArray,        # (u,v,mask)
+#     x_target::AbstractArray,    # (u,v)
+#     μ₀::AbstractArray;          # (H,W,1,B)  1 outside / 0 inside
+#     loss=:L1,
+#     λdiv=0f0,
+#     λmask=0f0)
+
+#     # 1) Forward pass through AE (Lux-style)
+#     x̂, st2 = m(x_in, ps, st)
+
+#     corrs = batch_corrs(x_target, x̂)
+
+#     # 3) Mask out body region
+#     x̂ = x̂ .* μ₀
+
+#     # 4) Reconstruction + optional extra losses
+#     Linside = 0f0
+#     L2div   = 0f0
+#     Lrec    = 0f0
+
+#     if λmask != 0f0
+#         Lrec, Linside = masked_loss(x_target, x̂, μ₀; loss=loss)
+#     elseif λdiv != 0f0
+#         try
+#             # If divergence computation fails on GPU we skip it (avoid CPU/GPU mix)
+#             L2div = div_loss_L2(x̂)
+#         catch e
+#             @warn "div_loss_L2 failed (likely GPU/CPU mismatch). skipping divergence loss: $e"
+#         end
+#         Lrec = recon_loss(x_target, x̂; loss=loss)
+#     else
+#         Lrec = recon_loss(x_target, x̂; loss=loss)
+#     end
+
+#     L = Lrec + λdiv * L2div + λmask * Linside
+
+#     return L, st2, (Lrec, Linside, L2div, corrs)
+# end
 function total_loss(m::AE, ps, st, 
     x_in::AbstractArray,        # (u,v,mask)
     x_target::AbstractArray,    # (u,v)
@@ -470,38 +510,64 @@ function total_loss(m::AE, ps, st,
     λdiv=0f0,
     λmask=0f0)
 
+    st2 = st
+    Lrec = 0f0
+    Linside = 0f0
+    L2div = 0f0
+    corrs = Float32[]
+
     # 1) Forward pass through AE (Lux-style)
+    Zygote.ignore() do
+        @timeit Main.to "AE forward" begin
+            # do not put heavy compute inside ignore; only the timing wrapper
+        end
+    end
     x̂, st2 = m(x_in, ps, st)
 
+    # correlations
+    Zygote.ignore() do
+        @timeit Main.to "correlations" begin end
+    end
     corrs = batch_corrs(x_target, x̂)
 
-    # 3) Mask out body region
+    # apply mask
+    Zygote.ignore() do
+        @timeit Main.to "apply mask" begin end
+    end
     x̂ = x̂ .* μ₀
 
-    # 4) Reconstruction + optional extra losses
-    Linside = 0f0
-    L2div   = 0f0
-    Lrec    = 0f0
-
     if λmask != 0f0
+        Zygote.ignore() do
+            @timeit Main.to "masked_loss" begin end
+        end
         Lrec, Linside = masked_loss(x_target, x̂, μ₀; loss=loss)
     elseif λdiv != 0f0
+        Zygote.ignore() do
+            @timeit Main.to "divergence_loss" begin end
+        end
         try
-            # If divergence computation fails on GPU we skip it (avoid CPU/GPU mix)
             L2div = div_loss_L2(x̂)
         catch e
             @warn "div_loss_L2 failed (likely GPU/CPU mismatch). skipping divergence loss: $e"
         end
+        Zygote.ignore() do
+            @timeit Main.to "recon_loss" begin end
+        end
         Lrec = recon_loss(x_target, x̂; loss=loss)
     else
+        Zygote.ignore() do
+            @timeit Main.to "recon_loss" begin end
+        end
         Lrec = recon_loss(x_target, x̂; loss=loss)
     end
 
+    # aggregate
+    Zygote.ignore() do
+        @timeit Main.to "total_loss aggregate" begin end
+    end
     L = Lrec + λdiv * L2div + λmask * Linside
-
     return L, st2, (Lrec, Linside, L2div, corrs)
 end
-
 
 """
     load_trained_AE(checkpoint_path; device=cpu_device(), return_params=false)

@@ -39,19 +39,20 @@ function visualize_reconstructions(checkpoint_path::Union{String,Nothing}=nothin
     ps = device(ps)
     st = device(st)
 
-    enc = Encoder(args.input_dim,  args.latent_dim; hidden_dim=args.hidden_dim, C_next=args.C_conv, padding=args.padding, stride=args.stride, verbose=false)
-    dec = Decoder(args.output_dim, args.latent_dim; hidden_dim=args.hidden_dim, C_next=args.C_conv, verbose=false) 
+    enc = Encoder(args, verbose=false)
+    dec = Decoder(args, verbose=false)
 
     ae = AE(enc, dec)
     
     # optional seeding
     args.seed > 0 && Random.seed!(args.seed)
 
-    @load args.data_path data
-    preprocess_data!(data; n_samples=args.downsample, clip_bc=args.clip_bc,verbose=false)
+    simdata = load_simdata(args.full_data_path)
+    preprocess_data!(simdata; verbose=false)
 
 
-    span = length(data["time"])
+
+    span = length(simdata.time)
 
     if span < args.n_reconstruct
         error("amount of data must be ≥ $(args.n_reconstruct)")
@@ -60,14 +61,14 @@ function visualize_reconstructions(checkpoint_path::Union{String,Nothing}=nothin
     # sample without replacement from the actual span
     ids = randperm(span)[1:args.n_reconstruct]
 
-
+    
     @info "Selected $(args.n_reconstruct) $(args.field) snapshots with indices $ids for reconstruction"
     # prepare plotting grid: each sample has C rows; three columns (input, recon, colorbar-only)
     plots = []
     dirs = ["x" , "y"]
     for (s, id) in enumerate(ids)
-        μ₀ = data["μ₀"][:, :, :, id:id]
-        x = data[args.field][:, :, :, id:id]
+        μ₀ = simdata.μ₀[:, :, :, id:id]
+        x = simdata.u[:, :, :, id:id]
         if args.normalize
             x_target, _ = normalize_batch(x, normalizer=normalizer)
             x_in = cat(x_target, μ₀; dims=3)
@@ -135,7 +136,7 @@ function visualize_reconstructions(checkpoint_path::Union{String,Nothing}=nothin
 end
 
 if abspath(PROGRAM_FILE) == (@__FILE__) || isinteractive()
-    checkpoint = "data/Lux_models/2025-11-25_16-50-09/checkpoint.jld2"
+    checkpoint = "data/Lux_models/2025-12-10_11-09-39/checkpoint.jld2"
     # visualize_reconstructions(checkpoint)
 
 end

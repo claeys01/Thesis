@@ -16,8 +16,8 @@ rng = Xoshiro(0)
 # pool_kernel = 2
 # latent_dim = 16
 
-
 enc = Encoder(args, verbose=true)
 dec = Decoder(args, verbose=true)
 ae = AE(enc, dec)
-nothing
+
+# nothing

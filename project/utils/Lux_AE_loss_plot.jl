@@ -121,6 +121,8 @@ function plot_losses(loss_trajectory_path::AbstractString, checkpoint_path::Abst
         minor_ticks = true,
         grid = :y,
         framestyle = :box,
+        ylims = (-Inf, 1),  # cap the upper limit at 1
+
     )
     if final_loss_str != ""
         if final_test_loss_str != ""
@@ -205,8 +207,8 @@ function plot_losses(loss_trajectory_path::AbstractString, checkpoint_path::Abst
 
 end
 
-checkpoint = "data/Lux_models/2025-12-01_17-16-32/checkpoint.jld2"
-losses = "data/Lux_models/2025-12-01_17-16-32/loss_trajectory.jld2"
+checkpoint = "data/Lux_models/2025-12-10_11-09-39/checkpoint.jld2"
+losses = "data/Lux_models/2025-12-10_11-09-39/loss_trajectory.jld2"
 
 # p = plot_losses(losses, checkpoint)
 # display(p)
