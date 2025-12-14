@@ -70,6 +70,8 @@ function plot_losses(loss_trajectory_path::AbstractString, checkpoint_path::Abst
         yguidefont = font(10),
         xtickfont  = font(8),
         ytickfont  = font(8),
+        ylims = (-Inf, 1),  # cap the upper limit at 1
+
     )
 
     # validation loss
@@ -121,7 +123,6 @@ function plot_losses(loss_trajectory_path::AbstractString, checkpoint_path::Abst
         minor_ticks = true,
         grid = :y,
         framestyle = :box,
-        ylims = (-Inf, 1),  # cap the upper limit at 1
 
     )
     if final_loss_str != ""

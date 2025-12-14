@@ -17,6 +17,8 @@ includet("Lux_AE.jl")
 includet("../utils/Lux_AE_reconstructer.jl")
 includet("../utils/Lux_AE_loss_plot.jl")
 
+# hyperparameters to tune
+
 
 function train(; kws...)
 
@@ -34,8 +36,6 @@ function train(; kws...)
             split = 0.2,
             t_training = args.t_training,
         )
-        
-
     if args.use_gpu
         device = gpu_device()
     else
@@ -121,7 +121,8 @@ function train(; kws...)
                 for val_idx in validation_loader
                     val_batch = @timeit to "get validation data" get_data_in(X, μ₀; idx=val_idx)
                     # Forward pass only (no gradients)
-                    val_loss, val_st, val_stats = @timeit to "validation loss" loss_func(ae, train_state.parameters, train_state.states, val_batch)
+                    st_test = LuxCore.testmode(train_state.states)
+                    val_loss, _, val_stats = @timeit to "validation loss" loss_func(ae, train_state.parameters, st_test, val_batch)
                     _, _, _, val_corr = val_stats
                     val_sum += val_loss
                     n_val += 1
@@ -144,12 +145,13 @@ function train(; kws...)
                     for test_idx in test_loader
                         test_batch = @timeit to "get test batch" get_data_in(X, μ₀; idx=test_idx)
                         # Forward pass only
-                        test_loss, test_st, test_stats = @timeit to "get test loss" loss_func(ae, train_state.parameters, train_state.states, test_batch)
+                        st_test = LuxCore.testmode(train_state.states)
+                        test_loss, _, test_stats = @timeit to "get test loss" loss_func(ae, train_state.parameters, st_test, test_batch)
                         _, _, _, test_corr = test_stats
                         test_sum += test_loss
                         n_test += 1
                         test_corr_total .+= test_corr
-                        next!(test_progress; showvalues=[(:test_loss, test_loss)])
+                        next!(test_progress; showvalues=[("test_loss", test_loss), ("Test corr", test_corr_total)])
                     end
                     test_mean = Float32(test_sum / max(n_test, 1))
                     test_corr_mean = vec((test_corr_total / max(n_test, 1)))

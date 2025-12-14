@@ -3,6 +3,17 @@ import WaterLily: ∂, @loop
 using Revise
 using JLD2
 
+# Ensure parent directory exists for any file path
+function ensure_parent_dir(path::AbstractString)
+    dir = dirname(path)
+    if !ispath(dir)
+        mkpath(dir)
+    end
+    return dir
+end
+
+
+
 # includet("simulations/vortex_shedding.jl")
 includet("../simulations/vortex_shedding_biot_savart.jl")
 includet("../custom.jl")
@@ -10,9 +21,7 @@ includet("../utils/SimDataTypes.jl")
 
 using .SimDataTypes
 
-n=2^8
-sim_shedding = circle_shedding_biot(mem=Array, Re=2500, n=n, m=n)
-t_end = 100.0
+
 
 function reorder_center_out(arr)
     n = length(arr)
@@ -36,17 +45,6 @@ function reorder_center_out(arr)
     return out
 end
 
-# Base.@kwdef mutable struct SimData
-#     time::Vector{Float32}
-#     Δt::Vector{Float32}
-#     u::Array{Float32,4}                  # (H, W, C, T)
-#     μ₀::Array{Float32,2}                 # (nμ, T)
-#     force::Vector{NTuple{2,Float32}}     # (Cd, Cl)
-#     ε::Vector{Float32}                   # dissipation per snapshot
-#     period_ranges::Vector{UnitRange{Int}}
-#     reordered_ranges::Vector{UnitRange{Int}}
-#     single_period_idx::UnitRange{Int}
-# end
 
 
 function data_run(sim::AbstractSimulation, time_max, save_path; sample_instance=50, verbose=false, sample_single_period=false, single_period_direction=:rising)
@@ -64,6 +62,11 @@ function data_run(sim::AbstractSimulation, time_max, save_path; sample_instance=
     root, ext = splitext(save_path)
     period_path = string(root, "_period", ext)
     full_path   = string(root, "_full",   ext)
+
+    # Create parent dirs for both outputs
+    ensure_parent_dir(period_path)
+    ensure_parent_dir(full_path)
+    
     while sim_time(sim) < time_max
         sim_step!(sim)
         verbose && sim_info(sim)
@@ -138,15 +141,17 @@ function data_run(sim::AbstractSimulation, time_max, save_path; sample_instance=
     return simdata
 end
 
-save_dir = "data/datasets/RE2500/2e8/"
-data_path = joinpath(save_dir, "U_128.jld2")
+# # save_dir = "data/datasets/RE2500/2e8/"
+# save_dir = "data/datasets/RE250/"
+# name = "U_128.jl"               # change depending on grid size
+# data_path = joinpath(save_dir, name)
 
-root, ext = splitext(data_path)
-period_path = string(root, "_period", ext)
-full_path   = string(root, "_full",   ext)
+# root, ext = splitext(data_path)
+# period_path = string(root, "_period", ext)
+# full_path   = string(root, "_full",   ext)
 
 
-simdata = data_run(sim_shedding, t_end, data_path; verbose=true, sample_single_period=true)
+# simdata = data_run(sim_shedding, t_end, data_path; verbose=true, sample_single_period=true)
 
 # @load full_path simdata
 
@@ -194,6 +199,33 @@ function plot_sampled_period(simdata::Any, period_path::AbstractString, save_dir
     return (plt = plt, fig_path = fig_path, zero_idxs = zero_idxs, single_period = single_period)
 end
 
-# Example call (keeps previous behavior)
-plot_sampled_period(simdata, period_path, save_dir)
+if abspath(PROGRAM_FILE) == (@__FILE__) || isinteractive()
+    n=2^7
+    Re = 250
+
+    # Build save_dir and ensure it exists
+    save_dir = string("data/datasets/RE",Re, "/2e", Int(log2(n)), "/" )
+    if !ispath(save_dir)
+        mkpath(save_dir)
+    end
+
+    name = string("U_", n, ".jld2")            
+    data_path = joinpath(save_dir, name)
+
+    root, ext = splitext(data_path)
+    period_path = string(root, "_period", ext)
+    full_path   = string(root, "_full",   ext)
+
+    @show save_dir, name, data_path
+    @show period_path, full_path
+
+    sim_shedding = circle_shedding_biot(mem=Array, Re=Re, n=n, m=n)
+    t_end = 100.0
+
+    simdata = data_run(sim_shedding, t_end, data_path; verbose=true, sample_single_period=true)
+
+    plot_sampled_period(simdata, period_path, save_dir)
+end
+
+
 

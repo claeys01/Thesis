@@ -8,25 +8,25 @@ includet("Lux_AE.jl")
 args = LuxArgs()
 rng = Xoshiro(0)
 
-# Define encoder layer: Conv -> ReLU -> MaxPool
-enc_layer(k, p, Cin, Cout, pad, stride) =
-    Chain(Conv((k, k), Cin => Cout, identity; pad, stride, cross_correlation=true),
-          relu,
-          MaxPool((p, p)))
+# # Define encoder layer: Conv -> ReLU -> MaxPool
+# enc_layer(k, p, Cin, Cout, pad, stride) =
+#     Chain(Conv((k, k), Cin => Cout, identity; pad, stride, cross_correlation=true),
+#           relu,
+#           MaxPool((p, p)))
 
-# Define decoder layer: Upsample -> Conv -> GELU
-dec_layer(k, p, Cin, Cout, pad) =
-    Chain(x -> NNlib.upsample_bilinear(x; size=(size(x,1)*p, size(x,2)*p)),
-          Conv((k, k), Cin => Cout; pad),
-          gelu)
+# # Define decoder layer: Upsample -> Conv -> GELU
+# dec_layer(k, p, Cin, Cout, pad) =
+#     Chain(x -> NNlib.upsample_bilinear(x; size=(size(x,1)*p, size(x,2)*p)),
+#           Conv((k, k), Cin => Cout; pad),
+#           gelu)
 
 # Setup input/output dimensions
 size_pow = 8
-input_dim = (2^size_pow, 2^size_pow, 4, 1)
-output_dim = (2^size_pow, 2^size_pow, 2, 1)
+input_dim = (2^size_pow, 2^size_pow, 4, 10)
+output_dim = (2^size_pow, 2^size_pow, 2, 10)
 
 x = rand(Float32, input_dim)
-H, W, C_in, _ = input_dim
+H, W, C_in, T = input_dim
 _, _, C_out, _ = output_dim
 
 # Architecture hyperparameters
@@ -40,26 +40,32 @@ latent_dim = 16
 # Build encoder convolutional layers
 enc_layers = []
 enc_channels = []
-enc_dof = []
-input_params = size(vec(x))[end]
+
+input_params = H*W*C_in
 @info "Input dims: $(size(x)), input params: $(input_params)"
-push!(enc_layers, enc_layer(conv_kernel, pool_kernel, C_in, C_base, args.padding, args.stride))
+
+push!(enc_layers, enc_layer(conv_kernel, pool_kernel, C_in, C_base, args.stride))
 push!(enc_channels, (C_in, C_base))
 
 for i in 1:(n_conv - 1)
-    C1 = C_base * 2^(i - 1)
-    C2 = C_base * 2^i
-    push!(enc_channels, (C1, C2))
-    push!(enc_layers, enc_layer(conv_kernel, pool_kernel, C1, C2, args.padding, args.stride))
-end
+        C1 = C_base * 2^(i - 1)
+        C2 = C_base * 2^i
+        
+        push!(enc_channels, (C1, C2))
+        is_last = (i == n_conv - 1)  # this is the last conv block
+        push!(enc_layers,
+              enc_layer(conv_kernel, pool_kernel, C1, C2, stride; BN = !is_last))        
+    end
 
 # Test encoder and calculate compression ratio
-temp_enc = Chain(enc_layers...)
-temp_p, temp_st = Lux.setup(rng, temp_enc)
-temp_out, temp_st = temp_enc(x, temp_p, temp_st)
+temp_conv = Chain(enc_layers...)
+temp_p, temp_st = Lux.setup(rng, temp_conv)
+temp_out, _ = temp_conv(dummy, temp_p, temp_st)
+H_temp, B_temp, C_temp ,_ = size(temp_out)
+dense_in = H_temp*B_temp*C_temp
 
 latent = vec(temp_out)
-cr = div(input_params, length(latent))
+cr = div(input_params, dense_in)
 
 # Track encoder layer outputs
 for l in 1:length(enc_layers)

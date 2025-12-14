@@ -38,6 +38,7 @@ function visualize_reconstructions(checkpoint_path::Union{String,Nothing}=nothin
     # move params/states to device
     ps = device(ps)
     st = device(st)
+    st_test = LuxCore.testmode(st)
 
     enc = Encoder(args, verbose=false)
     dec = Decoder(args, verbose=false)
@@ -61,7 +62,7 @@ function visualize_reconstructions(checkpoint_path::Union{String,Nothing}=nothin
     # sample without replacement from the actual span
     ids = randperm(span)[1:args.n_reconstruct]
 
-    
+
     @info "Selected $(args.n_reconstruct) $(args.field) snapshots with indices $ids for reconstruction"
     # prepare plotting grid: each sample has C rows; three columns (input, recon, colorbar-only)
     plots = []
@@ -73,7 +74,7 @@ function visualize_reconstructions(checkpoint_path::Union{String,Nothing}=nothin
             x_target, _ = normalize_batch(x, normalizer=normalizer)
             x_in = cat(x_target, μ₀; dims=3)
             x_in_dev = device(Float32.(x_in))
-            x̂_norm, _ = ae(x_in_dev, ps, st)
+            x̂_norm, _ = ae(x_in_dev, ps, st_test)
             x̂_norm = cpu(Array(x̂_norm))  # bring to CPU Array for denormalize/plotting
 
 
@@ -83,7 +84,7 @@ function visualize_reconstructions(checkpoint_path::Union{String,Nothing}=nothin
             x_in = cat(x, μ₀; dims=3)
             if use_lux_checkpoint
                 x_in_dev = device(Float32.(x_in))
-                x̂_dev, _ = ae(x_in_dev, ps, st)
+                x̂_dev, _ = ae(x_in_dev, ps, st_test)
                 x̂ = cpu(Array(x̂_dev))
             else
                 x̂ = reconstruct(enc, dec, x_in, μ₀)
