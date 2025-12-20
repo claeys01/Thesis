@@ -1,4 +1,4 @@
-using ComponentArrays, Lux, DiffEqFlux, Optimization, OptimizationPolyalgorithms,
+using ComponentArrays, Lux, DiffEqFlux, Optimization, OptimizationPolyalgorithms
       OrdinaryDiffEq, Plots
 using DiffEqFlux: group_ranges
 
@@ -82,5 +82,5 @@ end
 adtype = Optimization.AutoZygote()
 optf = Optimization.OptimizationFunction((x, p) -> loss_multiple_shooting(x), adtype)
 optprob = Optimization.OptimizationProblem(optf, pd)
-res_ms = Optimization.solve(optprob, PolyOpt(); callback = callback, maxiters = 300)
+res_ms = Optimization.solve(optprob, LBFGS(); callback = callback, maxiters = 300)
 gif(anim, "multiple_shooting.gif"; fps = 15)

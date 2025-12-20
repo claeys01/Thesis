@@ -67,6 +67,9 @@ end
 function downsample_equal(v::AbstractVector, M::Integer)
     N = length(v)
     M ≤ N || @warn "Cannot downsample to $M entries from $N points, returning $N points"
+    if M < 0
+        return v
+    end
     M = clamp(M, 1, N)
     # idx = round.(Int, range(1, N, length = M))
     idx = 1 .+ floor.(Int, (0:M-1) .* (N / M))
