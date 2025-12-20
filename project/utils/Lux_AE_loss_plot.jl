@@ -32,6 +32,9 @@ function plot_losses(loss_trajectory_path::AbstractString, checkpoint_path::Abst
     val_iters      = get(losses, "val_iters", Int[])
     train_corrs    = get(losses, "train_corrs", Vector{Float32}[])
     val_corrs      = get(losses, "val_corrs", Vector{Float32}[])
+    test_losses    = get(losses, "test_losses", Float32[])
+    test_corrs    = get(losses, "test_corrs", Vector{Float32}[])
+
 
     checkpoint = JLD2.load(checkpoint_path)
     args = LuxArgs(; checkpoint["args"]...)
@@ -44,6 +47,12 @@ function plot_losses(loss_trajectory_path::AbstractString, checkpoint_path::Abst
     # figure annotation text (final val loss)
     final_loss_str = if !isempty(val_losses)
         @sprintf("final val loss = %.3g", val_losses[end])
+    else
+        ""
+    end
+
+    final_test_loss_str = if !isempty(test_losses)
+        @sprintf("final test loss = %.3g", test_losses[end])
     else
         ""
     end
@@ -61,6 +70,8 @@ function plot_losses(loss_trajectory_path::AbstractString, checkpoint_path::Abst
         yguidefont = font(10),
         xtickfont  = font(8),
         ytickfont  = font(8),
+        ylims = (-Inf, 1),  # cap the upper limit at 1
+
     )
 
     # validation loss
@@ -71,6 +82,17 @@ function plot_losses(loss_trajectory_path::AbstractString, checkpoint_path::Abst
             color = :red,
             # alpha = 0.9,
         )
+    end
+
+    # test losses 
+    if !isempty(test_losses)
+        plot!(p, val_iters, test_losses;
+                linestyle=:dashdot,
+                label = "test",
+                lw = 1,
+                color = :purple,
+                # alpha = 0.9,
+            )
     end
 
     # optional extra loss terms if enabled
@@ -101,9 +123,16 @@ function plot_losses(loss_trajectory_path::AbstractString, checkpoint_path::Abst
         minor_ticks = true,
         grid = :y,
         framestyle = :box,
+
     )
     if final_loss_str != ""
-        plot!(p, title = final_loss_str, titlefont = font(10))  # change 10 to desired point size
+        if final_test_loss_str != ""
+            title = final_loss_str * ",  " * final_test_loss_str
+            # plot!(p, title = title, titlefont = font(10))  # change 10 to desired point siz
+        else
+            title = final_loss_str
+        end
+        plot!(p, title = title, titlefont = font(10))  # change 10 to desired point siz
     end
 
 
@@ -136,6 +165,31 @@ function plot_losses(loss_trajectory_path::AbstractString, checkpoint_path::Abst
             ylims = (0,1),
         )
     end
+
+    if !isempty(test_corrs)
+        test_cc1 = first.(test_corrs)
+        test_cc2 = last.(test_corrs)
+
+        # p2 = twinx()
+        plot!(p2, val_iters, test_cc1;
+            label = "test CCᵤ",
+            lw = 0.8,
+            linestyle=:dashdot,
+            color = :green,
+            alpha = 0.9,
+            ylabel = "CC",
+            ylims = (0,1),
+        )
+
+        plot!(p2, val_iters, test_cc2;
+            label = "test CCᵥ",
+            lw = 0.8,
+            linestyle=:dashdot,
+            color = :magenta,
+            alpha = 0.9,
+            ylims = (0,1),
+        )
+    end
     # ------------------
     # Cosmetic annotations
     # ------------------
@@ -154,9 +208,9 @@ function plot_losses(loss_trajectory_path::AbstractString, checkpoint_path::Abst
 
 end
 
-checkpoint = "data/Lux_models/2025-11-25_15-21-40/checkpoint.jld2"
-losses = "data/Lux_models/2025-11-25_15-21-40/loss_trajectory.jld2"
+checkpoint = "data/Lux_models/2025-12-18_14-27-49/checkpoint.jld2"
+losses = "data/Lux_models/2025-12-18_14-27-49/loss_trajectory.jld2"
 
 # p = plot_losses(losses, checkpoint)
 # display(p)
-# savefig(p, "data/models/2025-11-02_17-52-57/loss_evolution.png")
+# savefig(p, "data/Lux_models/2025-12-01_17-16-32/loss_evolution.png")

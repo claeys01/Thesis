@@ -3,6 +3,10 @@ import WaterLily: ∂, @loop, @inside, inside_u
 using JLD2
 using Random
 using Statistics
+includet("utils/SimDataTypes.jl")
+
+using .SimDataTypes
+
 
 function scalar_grad(field::AbstractArray)
     T = eltype(field); sz = size(field); N = ndims(field)
@@ -26,73 +30,31 @@ function remove_ghosts(snapshot::AbstractArray)
     return snapshot[2:end-1, 2:end-1, :, :]
 end
 
+function preprocess_data!(data::SimData;
+                          verbose::Bool = true)
 
-function preprocess_data!(data; tmin=-1, tmax=-1, n_samples=-1, clip_bc=false, verbose=true)
-    time = data["time"]
+    time = data.time
 
-    # Resolve defaults
-    tlo = (tmin == -1) ? first(time) : tmin
-    thi = (tmax == -1) ? last(time)  : tmax
-    ns  = (n_samples == -1) ? length(time) : n_samples
-
-    # Select indices within [tlo, thi]
-    selected = findall(t -> t >= tlo && t <= thi, time)
-    if isempty(selected)
-        verbose && @info "No samples in [$(tlo), $(thi)]. Nothing changed."
-        return data
-    end
-
-    # Downsample to ns entries (clamped to available range)
-    ns = clamp(ns, 1, length(selected))
-    idx_in_selected = round.(Int, collect(range(1, length(selected), length=ns)))
-    final_idx = selected[idx_in_selected]
-
-    # Helper: downsample a key if present
-    @inline function maybe_downsample!(dict, key, idx)
-        if haskey(dict, key)
-            val = dict[key]
-            d = ndims(val)
-            if d == 1
-                dict[key] = val[idx]
-            else
-                leading = ntuple(_ -> Colon(), d - 1)
-                dict[key] = val[leading..., idx]
-            end
+    # --- boundary clipping on u and μ₀ ---
+    @inline function clip_time_series(ts)
+        H, W, C, T = size(ts)
+        temp = similar(ts, eltype(ts), H-2, W-2, C, T)
+        @inbounds for i in axes(ts, 4)
+            temp[:, :, :, i] = remove_ghosts(ts[:, :, :, i])
         end
-
-        return nothing
+        return temp
     end
 
-    # Apply downsampling
-    for k in ("time", "Δt", "RHS", "flow", "μ₀", "u")
-        maybe_downsample!(data, k, final_idx)
-    end
-
-    # Optional boundary clipping
-    if clip_bc
-        @inline function clip_time_series(ts)
-            H, W, C, T = size(ts)
-            temp = similar(ts, eltype(ts), H-2, W-2, C, T)
-            @inbounds for i in axes(ts, 4)
-                temp[:,:,:,i] = remove_ghosts(ts[:,:,:,i])
-            end
-            return temp
-        end
-
-        # replace entries in the dict with the clipped arrays
-        haskey(data, "RHS") && (data["RHS"] = clip_time_series(data["RHS"]))
-        haskey(data, "μ₀") && (data["μ₀"] = clip_time_series(data["μ₀"]))
-        haskey(data, "u")  && (data["u"]  = clip_time_series(data["u"]))
-    end
+    data.u = clip_time_series(data.u)
+    data.μ₀ = clip_time_series(data.μ₀)
 
     if verbose
-        @info "Downsampled to $(length(data["time"])) time steps."
-        sz = (haskey(data, "u") && !isempty(data["u"])) ? size(data["u"]) : "—"
-        @info "Input data size: $(sz)"
+        @info "removed ghost cells; input data size (u): $(size(data.u))"
     end
 
     return data
 end
+
 
 ispow2(n::Integer) = n > 0 && (n & (n - 1)) == 0
 
@@ -116,4 +78,95 @@ function kinetic_energy_diffusion(u::AbstractArray; ν::Real=1.0)
     ε = 2f0 * ν .* sum(S .^ 2, dims = (3, 4))  # sum over i,j
     ε = dropdims(ε, dims = (3, 4))
     return ε
+end
+
+function zero_crossing(y; direction=:both, eps=0.0)
+    @assert direction in (:both, :rising, :falling)
+    n = length(y)
+    idx = Int[]
+    # treat tiny values as exact zeros if eps>0
+    yproc = copy(y)
+    if eps > 0.0
+        for i in eachindex(yproc)
+            if abs(yproc[i]) <= eps
+                yproc[i] = zero(yproc[i])
+            end
+        end
+    end
+
+    for i in 1:n-1
+        a, b = yproc[i], yproc[i+1]
+        if a*b < 0 || a == 0 || b == 0
+            dir = if a < 0 && b > 0
+                :rising
+            elseif a > 0 && b < 0
+                :falling
+            elseif a == 0 && b != 0
+                b > 0 ? :rising : :falling
+            elseif b == 0 && a != 0
+                a > 0 ? :falling : :rising 
+            else
+                # flat at zero
+                nothing
+            end
+            if dir !== nothing && (direction == :both || dir == direction)
+                push!(idx, i)
+            end
+        end
+    end
+    return idx
+end
+
+function train_force_plot(simdata::Any; train_idx=nothing, val_idx=nothing, test_idx=nothing)
+    forces = simdata.force
+    time = simdata.time
+    drag = first.(forces)
+    lift = last.(forces)
+
+    zero_idxs = zero_crossing(lift; direction=:rising)
+    
+
+    plt = plot(time, [drag, lift],
+        labels=["drag" "lift"],
+        colors=[:red, :blue],
+        xlabel="tU/L",
+        ylabel="Pressure force coefficients",
+        legend=:topright, 
+        linewidth=1.5)
+
+
+    if !isnothing(val_idx) && !isempty(val_idx)
+        scatter!(plt, time[val_idx], lift[val_idx], 
+        markersize = 2, color=:darkgreen, markerstrokewidth = 0, markershape =:dtriangle, 
+        label="validation points")
+    end
+    # Highlight train/val region (before test starts)
+    if !isnothing(train_idx) && !isempty(train_idx)
+        train_range = first(train_idx) : last(train_idx)
+        
+        # Add vertical shaded region for train/val
+        vspan!(plt, [time[first(train_range)], time[last(train_range)]];
+            fillcolor=:green, alpha=0.1, label="train/val region")
+        
+
+    end
+ 
+    # Highlight test region
+    if !isnothing(test_idx) && !isempty(test_idx)
+        test_range = first(test_idx) : last(test_idx)
+        
+        # Add vertical shaded region for test
+        vspan!(plt, [time[first(test_range)], time[last(test_range)]];
+            fillcolor=:purple, alpha=0.1, label="test region")
+        
+    end
+    # Annotate zero crossings
+    for (i, idx) in enumerate(zero_idxs)
+        shift = i % 2
+        scatter!(plt, [time[idx]], [lift[idx]]; label=false, color=:black, markersize=3)
+        annotate!(plt, time[idx], lift[idx] + 0.1 -(shift*0.2) , text(string(round(time[idx],digits = 3)), 8, :right))
+    end
+
+    # display(plt)
+    return plt
 end

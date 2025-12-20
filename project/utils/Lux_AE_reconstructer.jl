@@ -38,20 +38,22 @@ function visualize_reconstructions(checkpoint_path::Union{String,Nothing}=nothin
     # move params/states to device
     ps = device(ps)
     st = device(st)
+    st_test = LuxCore.testmode(st)
 
-    enc = Encoder(args.input_dim,  args.latent_dim; hidden_dim=args.hidden_dim, C_next=args.C_conv, padding=args.padding, stride=args.stride, verbose=false)
-    dec = Decoder(args.output_dim, args.latent_dim; hidden_dim=args.hidden_dim, C_next=args.C_conv, verbose=false) 
+    enc = Encoder(args, verbose=false)
+    dec = Decoder(args, verbose=false)
 
     ae = AE(enc, dec)
     
     # optional seeding
     args.seed > 0 && Random.seed!(args.seed)
 
-    @load args.data_path data
-    preprocess_data!(data; n_samples=args.downsample, clip_bc=args.clip_bc,verbose=false)
+    simdata = load_simdata(args.full_data_path)
+    preprocess_data!(simdata; verbose=false)
 
 
-    span = length(data["time"])
+
+    span = length(simdata.time)
 
     if span < args.n_reconstruct
         error("amount of data must be ≥ $(args.n_reconstruct)")
@@ -66,13 +68,13 @@ function visualize_reconstructions(checkpoint_path::Union{String,Nothing}=nothin
     plots = []
     dirs = ["x" , "y"]
     for (s, id) in enumerate(ids)
-        μ₀ = data["μ₀"][:, :, :, id:id]
-        x = data[args.field][:, :, :, id:id]
+        μ₀ = simdata.μ₀[:, :, :, id:id]
+        x = simdata.u[:, :, :, id:id]
         if args.normalize
             x_target, _ = normalize_batch(x, normalizer=normalizer)
             x_in = cat(x_target, μ₀; dims=3)
             x_in_dev = device(Float32.(x_in))
-            x̂_norm, _ = ae(x_in_dev, ps, st)
+            x̂_norm, _ = ae(x_in_dev, ps, st_test)
             x̂_norm = cpu(Array(x̂_norm))  # bring to CPU Array for denormalize/plotting
 
 
@@ -82,7 +84,7 @@ function visualize_reconstructions(checkpoint_path::Union{String,Nothing}=nothin
             x_in = cat(x, μ₀; dims=3)
             if use_lux_checkpoint
                 x_in_dev = device(Float32.(x_in))
-                x̂_dev, _ = ae(x_in_dev, ps, st)
+                x̂_dev, _ = ae(x_in_dev, ps, st_test)
                 x̂ = cpu(Array(x̂_dev))
             else
                 x̂ = reconstruct(enc, dec, x_in, μ₀)
@@ -135,7 +137,7 @@ function visualize_reconstructions(checkpoint_path::Union{String,Nothing}=nothin
 end
 
 if abspath(PROGRAM_FILE) == (@__FILE__) || isinteractive()
-    checkpoint = "data/Lux_models/2025-11-25_16-50-09/checkpoint.jld2"
+    checkpoint = "data/Lux_models/2025-12-10_11-09-39/checkpoint.jld2"
     # visualize_reconstructions(checkpoint)
 
 end

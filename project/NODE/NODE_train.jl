@@ -11,7 +11,8 @@ includet("NODE_core.jl")
 
 function train_NODE(args; kws...)
 
-    z, t, tspan, z0 = get_NODE_data(args.period_latent_path, args.period_u_path)
+    z, t, tspan, z0 = get_NODE_data(args.train_latent_path; downsample=args.downsample)
+
     node = NODE(args.latent_dim, args.dense_mult; 
                 tspan=tspan, t=t, activation=args.activation, 
                 solver=args.solver, abstol=args.abstol, reltol=args.reltol)
@@ -30,7 +31,7 @@ function train_NODE(args; kws...)
     callback = function (state, l; plotting=true)
         cb_step[] += 1
         if plotting
-            p = plot_node_trajectory(node, z, z0; p=state.u)
+            p = plot_node_trajectory(node, z, z0; p=state.u, loss=l)
             display(p)
         end
         next!(pb; showvalues=[(:step, cb_step[]) (:loss, l)])
