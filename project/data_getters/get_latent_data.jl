@@ -7,6 +7,8 @@ includet("../custom.jl")
 includet("../utils/AE_normalizer.jl")
 
 
+
+
 function get_latent_data(checkpoint_path::String; save_path::Union{String,Nothing}=nothing)
     checkpoint = JLD2.load(checkpoint_path)
     encoder_state = checkpoint["encoder"]
@@ -57,7 +59,7 @@ function get_latent_data(checkpoint_path::String; save_path::Union{String,Nothin
     return latent_snaps
 end
 
-checkpoint = "data/Lux_models/2025-11-28_15-24-32/checkpoint.jld2"
+checkpoint = "data/saved_models/u/Lux/256h_16l/RE2500/2e8/2e8_u_200e_4096n_16l_norm_pooling_ups_mu_L1/checkpoint.jld2"
 save_path = "data/latent_data/16/RE2500/2e8/U_128_latent.jld2"
-# kkr = get_latent_data(checkpoint; save_path=save_path)
+kkr = get_latent_data(checkpoint; save_path=save_path)
 nothing

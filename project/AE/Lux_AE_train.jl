@@ -27,8 +27,8 @@ function train(; kws...)
     args.seed > 0 && Random.seed!(args.seed)
 
     # load RHS data and normalizer
-    train_loader, validation_loader, test_loader,
-    X, μ₀, normalizer = @timeit to "get_data" get_data(
+
+    data, loaders, normalizer = @timeit to "get_data" get_data(
             args.batch_size,
             args.full_data_path;
             n_training = args.train_downsample,
@@ -36,6 +36,9 @@ function train(; kws...)
             split = 0.2,
             t_training = args.t_training,
         )
+    TrainData, ValData, TestData = data
+    train_loader, validation_loader, test_loader = loaders
+
     if args.use_gpu
         device = gpu_device()
     else
@@ -47,11 +50,17 @@ function train(; kws...)
     @info "Training on $device"
 
     # # initialize encoder and decoder
-    enc = Encoder(args, verbose=true)
-    dec = Decoder(args, verbose=true)
-    ae = AE(enc, dec)
-    rng = Xoshiro(args.seed)
-    ps, st = Lux.setup(rng, ae) .|> device
+    if args.retrain 
+        (enc, dec, ae, ps, st) = load_trained_AE(args.checkpoint_path; return_params=true)
+        @info "Retraining model saved at $(args.checkpoint_path)"
+    else
+        enc = Encoder(args, verbose=true)
+        dec = Decoder(args, verbose=true)
+        ae = AE(enc, dec)
+        rng = Xoshiro(args.seed)
+        ps, st = Lux.setup(rng, ae) .|> device
+        @info "AE initiated"
+    end
 
     # define optimizer
     opt = AdamW(; eta=args.η, lambda=args.λ)
@@ -92,12 +101,11 @@ function train(; kws...)
             # ---- TRAIN ----
             @timeit to "train" begin
                 for train_idx in train_loader
-                    batch = @timeit to "get training batch" get_data_in(X, μ₀; idx=train_idx)
+                    batch = @timeit to "get training batch" build_batch(TrainData, train_idx)
                     _, loss, stats, train_state = @timeit to "single_train_step!" Training.single_train_step!(
                         args.Autodiff, loss_func, batch, train_state; return_gradients=Val(false)
                     )
                     Lrec, Linside, L2div, corrs = stats
-
                     # record
                     iter += 1
                     iters[iter] = iter
@@ -119,7 +127,7 @@ function train(; kws...)
             val_corr_total = zeros(Float32, 2)
             @timeit to "validation" begin
                 for val_idx in validation_loader
-                    val_batch = @timeit to "get validation data" get_data_in(X, μ₀; idx=val_idx)
+                    val_batch = @timeit to "get validation data" build_batch(ValData, val_idx)
                     # Forward pass only (no gradients)
                     st_test = LuxCore.testmode(train_state.states)
                     val_loss, _, val_stats = @timeit to "validation loss" loss_func(ae, train_state.parameters, st_test, val_batch)
@@ -141,9 +149,10 @@ function train(; kws...)
                     test_progress = Progress(length(test_loader); desc="Test", color=:red)
                     test_sum = 0.0
                     n_test = 0
+                    test_corr_mean = (0.0, 0.0)
                     test_corr_total = zeros(Float32, 2)
                     for test_idx in test_loader
-                        test_batch = @timeit to "get test batch" get_data_in(X, μ₀; idx=test_idx)
+                        test_batch = @timeit to "get test batch" build_batch(TestData, test_idx)
                         # Forward pass only
                         st_test = LuxCore.testmode(train_state.states)
                         test_loss, _, test_stats = @timeit to "get test loss" loss_func(ae, train_state.parameters, st_test, test_batch)
@@ -151,22 +160,21 @@ function train(; kws...)
                         test_sum += test_loss
                         n_test += 1
                         test_corr_total .+= test_corr
-                        next!(test_progress; showvalues=[("test_loss", test_loss), ("Test corr", test_corr_total)])
+                        test_corr_mean = vec((test_corr_total / max(n_test, 1)))
+                        next!(test_progress; showvalues=[("Loss", test_loss), ("Corrs", test_corr_mean)])
                     end
                     test_mean = Float32(test_sum / max(n_test, 1))
-                    test_corr_mean = vec((test_corr_total / max(n_test, 1)))
                     push!(test_losses, test_mean)
                     push!(test_corrs, test_corr_mean)
                 end
             end
-
-            # @show test_loss
         end
     end
 
     # save model
-    timestamp = Dates.format(now(), "yyyy-mm-dd_HH-MM-SS")
-    save_folder = joinpath(args.save_path, timestamp)
+    timestamp = Dates.format(now(), "MMdd_HHmm")
+    tag = run_tag(args)
+    save_folder = joinpath(args.save_path, "$(timestamp)__$(tag)")
     !ispath(save_folder) && mkpath(save_folder)
     filepath = joinpath(save_folder, "checkpoint.jld2")
     loss_trajectory_path = joinpath(save_folder, "loss_trajectory.jld2")
@@ -220,6 +228,30 @@ function train(; kws...)
     show(to)
 end
 
+
+_fmt(x) = replace(string(round(Float64(x), sigdigits=3)), "." => "p")
+_yn(b) = b ? "Y" : "N"
+
+function run_tag(args)
+    H, W, Cin = args.input_dim
+    _, _, Cout = args.output_dim
+
+    return join([
+        "E$(args.epochs)",
+        "HW$(H)x$(W)",
+        "C$(Cin)to$(Cout)",
+        "nc$(args.n_conv)",
+        "nd$(args.n_dense)",
+        "z$(args.latent_dim)",
+        "C$(args.C_base)",
+        "lr$(_fmt(args.η))",
+        "wd$(_fmt(args.λ))",
+        "bs$(args.batch_size)",
+        "N$(_yn(args.normalize))",
+        "L$(args.loss)",
+    ], "_")
+end
+
 function make_loss_function(args, device, normalizer)
     function loss_function(m, ps, st, batch)
         x_in, x_target, μ₀ = batch
@@ -254,7 +286,5 @@ end
 
 if abspath(PROGRAM_FILE) == (@__FILE__) || isinteractive()
     train()
-    # run_dim_check()
 end
-# train()
 

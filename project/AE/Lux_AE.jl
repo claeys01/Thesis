@@ -11,19 +11,19 @@ includet("../utils/SimDataTypes.jl")
 using .SimDataTypes
 
 Base.@kwdef mutable struct LuxArgs
-    η = 1e-4                    # learning rate
-    λ = 3e-4                    # regularization paramater
+    η = 1e-3                    # learning rate
+    λ = 9e-4                    # regularization paramater
     Autodiff = AutoZygote()
     λdiv = 0                    # divergence loss weight
     λmask = 0                   # weight of body mask loss
-    loss = :L1                  # loss function for reconstruction loss (:L1, :L2, :charb)
-    batch_size = 32             # batch size
+    loss = :L2                  # loss function for reconstruction loss (:L1, :L2, :charb)
+    batch_size = 50             # batch size
     t_training = 16.603
     train_downsample = 200     # amount of data used for training 
-    test_downsample = 100
+    test_downsample = 200
     split = 0.2
     n_periods = 3               # amount of shedding periods to use for training data
-    epochs = 2                  # number of epochs
+    epochs = 200                  # number of epochs
     seed = 42                   # random seed
     n_reconstruct = 2           # sampling size for output   
     test_loss = true
@@ -33,29 +33,31 @@ Base.@kwdef mutable struct LuxArgs
     input_dim = (2^8, 2^8, 4)   # flow field size with μ₀ concatenated
     output_dim = (2^8, 2^8, 2)  # size of reconstructed RHS field
     conv_kernel = 3             # DO NOT CHANGE
-    pool_kernel = 4             # DO NOT CHANGE  
-    n_conv = 4                  # number of convolutional layers
+    pool_kernel = 2             # DO NOT CHANGE  
+    n_conv = 6                  # number of convolutional layers
     n_dense = 2                 # number of dense layers in bottleneck
+    dense_traj = nothing
     latent_dim = 16             # latent dimension
     stride = 1                  # stride for convolutions
-    C_base = 16                 # first amount of channels for convs
+    C_base = 8                 # first amount of channels for convs
     normalize = true            # normalise training data
     save_path = "data/Lux_models"   # results path
     data_path = "data/datasets/RE2500/2e8/U_128_period.jld2"
     full_data_path = "data/datasets/RE2500/2e8/U_128_full.jld2"
+    retrain = false
+    checkpoint_path = "data/Lux_models/2025-12-16_12-37-28/checkpoint.jld2"
 end
 
-function get_data_in(X, μ₀; idx=nothing)
+function get_data_in(Xtarget, μ₀; idx=nothing, normalise=false)
     if isnothing(idx)
-        Xin = cat(X, μ₀; dims=3)
+        Xin = cat(Xtarget, μ₀; dims=3)
     else
-        Xtarget = X[:, :, :, idx]
-        μbatch = μ₀[:, :, :, idx]
-        Xin = cat(Xtarget, μbatch; dims=3)
+        Xtarget = Xtarget[:, :, :, idx]
+        μ₀ = μ₀[:, :, :, idx]
+        Xin = cat(Xtarget, μ₀; dims=3)
     end
-    return (Xin, Xtarget, μbatch)
+    return (Xin, Xtarget, μ₀)
 end
-
 
 function load_simdata(path)
     @load path simdata
@@ -66,24 +68,20 @@ function downsample_equal(v::AbstractVector, M::Integer)
     N = length(v)
     M ≤ N || @warn "Cannot downsample to $M entries from $N points, returning $N points"
     M = clamp(M, 1, N)
-    idx = round.(Int, range(1, N, length = M))
+    # idx = round.(Int, range(1, N, length = M))
+    idx = 1 .+ floor.(Int, (0:M-1) .* (N / M))
     return v[idx]
 end
 
 
-function get_data(batch_size, path;t_training=10, n_training=500, n_test=500, split=0.2, verbose=true)
+function get_data(batch_size, path;t_training=10, n_training=500, n_test=500, split=0.2, verbose=true, showplot=true)
 
     simdata = load_simdata(path)
     preprocess_data!(simdata; verbose=verbose)
 
-    # X :: (H,W,C,N)
-    X  = simdata.u
-    μ₀ = simdata.μ₀
 
     # normalizer from X only (physics channels)
-    _, normalizer = normalize_batch(X; normalizer=nothing)
-
-    N = size(X, 4)
+    N = size(simdata.u, 4)
 
     if N < 2
         error("get_data: need at least 2 samples to create train/validation split (got $N)")
@@ -91,42 +89,66 @@ function get_data(batch_size, path;t_training=10, n_training=500, n_test=500, sp
     
     train_idxs_full = findall(t -> t < t_training, simdata.time)
     train_idx_combined = downsample_equal(train_idxs_full, n_training)
-    
     # Split into train / val by downsampling evenly from the combined pool
     n_val = clamp(round(Int, length(train_idx_combined) * split), 0, length(train_idx_combined))
-
     if n_val == 0
-        @warn "No validation data created"
-        val_idx = Int[]
-        train_idx = train_idx_combined
+        @error "No validation data created"
     else
         # Downsample evenly to get validation indices
         val_idx = downsample_equal(train_idx_combined, n_val)
         # Remove validation indices from train
         train_idx = setdiff(train_idx_combined, val_idx)
     end
-
     test_idx = downsample_equal(collect(last(train_idx_combined)+1 : N), n_test)
 
     plt = train_force_plot(simdata; train_idx=train_idx, val_idx=val_idx, test_idx=test_idx)
-    display(plt)
+    showplot && display(plt)
+
+    # compute normaliser on training data only and then normalise each batch
+    _, normalizer = normalize_batch(simdata.u[:, :, :, train_idx_combined]; normalizer=nothing)
+
+
+    data = (
+        TrainData = EpochData(get_data_in(simdata.u, simdata.μ₀; idx=train_idx)...),
+        ValData =   EpochData(get_data_in(simdata.u, simdata.μ₀; idx=val_idx)...),
+        TestData =  EpochData(get_data_in(simdata.u, simdata.μ₀; idx=test_idx)...)
+    )
+    
+    simdata = nothing
 
     # DataLoaders over indices only (lightweight)
-    train_loader = DataLoader(train_idx; batchsize=batch_size, shuffle=true)
-    val_loader   = DataLoader(val_idx;   batchsize=batch_size, shuffle=false)
-    test_loader  = DataLoader(test_idx;  batchsize=batch_size, shuffle=false)
+    loaders = (
+        train_loader = DataLoader(collect(1:length(train_idx)); batchsize=batch_size, shuffle=true),
+        val_loader   = DataLoader(collect(1:length(val_idx));   batchsize=batch_size, shuffle=false),
+        test_loader  = DataLoader(collect(1:length(test_idx));  batchsize=batch_size, shuffle=false)
+    )
 
-    # return X, μ₀, normalizer 
-    return train_loader, val_loader, test_loader, X, μ₀, normalizer
+
+
+    return data, loaders, normalizer
 end
 
+
+function build_batch(data::EpochData, idx; normalizer=nothing)
+    if isnothing(normalizer)
+        Xin   = data.Xin[:, :, :, idx]
+        Xout  = data.Xout[:, :, :, idx]
+        μ₀    = data.μ₀[:, :, :, idx]
+    else
+        @assert isa(normalizer, Normalizer) "normaliser must be of type Normalizer"
+        Xout, _ = normalize_batch(data.Xout[:, :, :, idx]; normalizer=normalizer)
+        μ₀    = data.μ₀[:, :, :, idx]
+        Xin = cat(Xout, μ₀; dims=3)
+    end
+    return (Xin, Xout, μ₀)
+end 
 
 struct Encoder{L} <: AbstractLuxWrapperLayer{:layers}
     layers::L
 end
 
 # Helper functions for parametric construction
-function enc_layer(k, p, Cin, Cout, stride; BN=true)
+function enc_layer(k, p, Cin, Cout, stride; BN=false)
     if BN
         return Chain(
             Conv((k, k), Cin => Cout, identity; pad=SamePad(), stride=stride, cross_correlation=true),
@@ -147,12 +169,12 @@ end
 Encoder(args::LuxArgs; verbose=true) = Encoder_parametric(args.input_dim, args.latent_dim;
                             n_conv=args.n_conv, n_dense=args.n_dense, C_base=args.C_base,
                             conv_kernel=args.conv_kernel, pool_kernel=args.pool_kernel,
-                            stride=args.stride, verbose=verbose)
+                            stride=args.stride, dense_traj=args.dense_traj, verbose=verbose)
 
 # Parametric encoder constructor
 function Encoder_parametric(input_size::Tuple{Int,Int,Int}, latent_dim::Int;
                            n_conv=4, n_dense=3, C_base=8, conv_kernel=3,
-                           pool_kernel=2, stride=1, verbose=true)
+                           pool_kernel=2, stride=1, dense_traj=nothing, verbose=true)
     H, W, C_in = input_size
     # Build convolutional layers
     enc_layers = []
@@ -186,11 +208,9 @@ function Encoder_parametric(input_size::Tuple{Int,Int,Int}, latent_dim::Int;
     dense_nodes = []
     
     for k in 0:(n_dense - 2)
-        # nodes = Int.(pool_kernel .^ (log(pool_kernel, dense_in)))
-        # nodes = Int.(2 .^ (log2(dense_in) .- 2 .* (k, k+1)))
         nodes = Int.(dense_in .* 1 ./ (2^k, 2^(k+1)))
         if nodes[end] ≤ latent_dim
-            @warn "Requested amount of dense layers to high for "
+            @warn "Requested amount of dense layers to high for amount of convs"
             break
         end
         push!(dense_nodes, nodes)
@@ -225,40 +245,6 @@ function Encoder_parametric(input_size::Tuple{Int,Int,Int}, latent_dim::Int;
 end
     
 
-
-# Encoder(input_size::Tuple{Int,Int,Int}, latent_dim::Int; hidden_dim=256, C_next::Int=4, padding=1, stride=2, verbose::Bool=true) = begin
-#     H, W, C = input_size
-
-#     convpart = Chain(
-#         Conv((3, 3), C => C_next, identity; pad=padding, stride=stride, cross_correlation=true), relu,
-#         MaxPool((2, 2)),
-#         Conv((3, 3), C_next => 2C_next, identity; pad=padding, stride=stride, cross_correlation=true), relu,
-#         MaxPool((2, 2)),
-#         Conv((3, 3), 2C_next => 4C_next, identity; pad=padding, stride=stride, cross_correlation=true), relu,
-#         MaxPool((2, 2)),
-#         Conv((3, 3), 4C_next => 8C_next, identity; pad=padding, stride=stride, cross_correlation=true), relu,
-#         MaxPool((2, 2)),
-#         FlattenLayer()  # instantiate
-#         # more pooling and Conv
-#     )
-#     dummy = zeros(Float32, H, W, C, 1)
-
-#     # initialize convpart params/state and run forward to infer flattened size
-#     rng = Xoshiro(0)
-#     ps_conv, st_conv = Lux.setup(rng, convpart)
-#     flat, st_conv = convpart(dummy, ps_conv, st_conv)
-#     dense_in = size(flat, 1)
-
-#     verbose && @info "Initialize Encoder with $(dense_in) → $(hidden_dim) → $(latent_dim) bottleneck"
-
-#     layers = Chain(
-#         convpart,
-#         Dense(dense_in, hidden_dim), gelu,
-#         Dense(hidden_dim, latent_dim)      # latent_dim = 16 later
-#     )
-
-#     return Encoder(layers)
-# end
 
 function (encoder::Encoder)(x, ps, st)
     z, st_new = encoder.layers(x, ps, st)
@@ -393,38 +379,6 @@ function Decoder_parametric(output_size::Tuple{Int,Int,Int}, latent_dim::Int;
     return Decoder(layers)
 end
 
-# Decoder(output_size::Tuple{Int,Int,Int}, latent_dim::Int; hidden_dim=256, C_next::Int=4, verbose::Bool=true) = begin
-#     H, W, C = output_size
-#     h_lat, w_lat = div(H, 16), div(W, 16)
-#     channels_mid = 8 * C_next
-#     dense_len = h_lat * w_lat * channels_mid
-
-#     layers = Chain(
-#         Dense(latent_dim, hidden_dim), gelu,
-#         Dense(hidden_dim, dense_len),
-#         x -> reshape(x, h_lat, w_lat, channels_mid, size(x, 2)),
-
-#         # stage 1: H/16 → H/8
-#         x -> upsample2(x),
-#         Conv((3, 3), 8C_next => 4C_next; pad=1), gelu,
-
-#         # stage 2: H/8 → H/4
-#         x -> upsample2(x),
-#         Conv((3, 3), 4C_next => 2C_next; pad=1), gelu,
-
-#         # stage 3: H/4 → H/2
-#         x -> upsample2(x),
-#         Conv((3, 3), 2C_next => 1C_next; pad=1), gelu,
-
-#         # stage 4: H/2 → H
-#         x -> upsample2(x),
-#         Conv((3, 3), C_next => C; pad=1),     # linear output (no relu!)
-#         Conv((3, 3), C => C; pad=1)           # small anti-alias / smoothing
-#     )
-#     verbose && @info "Initialize Decoder (upsample+conv) with $(latent_dim) → $(hidden_dim) → $(dense_len)"
-
-#     return Decoder(layers)
-# end
 
 function (dec::Decoder)(z, ps, st)
     x̂, st_new = dec.layers(z, ps, st)
@@ -505,7 +459,6 @@ function total_loss(m::AE, ps, st,
     loss=:L1,
     λdiv=0f0,
     λmask=0f0)
-
     # 1) Forward pass through AE (Lux-style)
     x̂, st2 = m(x_in, ps, st)
 
@@ -537,72 +490,6 @@ function total_loss(m::AE, ps, st,
 
     return L, st2, (Lrec, Linside, L2div, corrs)
 end
-# function total_loss(m::AE, ps, st, 
-#     x_in::AbstractArray,        # (u,v,mask)
-#     x_target::AbstractArray,    # (u,v)
-#     μ₀::AbstractArray;          # (H,W,1,B)  1 outside / 0 inside
-#     loss=:L1,
-#     λdiv=0f0,
-#     λmask=0f0)
-
-#     st2 = st
-#     Lrec = 0f0
-#     Linside = 0f0
-#     L2div = 0f0
-#     corrs = Float32[]
-
-#     # 1) Forward pass through AE (Lux-style)
-#     Zygote.ignore() do
-#         @timeit Main.to "AE forward" begin
-#             # do not put heavy compute inside ignore; only the timing wrapper
-#         end
-#     end
-#     x̂, st2 = m(x_in, ps, st)
-
-#     # correlations
-#     Zygote.ignore() do
-#         @timeit Main.to "correlations" begin end
-#     end
-#     corrs = batch_corrs(x_target, x̂)
-
-#     # apply mask
-#     Zygote.ignore() do
-#         @timeit Main.to "apply mask" begin end
-#     end
-#     x̂ = x̂ .* μ₀
-
-#     if λmask != 0f0
-#         Zygote.ignore() do
-#             @timeit Main.to "masked_loss" begin end
-#         end
-#         Lrec, Linside = masked_loss(x_target, x̂, μ₀; loss=loss)
-#     elseif λdiv != 0f0
-#         Zygote.ignore() do
-#             @timeit Main.to "divergence_loss" begin end
-#         end
-#         try
-#             L2div = div_loss_L2(x̂)
-#         catch e
-#             @warn "div_loss_L2 failed (likely GPU/CPU mismatch). skipping divergence loss: $e"
-#         end
-#         Zygote.ignore() do
-#             @timeit Main.to "recon_loss" begin end
-#         end
-#         Lrec = recon_loss(x_target, x̂; loss=loss)
-#     else
-#         Zygote.ignore() do
-#             @timeit Main.to "recon_loss" begin end
-#         end
-#         Lrec = recon_loss(x_target, x̂; loss=loss)
-#     end
-
-#     # aggregate
-#     Zygote.ignore() do
-#         @timeit Main.to "total_loss aggregate" begin end
-#     end
-#     L = Lrec + λdiv * L2div + λmask * Linside
-#     return L, st2, (Lrec, Linside, L2div, corrs)
-# end
 
 """
     load_trained_AE(checkpoint_path; device=cpu_device(), return_params=false)
@@ -625,8 +512,8 @@ function load_trained_AE(checkpoint_path::String; device=cpu_device(), return_pa
     end
 
     # reinstantiate model architecture
-    enc = Encoder(args.input_dim, args.latent_dim; hidden_dim=args.hidden_dim, C_next=args.C_conv, padding=args.padding, stride=args.stride, verbose=false)
-    dec = Decoder(args.output_dim, args.latent_dim; hidden_dim=args.hidden_dim, C_next=args.C_conv, verbose=false)
+    enc = Encoder(args, verbose=false)
+    dec = Decoder(args, verbose=false)
     ae = AE(enc, dec)
 
     # move parameter/state trees to device if present

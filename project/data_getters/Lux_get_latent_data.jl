@@ -1,70 +1,79 @@
 using JLD2
 using Lux
+using MLUtils
+
 
 
 includet("../AE/Lux_AE.jl")
 includet("../custom.jl")
 includet("../utils/AE_normalizer.jl")
+includet("../utils/SimDataTypes.jl")
+using .SimDataTypes
 
 
-function get_latent_data(checkpoint_path::String; save_path::Union{String,Tuple{String,String},Nothing}=nothing)
+function get_latent_data(checkpoint_path::String; save_path::Union{String,Tuple{String,String},Nothing}=nothing, batch_size=1024)
     enc, _, _, ps, st = load_trained_AE(checkpoint_path; return_params=true)
-    
+    st = LuxCore.testmode(st)
+
     checkpoint = JLD2.load(checkpoint_path)
     args_dict = checkpoint["args"]
     args = LuxArgs(; args_dict...)
     normalizer = checkpoint["normalizer"]
 
+    simdata = load_simdata(args.full_data_path)
+    N =size(simdata.u, 4)
 
-    # period_data = load(args.data_path, "data")
-    # full_data = load(args.full_data_path, "data")
-    period_data = load("data/datasets/RE2500/2e8/U_128_period.jld2", "data")
-    full_data = load("data/datasets/RE2500/2e8/U_128_full.jld2", "data")
+    preprocess_data!(simdata; verbose=true)
+
+    train_idx = findall(t -> t < args.t_training, simdata.time)
+    test_idx = collect(last(train_idx)+1 : N)
+
+    TrainData = EpochData(get_data_in(simdata.u, simdata.μ₀; idx=train_idx)...)
+    t_train = simdata.time[train_idx]
+    train_loader = DataLoader(train_idx, batchsize=batch_size, shuffle=false)
+
+    TestData = EpochData(get_data_in(simdata.u, simdata.μ₀; idx=test_idx)...)
+    t_test = simdata.time[test_idx]
+    n_test = size(t_test, 1)
+    test_loader = DataLoader(collect(1 : n_test); batchsize=batch_size, shuffle=false)
 
 
-    preprocess_data!(period_data; clip_bc=args.clip_bc, verbose=true)
-    preprocess_data!(full_data; clip_bc=args.clip_bc, verbose=true)
-
+    simdata = nothing
 
     # helper that computes latent snaps for one dataset dict
-    function compute_latents(data::Dict)
-        # ensure μ₀ is a 4-D array too if present
-        if haskey(data, "μ₀")
-            data["μ₀"] = isa(data["μ₀"], AbstractArray) && ndims(data["μ₀"]) == 4 ?
-                             Float32.(data["μ₀"]) : Float32.(cat(data["μ₀"]...; dims=4))
-        end
+    
+    function compute_latents(data::EpochData, enc::Encoder, ps, st, normalizer, idx_loader)
+        nsnaps = size(data.Xin, 4)
+        @info "  Found $nsnaps snapshots"
+        
+        latents = Matrix{Float32}(undef, args.latent_dim, nsnaps)
 
-        nsnaps = size(data["u"], 4)
-        @info "Found $nsnaps snapshots"
-
-        latent_snaps = Vector{Vector{Float32}}()
-        for i in 1:nsnaps
-            x = data["u"][:, :, :, i]         # H×W×C
-            μ₀ = haskey(data, "μ₀") ? data["μ₀"][:, :, :, i] : zeros(Float32, size(x,1), size(x,2), 1)
-
-            # make a (H,W,C,1) input batch
-            if args.normalize
-                x_target_norm, _ = normalize_batch(reshape(x, size(x,1), size(x,2), size(x,3), 1), normalizer=normalizer)
-                x_in = cat(x_target_norm, reshape(μ₀, size(μ₀,1), size(μ₀,2), size(μ₀,3), 1); dims=3)
-            else
-                x_in = cat(reshape(x, size(x,1), size(x,2), size(x,3), 1),
-                           reshape(μ₀, size(μ₀,1), size(μ₀,2), size(μ₀,3), 1); dims=3)
-            end
-
-            # pass a 4-D array (H,W,C,N) to the encoder — do NOT wrap in [ ... ]
-            z, _ = enc(x_in, ps.encoder, st.encoder)                # z has shape (latent_dim, 1) or similar
-            push!(latent_snaps, vec(Array(z)))   # store as 1-D Float32 vector
-        end
-
-        return latent_snaps
+        for idx in idx_loader
+            Xin, _, _ = build_batch(data, idx; normalizer)
+            z, _ = enc(Xin, ps.encoder, st.encoder)
+            latents[:, idx] = z
+           
+        end 
+        return latents
     end
 
-    @info "Computing latents for period_data"
-    period_latent = compute_latents(period_data)
+    @info "Computing latents for training data"
+    # jemoeder = compute_latents(TrainData, enc, ps, st, normalizer, train_loader)
+    # @show size(jemoeder), typeof(jemoeder)
+    train_latent = LatentData(
+        compute_latents(TrainData, enc, ps, st, normalizer, train_loader), 
+        t_train
+    )
+    TrainData = nothing
+    GC.gc()
 
-    @info "Computing latents for full_data"
-    full_latent = compute_latents(full_data)
-
+    @info "Computing latents for test data"
+    test_latent = LatentData(
+        compute_latents(TestData, enc, ps, st, normalizer, test_loader), 
+        t_test
+    )
+    TestData = nothing
+    GC.gc()
 
 
     # handle saving: save_path can be nothing, a single string (creates two files with suffixes),
@@ -72,25 +81,25 @@ function get_latent_data(checkpoint_path::String; save_path::Union{String,Tuple{
     if save_path !== nothing
         if isa(save_path, String)
             root, ext = splitext(save_path)
-            period_path = string(root, "_period", ext)
-            full_path   = string(root, "_full",   ext)
+            train_path = string(root, "_train", ext)
+            test_path   = string(root, "_test",   ext)
         elseif isa(save_path, Tuple) && length(save_path) == 2
-            period_path, full_path = save_path
-        else
+            train_path, test_path = save_path
+        elses
             error("save_path must be nothing, a String, or a Tuple{String,String}")
         end
 
-        @info "Saving period latents to $period_path"
-        @save period_path z = period_latent
+        @info "Saving train latents to $train_path"
+        @save train_path train_latent
 
-        @info "Saving full latents to $full_path"
-        @save full_path z = full_latent
+        @info "Saving test latents to $test_path"
+        @save test_path test_latent        
     end
 
-    return period_latent, full_latent
+    return train_latent, test_latent
 end
 
-checkpoint = "data/saved_models/u/Lux/256h_16l/RE2500/2e8/2e8_u_100period_100e_4096n_256h_16l_norm_pooling_ups_mu_L1/checkpoint.jld2"
+checkpoint = "data/saved_models/u/Lux/256h_16l/RE2500/2e8/2e8_u_200e_4096n_16l_norm_pooling_ups_mu_L1/checkpoint.jld2"
 save_path = "data/latent_data/16/RE2500/2e8/U_128_latent.jld2"
-kkr_period, kkr_full = get_latent_data(checkpoint; save_path=nothing)
+train_latent, test_latent = get_latent_data(checkpoint; save_path=save_path)
 nothing
