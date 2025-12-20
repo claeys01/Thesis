@@ -208,8 +208,8 @@ function plot_losses(loss_trajectory_path::AbstractString, checkpoint_path::Abst
 
 end
 
-checkpoint = "data/Lux_models/2025-12-10_11-09-39/checkpoint.jld2"
-losses = "data/Lux_models/2025-12-10_11-09-39/loss_trajectory.jld2"
+checkpoint = "data/Lux_models/2025-12-18_14-27-49/checkpoint.jld2"
+losses = "data/Lux_models/2025-12-18_14-27-49/loss_trajectory.jld2"
 
 # p = plot_losses(losses, checkpoint)
 # display(p)

@@ -10,6 +10,7 @@ using Plots
 
 
 includet("../custom.jl")
+includet("../AE/Lux_AE.jl")
 
 Base.@kwdef mutable struct NodeArgs
     η = 0.05                    # learning rate
@@ -23,31 +24,30 @@ Base.@kwdef mutable struct NodeArgs
     dense_mult = 2
     activation = tanhshrink
     n_reconstruct = 4
-    downsample = -1
+    downsample = 200
     clip_bc = true
     use_gpu = false             # use GPU
+    multiple_shooting = true
+    group_size = 10
+    continuity_term = 200
     save_path = "data/models/NODE_models"   # results dir
-    period_latent_path = "data/latent_data/16/RE2500/2e8/U_128_latent_period.jld2"
-    full_latent_path = "data/latent_data/16/RE2500/2e8/U_128_latent_full.jld2"
+    train_latent_path = "data/latent_data/16/RE2500/2e8/U_128_latent_train.jld2"
+    test_latent_path = "data/latent_data/16/RE2500/2e8/U_128_latent_train.jld2"
     period_u_path = "data/datasets/RE2500/2e8/U_128_period.jld2"
     full_u_path = "data/datasets/RE2500/2e8/U_128_full.jld2"
 end
 
-function get_NODE_data(period_latent_path, data_path; downsample=-1, clip_bc=true)
-    @load period_latent_path z
-    @load data_path data
-    # preprocess_data!(data; n_samples=downsample, clip_bc=clip_bc, verbose=false)
-
-    z = Float32.(cat(z...; dims=2))
-    t = Float32.(data["time"])
-    t .-= t[1]
-
+function get_NODE_data(train_latent_path; downsample=-1)
+    @load train_latent_path train_latent
+    n_total = size(train_latent.z, 2)
+    idx = collect(1:n_total)
+    idx_downsample = downsample_equal(idx, downsample)
+    z = train_latent.z[:, idx_downsample]
+    t = train_latent.time[idx_downsample]
     tspan = (t[1], t[end])
     z0 = z[:, 1]
     @info "Instantiated latent NODE data" size(z) size(t) tspan size(z0)
     return z, t, tspan, z0
-
-
 end
 
 mutable struct NODE
