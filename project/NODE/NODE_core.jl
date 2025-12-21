@@ -189,7 +189,7 @@ function plot_multiple_shoot(node::NODE, preds::Vector{<:AbstractMatrix}, z::Abs
             scatter!(p, [t_start], [pred_start]; color=c, marker=:x, markersize=6, markerstrokecolor=c,
                      markerstrokewidth=1.5, fillalpha=0.0,
                      label=sidx == 1 && j == 1 ? "pred start" : nothing)
-            scatter!(p, [t_end], [pred_end]; color=c, marker=:+, markersize=6, markerstrokecolor=c,
+            scatter!(p, [t_end], [pred_end]; color=c, marker=:x, markersize=6, markerstrokecolor=c,
                      markerstrokewidth=1.5, fillalpha=0.0,
                      label=sidx == 1 && j == 1 ? "pred end" : nothing)
         end
