@@ -5,7 +5,7 @@ using Random
 using ComponentArrays
 using JLD2
 using NNlib
-using Optimization, OptimizationOptimisers
+using Optimization, OptimizationOptimisers, OptimizationPolyalgorithms
 using Plots
 
 
@@ -14,7 +14,8 @@ includet("../AE/Lux_AE.jl")
 
 Base.@kwdef mutable struct NodeArgs
     η = 0.01                    # learning rate
-    optimiser = OptimizationOptimisers.Adam
+    optimiser = OptimizationOptimisers.AdamW
+    # optimiser = OptimizationPolyalgorithms.PolyOpt
     maxiters = 250
     solver = Tsit5()
     reltol = 1e-3
@@ -29,7 +30,7 @@ Base.@kwdef mutable struct NodeArgs
     use_gpu = false             # use GPU
     multiple_shooting = true
     group_size = 20
-    continuity_term = 2000
+    continuity_term = 200
     save_path = "data/models/NODE_models"   # results dir
     train_latent_path = "data/latent_data/16/RE2500/2e8/U_128_latent_train.jld2"
     test_latent_path = "data/latent_data/16/RE2500/2e8/U_128_latent_train.jld2"
@@ -163,17 +164,34 @@ function plot_multiple_shoot(node::NODE, preds::Vector{<:AbstractMatrix}, z::Abs
     if !isnothing(title_loss)
         title!(p, "loss = $(title_loss)")
     end
+
     idx_samples = round.(Int, range(1, stop=size(z, 1), length=n_reconstruct))
-    # z_samples = [vec(z[i, :]) for i in idx_samples]  # Vector of 8 one-dimensional arrays, each length 179
 
+    # cycle colors to avoid bounds errors
+    palette = [:black, :red, :blue, :green, :purple, :orange, :yellow]
+    ncolors = length(palette)
 
-    # Plot a single latent dimension for clarity (first dim)
-    colors = [:black, :red, :blue, :green, :purple, :orange, :yellow]
-
-    for (i, idx) in enumerate(idx_samples)
+    for (sidx, lat_idx) in enumerate(idx_samples)
+        c = palette[(sidx - 1) % ncolors + 1]
         for (j, rg) in enumerate(ranges)
-            plot!(p, node.t[rg], z[idx, rg]; color=colors[i], linestyle=:solid, label=i == 1 ? "data" : nothing)
-            plot!(p, node.t[rg], preds[j][idx, :]; color=colors[i], linestyle=:dash, label="group_$(i)")
+            # plot data and prediction for the selected latent component
+            plot!(p, node.t[rg], z[lat_idx, rg];
+                  color=c, linestyle=:solid, label=sidx == 1 && j == 1 ? "data" : nothing)
+            plot!(p, node.t[rg], preds[j][lat_idx, :];
+                  color=c, linestyle=:dash, label=sidx == 1 && j == 1 ? "pred" : nothing)
+
+            # start/end markers for the segment to visualize overlaps
+            t_start, t_end = node.t[rg][1], node.t[rg][end]
+            z_start, z_end = z[lat_idx, rg][1], z[lat_idx, rg][end]
+            pred_start, pred_end = preds[j][lat_idx, 1], preds[j][lat_idx, end]
+
+            # prediction markers (open circle at start, square at end)
+            scatter!(p, [t_start], [pred_start]; color=c, marker=:x, markersize=6, markerstrokecolor=c,
+                     markerstrokewidth=1.5, fillalpha=0.0,
+                     label=sidx == 1 && j == 1 ? "pred start" : nothing)
+            scatter!(p, [t_end], [pred_end]; color=c, marker=:+, markersize=6, markerstrokecolor=c,
+                     markerstrokewidth=1.5, fillalpha=0.0,
+                     label=sidx == 1 && j == 1 ? "pred end" : nothing)
         end
     end
     return p
@@ -201,7 +219,7 @@ function save_node(path::AbstractString, node::NODE, args::NodeArgs)
     node_tspan = node.tspan
     node_t = node.t
     @save path node_p0 = node.p0 node_st = node.st node_args = args_copy node_tspan node_t
-    @info "Saved NODE to $path"
+    @info "  Saved NODE to $path"
 end
 
 function load_node(path::AbstractString)

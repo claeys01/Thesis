@@ -6,10 +6,11 @@ using ProgressMeter
 using OptimizationPolyalgorithms
 
 
-
-
 includet("NODE_core.jl")
 
+make_optimiser(opt, η) = hasmethod(opt, Tuple{Float64}) ? opt(η) :
+                         hasmethod(opt, Tuple{}) ? opt() :
+                         error("Unsupported optimiser constructor: $(opt)")
 
 function train_NODE(args; kws...)
 
@@ -29,13 +30,18 @@ function train_NODE(args; kws...)
     optprob = Optimization.OptimizationProblem(optf, pinit)
 
     # progress bar used by callback (created with known maxiters)
-    pb = Progress(args.maxiters; desc="Optimizing NODE")
-    cb_step = Ref(0)
+
+    maxiters = args.maxiters
+    if args.optimiser === OptimizationPolyalgorithms.PolyOpt
+        maxiters *= 2
+        @info "maxiters doubled for PolyOpt"
+    end
+    pb = Progress(maxiters; desc="Optimizing NODE")
 
     # Callback function
     anim = Plots.Animation()
     callback = function (state, l; plotting=true)
-        cb_step[] += 1
+        step = state.iter              # current iteration index
         if plotting
             if args.multiple_shooting
                 # compute current segment predictions for visualization
@@ -46,29 +52,26 @@ function train_NODE(args; kws...)
             else
                 p = plot_node_trajectory(node, z, z0; p=state.u, loss=l)
             end
-            frame(anim)
-            display(p)
+            frame(anim); display(p)
         end
-        next!(pb; showvalues=[(:step, cb_step[]) (:loss, l)])
+        next!(pb; showvalues=[(:step, step) (:loss, l)])
         return false
     end
 
     # actual training of NODE
-    # result_neuralode = solve(optprob, args.optimiser(args.η); callback = callback, maxiters = args.maxiters)
-    result_neuralode = solve(optprob, PolyOpt(); callback = callback, maxiters = args.maxiters)
-
+    @info "Starting optimization"
+    opt_instance = make_optimiser(args.optimiser, args.η)
+    result = solve(optprob, opt_instance; callback=callback, maxiters=args.maxiters)
     finish!(pb)
+    @info "Optimization finished"
 
-
-     
-    node.p0 = result_neuralode.u # set final network parameters in struct
+    node.p0 = result.u # set final network parameters in struct
 
     # saving the model
+
+    @info "Saving model and plots"
     out_dir = joinpath("data", "NODE_models", Dates.format(now(), "yyyy-mm-dd_HH-MM-SS"))
-
     mkpath(out_dir)
-    
-
     # save optimized parameters
     node_path = joinpath(out_dir, "node_params.jld2")
     save_node(node_path, node, args)
@@ -78,18 +81,17 @@ function train_NODE(args; kws...)
     if args.multiple_shooting
         loss, preds = loss_multiple_shoot(node, z, z0; p=node.p0, t=node.t,
                                        group_size=args.group_size, continuity_term=args.continuity_term)
-        @show final_loss, loss
         p = plot_multiple_shoot(node, preds, z; group_size=args.group_size, title_loss=final_loss)
     else
         p = plot_node_trajectory(node, z, z0; loss=final_loss)
     end
     png_path = joinpath(out_dir, "trajectories.png")
-    @info "Saved trajectory plot to $png_path"
+    @info "  Saved trajectory plot to $png_path"
     savefig(p, png_path)
 
     gif_path = joinpath(out_dir, "training_trajectories.gif")
-    gif(anim, gif_path; fps = 15)
-    @info "Saved training gif to $gif_path"
+    gif(anim, gif_path; fps = 15, show_msg=false)
+    @info "  Saved training gif to $gif_path"
     nothing
 end
 
