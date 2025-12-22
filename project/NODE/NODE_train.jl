@@ -7,6 +7,7 @@ using OptimizationPolyalgorithms
 
 
 includet("NODE_core.jl")
+includet("NODE_RE2500_extrapolate.jl")
 
 make_optimiser(opt, η) = hasmethod(opt, Tuple{Float64}) ? opt(η) :
                          hasmethod(opt, Tuple{}) ? opt() :
@@ -75,6 +76,7 @@ function train_NODE(args; kws...)
     # save optimized parameters
     node_path = joinpath(out_dir, "node_params.jld2")
     save_node(node_path, node, args)
+    extrapolate_node(node_path)
 
     # final plot: match mode used during training
     final_loss = loss_function(node.p0)

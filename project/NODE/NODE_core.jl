@@ -14,8 +14,8 @@ includet("../AE/Lux_AE.jl")
 
 Base.@kwdef mutable struct NodeArgs
     η = 0.01                    # learning rate
-    optimiser = OptimizationOptimisers.AdamW
-    # optimiser = OptimizationPolyalgorithms.PolyOpt
+    optimiser = OptimizationPolyalgorithms.PolyOpt #PolyOpt
+    # optimiser = OptimizationOptimisers.Adam
     maxiters = 250
     solver = Tsit5()
     reltol = 1e-3
@@ -25,26 +25,25 @@ Base.@kwdef mutable struct NodeArgs
     dense_mult = 2
     activation = tanhshrink
     n_reconstruct = 4
-    downsample = 200
+    downsample = 2002
     clip_bc = true
     use_gpu = false             # use GPU
     multiple_shooting = true
-    group_size = 20
+    group_size = 10
     continuity_term = 200
     save_path = "data/models/NODE_models"   # results dir
     train_latent_path = "data/latent_data/16/RE2500/2e8/U_128_latent_train.jld2"
-    test_latent_path = "data/latent_data/16/RE2500/2e8/U_128_latent_train.jld2"
-    period_u_path = "data/datasets/RE2500/2e8/U_128_period.jld2"
-    full_u_path = "data/datasets/RE2500/2e8/U_128_full.jld2"
+    test_latent_path = "data/latent_data/16/RE2500/2e8/U_128_latent_test.jld2"
+    total_latent_path = "data/latent_data/16/RE2500/2e8/U_128_latent.jld2"
 end
 
-function get_NODE_data(train_latent_path; downsample=-1)
-    @load train_latent_path train_latent
-    n_total = size(train_latent.z, 2)
+function get_NODE_data(latent_path; downsample=-1)
+    @load latent_path latent_data
+    n_total = size(latent_data.z, 2)
     idx = collect(1:n_total)
     idx_downsample = downsample_equal(idx, downsample)
-    z = train_latent.z[:, idx_downsample]
-    t = train_latent.time[idx_downsample]
+    z = latent_data.z[:, idx_downsample]
+    t = latent_data.time[idx_downsample]
     tspan = (t[1], t[end])
     z0 = z[:, 1]
     @info "Instantiated latent NODE data" size(z) size(t) tspan size(z0)
@@ -139,7 +138,8 @@ function loss_multiple_shoot(node::NODE, z::AbstractMatrix, z0; p=nothing, t=not
     # ps = ComponentArray(p === nothing ? node.p0 : p)
 
     # simple L2 loss over all predicted segments (sum of segment losses)
-    seg_loss(data_seg, pred_seg) = sum(abs2, data_seg .- pred_seg)
+    # seg_loss(data_seg, pred_seg) = sum(abs2, data_seg .- pred_seg)
+    seg_loss(data_seg, pred_seg) = sum(abs, data_seg .- pred_seg)
 
     # l: scalar loss; preds: Vector of predicted segment matrices (latent_dim × segment_len)
     l, preds = DiffEqFlux.multiple_shoot(p_used, z, tsteps, prob_node, seg_loss,

@@ -24,22 +24,7 @@ function get_latent_data(checkpoint_path::String; save_path::Union{String,Tuple{
     N =size(simdata.u, 4)
 
     preprocess_data!(simdata; verbose=true)
-
-    train_idx = findall(t -> t < args.t_training, simdata.time)
-    test_idx = collect(last(train_idx)+1 : N)
-
-    TrainData = EpochData(get_data_in(simdata.u, simdata.μ₀; idx=train_idx)...)
-    t_train = simdata.time[train_idx]
-    train_loader = DataLoader(train_idx, batchsize=batch_size, shuffle=false)
-
-    TestData = EpochData(get_data_in(simdata.u, simdata.μ₀; idx=test_idx)...)
-    t_test = simdata.time[test_idx]
-    n_test = size(t_test, 1)
-    test_loader = DataLoader(collect(1 : n_test); batchsize=batch_size, shuffle=false)
-
-
-    simdata = nothing
-
+    
     # helper that computes latent snaps for one dataset dict
     
     function compute_latents(data::EpochData, enc::Encoder, ps, st, normalizer, idx_loader)
@@ -58,8 +43,10 @@ function get_latent_data(checkpoint_path::String; save_path::Union{String,Tuple{
     end
 
     @info "Computing latents for training data"
-    # jemoeder = compute_latents(TrainData, enc, ps, st, normalizer, train_loader)
-    # @show size(jemoeder), typeof(jemoeder)
+    train_idx = findall(t -> t < args.t_training, simdata.time)
+    TrainData = EpochData(get_data_in(simdata.u, simdata.μ₀; idx=train_idx)...)
+    t_train = simdata.time[train_idx]
+    train_loader = DataLoader(train_idx, batchsize=batch_size, shuffle=false)
     train_latent = LatentData(
         compute_latents(TrainData, enc, ps, st, normalizer, train_loader), 
         t_train
@@ -68,11 +55,28 @@ function get_latent_data(checkpoint_path::String; save_path::Union{String,Tuple{
     GC.gc()
 
     @info "Computing latents for test data"
+    test_idx = collect(last(train_idx)+1 : N)
+    TestData = EpochData(get_data_in(simdata.u, simdata.μ₀; idx=test_idx)...)
+    t_test = simdata.time[test_idx]
+    n_test = size(t_test, 1)
+    test_loader = DataLoader(collect(1 : n_test); batchsize=batch_size, shuffle=false)
     test_latent = LatentData(
         compute_latents(TestData, enc, ps, st, normalizer, test_loader), 
         t_test
     )
     TestData = nothing
+    GC.gc()
+
+    @info "Computing latents for whole data"
+    TotalData = EpochData(get_data_in(simdata.u, simdata.μ₀)...)
+    total_idx = collect(1:N)
+    total_loader = DataLoader(total_idx, batchsize=batch_size, shuffle=false)
+    total_latent = LatentData(
+        compute_latents(TotalData, enc, ps, st, normalizer, total_loader), 
+        simdata.time
+    )
+    TotalData = nothing
+    simdata = nothing
     GC.gc()
 
 
@@ -90,10 +94,15 @@ function get_latent_data(checkpoint_path::String; save_path::Union{String,Tuple{
         end
 
         @info "Saving train latents to $train_path"
-        @save train_path train_latent
+        @save train_path latent_data = train_latent
 
         @info "Saving test latents to $test_path"
-        @save test_path test_latent        
+        @save test_path latent_data = test_latent
+
+        @info "Saving total latents to $save_path"
+        @save save_path latent_data = total_latent
+
+
     end
 
     return train_latent, test_latent
