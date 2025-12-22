@@ -14,7 +14,6 @@ make_optimiser(opt, η) = hasmethod(opt, Tuple{Float64}) ? opt(η) :
                          error("Unsupported optimiser constructor: $(opt)")
 
 function train_NODE(args; kws...)
-
     z, t, tspan, z0 = get_NODE_data(args.train_latent_path; downsample=args.downsample)
 
     node = NODE(args.latent_dim, args.dense_mult; 
@@ -44,16 +43,20 @@ function train_NODE(args; kws...)
     callback = function (state, l; plotting=true)
         step = state.iter              # current iteration index
         if plotting
+            # title = "Iteration $step, loss = "
             if args.multiple_shooting
                 # compute current segment predictions for visualization
+                mse_loss = 
+                title = "Iteration $step, MSE loss =  "
+
                 _, preds = loss_multiple_shoot(node, z, z0; p=ComponentArray(state.u),
                                                t=node.t, group_size=args.group_size,
                                                continuity_term=args.continuity_term)
-                p = plot_multiple_shoot(node, preds, z; group_size=args.group_size, title_loss=l, n_reconstruct=args.n_reconstruct)
+                plt = plot_multiple_shoot(node, preds, z; group_size=args.group_size, title_loss=l, n_reconstruct=args.n_reconstruct)
             else
-                p = plot_node_trajectory(node, z, z0; p=state.u, loss=l)
+                plt = plot_node_trajectory(node, z, z0; p=state.u, loss=l)
             end
-            frame(anim); display(p)
+            frame(anim); display(plt)
         end
         next!(pb; showvalues=[(:step, step) (:loss, l)])
         return false
@@ -69,32 +72,39 @@ function train_NODE(args; kws...)
     node.p0 = result.u # set final network parameters in struct
 
     # saving the model
-
     @info "Saving model and plots"
     out_dir = joinpath("data", "NODE_models", Dates.format(now(), "yyyy-mm-dd_HH-MM-SS"))
     mkpath(out_dir)
+
     # save optimized parameters
     node_path = joinpath(out_dir, "node_params.jld2")
     save_node(node_path, node, args)
-    extrapolate_node(node_path)
 
     # final plot: match mode used during training
     final_loss = loss_function(node.p0)
     if args.multiple_shooting
-        loss, preds = loss_multiple_shoot(node, z, z0; p=node.p0, t=node.t,
+        _, preds = loss_multiple_shoot(node, z, z0; p=node.p0, t=node.t,
                                        group_size=args.group_size, continuity_term=args.continuity_term)
-        p = plot_multiple_shoot(node, preds, z; group_size=args.group_size, title_loss=final_loss)
+        plt = plot_multiple_shoot(node, preds, z; group_size=args.group_size, title_loss=final_loss)
     else
-        p = plot_node_trajectory(node, z, z0; loss=final_loss)
+        plt = plot_node_trajectory(node, z, z0; loss=final_loss)
     end
     png_path = joinpath(out_dir, "trajectories.png")
     @info "  Saved trajectory plot to $png_path"
-    savefig(p, png_path)
+    savefig(plt, png_path)
 
     gif_path = joinpath(out_dir, "training_trajectories.gif")
-    gif(anim, gif_path; fps = 15, show_msg=false)
-    @info "  Saved training gif to $gif_path"
-    nothing
+    try gif(anim, gif_path; fps = 15, show_msg=false)
+        @info "  Saved training gif to $gif_path"
+    catch e
+        @warn "plotting turned off in callback, no gif saved"
+    end
+    
+    extrapolation_plot = extrapolate_node(node_path)
+    display(extrapolation_plot)
+    extrapolation_path = joinpath(out_dir, "extrapolation_plot_loss.png")
+    savefig(extrapolation_plot, extrapolation_path)
+    @info "  Saved extrapolation plot to $extrapolation_path"
 end
 
 if abspath(PROGRAM_FILE) == (@__FILE__) || isinteractive()

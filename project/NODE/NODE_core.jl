@@ -14,8 +14,8 @@ includet("../AE/Lux_AE.jl")
 
 Base.@kwdef mutable struct NodeArgs
     η = 0.01                    # learning rate
-    optimiser = OptimizationPolyalgorithms.PolyOpt #PolyOpt
-    # optimiser = OptimizationOptimisers.Adam
+    # optimiser = OptimizationPolyalgorithms.PolyOpt #PolyOpt
+    optimiser = OptimizationOptimisers.Adam
     maxiters = 250
     solver = Tsit5()
     reltol = 1e-3
@@ -25,11 +25,11 @@ Base.@kwdef mutable struct NodeArgs
     dense_mult = 2
     activation = tanhshrink
     n_reconstruct = 4
-    downsample = 2002
+    downsample = 300
     clip_bc = true
     use_gpu = false             # use GPU
     multiple_shooting = true
-    group_size = 10
+    group_size = 20
     continuity_term = 200
     save_path = "data/models/NODE_models"   # results dir
     train_latent_path = "data/latent_data/16/RE2500/2e8/U_128_latent_train.jld2"
@@ -37,7 +37,7 @@ Base.@kwdef mutable struct NodeArgs
     total_latent_path = "data/latent_data/16/RE2500/2e8/U_128_latent.jld2"
 end
 
-function get_NODE_data(latent_path; downsample=-1)
+function get_NODE_data(latent_path; downsample=-1, verbose=true)
     @load latent_path latent_data
     n_total = size(latent_data.z, 2)
     idx = collect(1:n_total)
@@ -46,7 +46,7 @@ function get_NODE_data(latent_path; downsample=-1)
     t = latent_data.time[idx_downsample]
     tspan = (t[1], t[end])
     z0 = z[:, 1]
-    @info "Instantiated latent NODE data" size(z) size(t) tspan size(z0)
+    verbose && @info "Instantiated latent NODE data" size(z) size(t) tspan size(z0)
     return z, t, tspan, z0
 end
 
@@ -63,9 +63,11 @@ end
 
 # constructor 
 function NODE(latent_dim, dense_mult; tspan=(0.0f0, 1.0f0), solver=Tsit5(), abstol=1e-6, reltol=1e-6, t=nothing, activation=tanh, verbose=true)
+    hidden_nodes = dense_mult * latent_dim
     nn = Chain(
-        Dense(latent_dim, dense_mult * latent_dim, activation),
-        Dense(dense_mult * latent_dim, latent_dim))
+        Dense(latent_dim, hidden_nodes, activation),
+        # Dense(hidden_nodes, hidden_nodes, activation),
+        Dense(hidden_nodes, latent_dim))
     verbose && @info "NODE initialized" latent_dim = latent_dim dense_mult = dense_mult tspan = tspan solver = typeof(solver) reltol = reltol abstol = abstol t = t activation = activation
     return NODE(nn, tspan, solver, abstol, reltol, t, nothing, nothing)
 end
@@ -176,9 +178,9 @@ function plot_multiple_shoot(node::NODE, preds::Vector{<:AbstractMatrix}, z::Abs
         for (j, rg) in enumerate(ranges)
             # plot data and prediction for the selected latent component
             plot!(p, node.t[rg], z[lat_idx, rg];
-                  color=c, linestyle=:solid, label=sidx == 1 && j == 1 ? "data" : nothing)
+                  color=c, linestyle=:solid, label=sidx == 1 && j == 1 ? "z (truth)" : "")
             plot!(p, node.t[rg], preds[j][lat_idx, :];
-                  color=c, linestyle=:dash, label=sidx == 1 && j == 1 ? "pred" : nothing)
+                  color=c, linestyle=:dash, label=sidx == 1 && j == 1 ? "ẑ (pred)" : "")
 
             # start/end markers for the segment to visualize overlaps
             t_start, t_end = node.t[rg][1], node.t[rg][end]
@@ -188,30 +190,43 @@ function plot_multiple_shoot(node::NODE, preds::Vector{<:AbstractMatrix}, z::Abs
             # prediction markers (open circle at start, square at end)
             scatter!(p, [t_start], [pred_start]; color=c, marker=:x, markersize=6, markerstrokecolor=c,
                      markerstrokewidth=1.5, fillalpha=0.0,
-                     label=sidx == 1 && j == 1 ? "pred start" : nothing)
+                     label=sidx == 1 && j == 1 ? "pred start/end" : nothing)
             scatter!(p, [t_end], [pred_end]; color=c, marker=:x, markersize=6, markerstrokecolor=c,
                      markerstrokewidth=1.5, fillalpha=0.0,
-                     label=sidx == 1 && j == 1 ? "pred end" : nothing)
+                     label=nothing)
         end
     end
     return p
 end
 
-function plot_node_trajectory(node::NODE, z::AbstractMatrix, z0; p=nothing, t=nothing, n_reconstruct=4, loss=nothing)
+function plot_node_trajectory(node::NODE, z::AbstractMatrix, z0; p=nothing, t=nothing, n_reconstruct=4, loss=nothing, plt=nothing, labels=true)
     idx_samples = round.(Int, range(1, stop=size(z, 1), length=n_reconstruct))
     z_samples = [vec(z[i, :]) for i in idx_samples]  # Vector of 8 one-dimensional arrays, each length 179
     ẑ = predict_array(node, z0; p=p, t=t)
     ẑ_samples = [vec(ẑ[i, :]) for i in idx_samples]  # Vector of 4 one-dimensional arrays, each length 179
-    p = plot()
+    fig = plt === nothing ? plot() : plt
     if !isnothing(loss)
-        title!(p, "loss = $(loss)")
+        title!(fig, "loss = $(loss)")
     end
     colors = [:black, :red, :blue, :green, :purple, :orange, :yellow]
+
+    lw_truth = 2.2
+    lw_pred  = 1.4
+    α_truth  = 0.95
+    α_pred   = 0.70
+    
     for i in 1:n_reconstruct
-        plot!(p, node.t, z_samples[i]; color=colors[i], label="data_$i")
-        plot!(p, node.t, ẑ_samples[i]; linestyle=:dash, color=colors[i], label="pred_$i")
+        c = colors[i]
+        plot!(fig, node.t, z_samples[i];
+            color=c, linewidth=lw_truth, alpha=α_truth,
+            label = labels ? "z $(idx_samples[i]) (truth)" : ""
+        )
+        plot!(fig, node.t, ẑ_samples[i];
+            color=c, linewidth=lw_pred, alpha=α_pred, linestyle=:dash,
+            label = labels ? "ẑ $(idx_samples[i]) (NODE)" : ""
+        )
     end
-    return p
+    return fig
 end
 
 function save_node(path::AbstractString, node::NODE, args::NodeArgs)
@@ -222,7 +237,7 @@ function save_node(path::AbstractString, node::NODE, args::NodeArgs)
     @info "  Saved NODE to $path"
 end
 
-function load_node(path::AbstractString)
+function load_node(path::AbstractString; verbose=true)
     @load path node_p0 node_st node_args node_tspan node_t
     node = NODE(node_args.latent_dim, node_args.dense_mult; activation=node_args.activation, verbose=false)
     setup_lux!(node, verbose=false)   # create a matching structure
@@ -230,7 +245,7 @@ function load_node(path::AbstractString)
     node.st = node_st
     node.tspan = node_tspan
     node.t = node_t
-    @info "NODE sucessfully loaded from $path"
+    verbose && @info "NODE sucessfully loaded from $path"
     return node, node_args
 end
 
