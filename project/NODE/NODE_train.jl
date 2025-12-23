@@ -15,6 +15,8 @@ make_optimiser(opt, η) = hasmethod(opt, Tuple{Float64}) ? opt(η) :
 
 function train_NODE(args; kws...)
     z, t, tspan, z0 = get_NODE_data(args.train_latent_path; downsample=args.downsample)
+    
+    z_test, t_test, tspan_test, z0_test = get_NODE_data(args.test_latent_path; downsample=args.test_downsample)
 
     node = NODE(args.latent_dim, args.dense_mult; 
                 tspan=tspan, t=t, activation=args.activation, 
@@ -38,16 +40,28 @@ function train_NODE(args; kws...)
     end
     pb = Progress(maxiters; desc="Optimizing NODE")
 
+    train_losses = Float64[]
+    test_losses  = Float64[]
+    epochs       = Int[]
+    eval_every   = 1  # change for sparser evaluation
+
     # Callback function
     anim = Plots.Animation()
     callback = function (state, l; plotting=true)
         step = state.iter              # current iteration index
+        if step % eval_every == 0
+            # push!(epochs, step)
+            # push!(train_losses, L2_loss(node, z, z0; p=state.u))
+            # push!(train_losses, l)
+            # Evaluate test loss with current params
+            # test_l = L2_loss(node, z_test, z0_test; p=state.u, t=t_test)
+            # push!(test_losses, test_l)
+            # push!(test_losses, node_loss(args, node, z_test, z0_test; p=state.u, t=t_test))
+        end
         if plotting
             # title = "Iteration $step, loss = "
             if args.multiple_shooting
                 # compute current segment predictions for visualization
-                mse_loss = 
-                title = "Iteration $step, MSE loss =  "
 
                 _, preds = loss_multiple_shoot(node, z, z0; p=ComponentArray(state.u),
                                                t=node.t, group_size=args.group_size,
@@ -92,6 +106,17 @@ function train_NODE(args; kws...)
     png_path = joinpath(out_dir, "trajectories.png")
     @info "  Saved trajectory plot to $png_path"
     savefig(plt, png_path)
+
+
+    # # Loss curve plot (train vs test)
+    # plt_loss = plot(epochs, train_losses; label="train", xlabel="epoch", ylabel="loss",
+    #                 title="NODE train/test loss", yscale=:log10, linewidth=2)
+    # if length(test_losses) == length(epochs)
+    #     plot!(plt_loss, epochs, test_losses; label="test", linewidth=2)
+    # end
+    # loss_path = joinpath(out_dir, "loss_curve.png")
+    # savefig(plt_loss, loss_path)
+    # @info "  Saved loss curve to $loss_path"
 
     gif_path = joinpath(out_dir, "training_trajectories.gif")
     try gif(anim, gif_path; fps = 15, show_msg=false)

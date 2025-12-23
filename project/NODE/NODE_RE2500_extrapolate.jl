@@ -35,12 +35,13 @@ function make_nodes(train_node, t_test, tspan_test, t_total, tspan_total)
     return test_node, total_node
 end
 
+
 function predictions_and_losses(test_node, z0_test, z_test, total_node, z0_total, z_total)
     test_pred  = predict_array(test_node, z0_test)
     total_pred = predict_array(total_node, z0_total)
 
-    test_loss  = abs2.(z_test  .- test_pred)
-    total_loss = abs2.(z_total .- total_pred)
+    test_loss  = abs.(z_test  .- test_pred)
+    total_loss = abs.(z_total .- total_pred)
 
     avg_test_loss  = avg_loss_over_latent(test_loss)
     avg_total_loss = avg_loss_over_latent(total_loss)
@@ -55,10 +56,11 @@ function plot_trajectories(test_node, z_test, z0_test, train_node, z_train, z0_t
     return p
 end
 
-function plot_losses(test_node, total_node, test_loss, total_loss, avg_test_loss, avg_total_loss; yscale=:linear, ylim=(0.000001, 3))
+function plot_losses(test_node, total_node, test_loss, total_loss, avg_test_loss, avg_total_loss; yscale=:linear, ylim=(0.00000, 0.5))
     eps = 1e-12
+    # ylim=()
     plt = plot(yscale=yscale, ylim=ylim)
-    plot!(plt; title="NODE extrapolation MSE loss", xlabel="time", ylabel="absolute error", grid=true, minorgrid=true)
+    plot!(plt; title="NODE extrapolation MAE loss", xlabel="time", ylabel="absolute error", grid=true, minorgrid=true)
 
     n_lat = size(test_loss, 1)
     for i in 1:n_lat
@@ -93,7 +95,7 @@ end
 # ---- Script guard ----
 
 if abspath(PROGRAM_FILE) == (@__FILE__) || isinteractive()
-    params_path = "data/NODE_models/2025-12-22_18-43-01/node_params.jld2"
+    params_path = "data/NODE_models/2025-12-23_14-30-58/node_params.jld2"
     # params_path = "data/NODE_models/2025-12-21_16-05-13/node_params.jld2"
     extrapolate_node(params_path)
 end

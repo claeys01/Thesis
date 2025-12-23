@@ -26,6 +26,7 @@ Base.@kwdef mutable struct NodeArgs
     activation = tanhshrink
     n_reconstruct = 4
     downsample = 300
+    test_downsample = 500
     clip_bc = true
     use_gpu = false             # use GPU
     multiple_shooting = true
@@ -84,9 +85,9 @@ end
 # Build a NeuralODE from the (possibly reconstructed) model and solve for given initial state z0 and params p.
 function predict(node::NODE, z0; p=nothing, t=nothing)
     t = t === nothing ? node.t : t
-
+    tspan = t === nothing ? node.tspan : (t[1], t[end])
     p_used = p === nothing ? node.p0 : p
-    nnode = NeuralODE(node.dudt, node.tspan, node.solver; saveat=t, abstol=node.abstol, reltol=node.reltol)
+    nnode = NeuralODE(node.dudt, tspan, node.solver; saveat=t, abstol=node.abstol, reltol=node.reltol)
     sol = nnode(z0, p_used, node.st)
 
     if isa(sol, Tuple)
@@ -103,7 +104,7 @@ function predict_array(node::NODE, z0; p=nothing, t=nothing)
 end
 
 # Mean-squared error loss between data `z` and NODE prediction (z shaped like (latent_dim, n_t))
-function mse_loss(node::NODE, z::AbstractMatrix, z0; p=nothing, t=nothing)
+function L2_loss(node::NODE, z::AbstractMatrix, z0; p=nothing, t=nothing)
     pred = predict_array(node, z0; p=p, t=t)
     @assert size(pred) == size(z) "prediction size $(size(pred)) != data size $(size(z))"
     return sum(abs2, z .- pred)
@@ -137,10 +138,7 @@ function loss_multiple_shoot(node::NODE, z::AbstractMatrix, z0; p=nothing, t=not
     # map parameters into ComponentArray to preserve axes
     p_used = p === nothing ? node.p0 : p
 
-    # ps = ComponentArray(p === nothing ? node.p0 : p)
-
     # simple L2 loss over all predicted segments (sum of segment losses)
-    # seg_loss(data_seg, pred_seg) = sum(abs2, data_seg .- pred_seg)
     seg_loss(data_seg, pred_seg) = sum(abs, data_seg .- pred_seg)
 
     # l: scalar loss; preds: Vector of predicted segment matrices (latent_dim × segment_len)
@@ -149,13 +147,13 @@ function loss_multiple_shoot(node::NODE, z::AbstractMatrix, z0; p=nothing, t=not
     return l, preds
 end
 
-function node_loss(args::NodeArgs, node::NODE, z::AbstractMatrix, z0; p)
+function node_loss(args::NodeArgs, node::NODE, z::AbstractMatrix, z0; p=nothing, t=nothing)
     if args.multiple_shooting
-        l, _ = loss_multiple_shoot(node, z, z0; p=p, t=node.t,
+        l, _ = loss_multiple_shoot(node, z, z0; p=p, t=t,
             group_size=args.group_size, continuity_term=args.continuity_term)
         return l
     else
-        return mse_loss(node, z, z0; p=p, t=node.t)
+        return L2_loss(node, z, z0; p=p, t=t)
     end
 end
 
