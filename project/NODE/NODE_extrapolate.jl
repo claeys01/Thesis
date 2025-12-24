@@ -24,7 +24,6 @@ function extrapolate_node(params_path; kws...)
     
     node_extr = deepcopy(node)
 
-
     node_extr.t = t_extra
     node_extr.tspan = (node_extr.t[1], node_extr.t[end])
     @show size(node.t) size(node_extr.t)
@@ -39,9 +38,7 @@ function extrapolate_node(params_path; kws...)
     pred_path = "data/latent_data/period_predictions/period_pred.jld2"
     JLD2.save(pred_path, "period_pred", period_pred,
                 "pred_idx", period_range[end])
-    
-
-    
+        
     @show size(pred) size(pred_extr)
 
     n_reconstruct = 4
