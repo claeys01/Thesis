@@ -11,41 +11,41 @@ includet("../utils/SimDataTypes.jl")
 using .SimDataTypes
 
 Base.@kwdef mutable struct LuxArgs
-    η = 1e-3                    # learning rate
-    λ = 9e-4                    # regularization paramater
-    Autodiff = AutoZygote()
-    λdiv = 0                    # divergence loss weight
-    λmask = 0                   # weight of body mask loss
-    loss = :L2                  # loss function for reconstruction loss (:L1, :L2, :charb)
-    batch_size = 50             # batch size
-    t_training = 16.603
-    train_downsample = 200     # amount of data used for training 
-    test_downsample = 200
-    split = 0.2
-    n_periods = 3               # amount of shedding periods to use for training data
-    epochs = 200                  # number of epochs
-    seed = 42                   # random seed
-    n_reconstruct = 2           # sampling size for output   
-    test_loss = true
-    field = "u"
-    use_gpu = false             # use GPU
-    clip_bc = true              # removes the ghost cells from the snapshot
-    input_dim = (2^8, 2^8, 4)   # flow field size with μ₀ concatenated
-    output_dim = (2^8, 2^8, 2)  # size of reconstructed RHS field
-    conv_kernel = 3             # DO NOT CHANGE
-    pool_kernel = 2             # DO NOT CHANGE  
-    n_conv = 6                  # number of convolutional layers
-    n_dense = 2                 # number of dense layers in bottleneck
-    dense_traj = nothing
-    latent_dim = 16             # latent dimension
-    stride = 1                  # stride for convolutions
-    C_base = 8                 # first amount of channels for convs
-    normalize = true            # normalise training data
-    save_path = "data/Lux_models"   # results path
-    data_path = "data/datasets/RE2500/2e8/U_128_period.jld2"
-    full_data_path = "data/datasets/RE2500/2e8/U_128_full.jld2"
-    retrain = false
-    checkpoint_path = "data/Lux_models/2025-12-16_12-37-28/checkpoint.jld2"
+    η::Float64 = 1e-3                    # learning rate
+    λ::Float64 = 9e-4                    # regularization parameter
+    Autodiff::Any = AutoZygote()
+    λdiv::Float64 = 0.0                  # divergence loss weight
+    λmask::Float64 = 0.0                 # weight of body mask loss
+    loss::Symbol = :L2                   # loss function for reconstruction (:L1, :L2, :charb)
+    batch_size::Int = 50                 # batch size
+    t_training::Float64 = 16.603
+    train_downsample::Int = 200          # amount of data used for training
+    test_downsample::Int = 200
+    split::Float64 = 0.2
+    n_periods::Int = 3                   # amount of shedding periods to use for training data
+    epochs::Int = 200                    # number of epochs
+    seed::Int = 42                       # random seed
+    n_reconstruct::Int = 2               # sampling size for output
+    test_loss::Bool = true
+    field::String = "u"
+    use_gpu::Bool = false                # use GPU
+    clip_bc::Bool = true                 # removes the ghost cells from the snapshot
+    input_dim::Tuple{Int,Int,Int} = (2^8, 2^8, 4)   # flow field size with μ₀ concatenated
+    output_dim::Tuple{Int,Int,Int} = (2^8, 2^8, 2)  # size of reconstructed RHS field
+    conv_kernel::Int = 3                 # DO NOT CHANGE
+    pool_kernel::Int = 2                 # DO NOT CHANGE
+    n_conv::Int = 6                      # number of convolutional layers
+    n_dense::Int = 2                     # number of dense layers in bottleneck
+    dense_traj::Union{Nothing,Any} = nothing
+    latent_dim::Int = 16                 # latent dimension
+    stride::Int = 1                      # stride for convolutions
+    C_base::Int = 8                      # first amount of channels for convs
+    normalize::Bool = true               # normalise training data
+    save_path::String = "data/Lux_models"   # results path
+    data_path::String = "data/datasets/RE2500/2e8/U_128_period.jld2"
+    full_data_path::String = "data/datasets/RE2500/2e8/U_128_full.jld2"
+    retrain::Bool = false
+    checkpoint_path::String = "data/Lux_models/2025-12-16_12-37-28/checkpoint.jld2"
 end
 
 function get_data_in(Xtarget, μ₀; idx=nothing, normalise=false)
@@ -77,11 +77,18 @@ function downsample_equal(v::AbstractVector, M::Integer)
 end
 
 
+get_data_args(args) = get_data(
+            args.batch_size,
+            args.full_data_path;
+            n_training = args.train_downsample,
+            n_test = args.test_downsample, 
+            split = args.split, 
+            t_training = args.t_training)
+
 function get_data(batch_size, path;t_training=10, n_training=500, n_test=500, split=0.2, verbose=true, showplot=true)
 
     simdata = load_simdata(path)
     preprocess_data!(simdata; verbose=verbose)
-
 
     # normalizer from X only (physics channels)
     N = size(simdata.u, 4)
@@ -527,5 +534,11 @@ function load_trained_AE(checkpoint_path::String; device=cpu_device(), return_pa
         st = device(st)
     end
 
-    return return_params ? (enc, dec, ae, ps, st) : (enc, dec, ae)
+    return return_params ? (enc, dec, ae, ps, st, args) : (enc, dec, ae, args)
+end
+
+function load_normalizer(checkpoint_path::String)
+    checkpoint = JLD2.load(checkpoint_path)
+    normalizer = checkpoint["normalizer"]
+    return normalizer
 end

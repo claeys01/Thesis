@@ -13,9 +13,9 @@ function region_spans!(plt, t_train, t_test)
     return plt
 end
 
-function load_datasets(args; test_downsample::Int = -1, total_downsample::Int = -1, verbose::Bool = false)
+function load_datasets(args; total_downsample::Int = -1, verbose::Bool = false)
     z_train, t_train, tspan_train, z0_train = get_NODE_data(args.train_latent_path; downsample=args.downsample, verbose=verbose)
-    z_test,  t_test,  tspan_test,  z0_test  = get_NODE_data(args.test_latent_path;  downsample=test_downsample,  verbose=verbose)
+    z_test,  t_test,  tspan_test,  z0_test  = get_NODE_data(args.test_latent_path;  downsample=args.test_downsample,  verbose=verbose)
     z_total, t_total, tspan_total, z0_total = get_NODE_data(args.total_latent_path; downsample=total_downsample, verbose=verbose)
 
     return (z_train=z_train, t_train=t_train, tspan_train=tspan_train, z0_train=z0_train,
@@ -79,6 +79,8 @@ function extrapolate_node(params_path; test_downsample::Int = -1, total_downsamp
 
     data = load_datasets(args; test_downsample=test_downsample, total_downsample=total_downsample, verbose=verbose)
     test_node, total_node = make_nodes(train_node, data.t_test, data.tspan_test, data.t_total, data.tspan_total)
+    
+    ẑ_train, ẑ_test = predict_array(train_node, data.z0_train), predict_array(test_node, data.z0_test)
 
     test_loss, total_loss, avg_test_loss, avg_total_loss =
         predictions_and_losses(test_node, data.z0_test, data.z_test, total_node, data.z0_total, data.z_total)
@@ -89,7 +91,9 @@ function extrapolate_node(params_path; test_downsample::Int = -1, total_downsamp
     plt = plot_losses(test_node, total_node, test_loss, total_loss, avg_test_loss, avg_total_loss)
     region_spans!(plt, data.t_train, data.t_test)
 
-    return plot(p, plt; layout=(2, 1), size=(900, 900))
+    return plot(p, plt; layout=(2, 1), size=(900, 900)), (ẑ_train, ẑ_test)
+    # return plot(p, plt; layout=(2, 1), size=(900, 900))
+
 end
 
 # ---- Script guard ----
@@ -97,6 +101,6 @@ end
 if abspath(PROGRAM_FILE) == (@__FILE__) || isinteractive()
     params_path = "data/NODE_models/2025-12-23_14-30-58/node_params.jld2"
     # params_path = "data/NODE_models/2025-12-21_16-05-13/node_params.jld2"
-    extrapolate_node(params_path)
+    # extrapolate_node(params_path)
 end
 

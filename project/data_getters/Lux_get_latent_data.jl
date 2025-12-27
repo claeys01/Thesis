@@ -12,12 +12,10 @@ using .SimDataTypes
 
 
 function get_latent_data(checkpoint_path::String; save_path::Union{String,Tuple{String,String},Nothing}=nothing, batch_size=1024)
-    enc, _, _, ps, st = load_trained_AE(checkpoint_path; return_params=true)
+    enc, _, _, ps, st, args = load_trained_AE(checkpoint_path; return_params=true)
     st = LuxCore.testmode(st)
 
     checkpoint = JLD2.load(checkpoint_path)
-    args_dict = checkpoint["args"]
-    args = LuxArgs(; args_dict...)
     normalizer = checkpoint["normalizer"]
 
     simdata = load_simdata(args.full_data_path)

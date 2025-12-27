@@ -125,11 +125,16 @@ function train_NODE(args; kws...)
         @warn "plotting turned off in callback, no gif saved"
     end
     
-    extrapolation_plot = extrapolate_node(node_path)
+    extrapolation_plot, (ẑ_train, ẑ_test) = extrapolate_node(node_path)
     display(extrapolation_plot)
     extrapolation_path = joinpath(out_dir, "extrapolation_plot_loss.png")
     savefig(extrapolation_plot, extrapolation_path)
     @info "  Saved extrapolation plot to $extrapolation_path"
+
+    # Save predictions
+    # preds_path = joinpath(out_dir, "predictions.jld2")
+    # @save preds_path ẑ_train ẑ_test
+    # @info "  Saved predictions to $preds_path"
 end
 
 if abspath(PROGRAM_FILE) == (@__FILE__) || isinteractive()
