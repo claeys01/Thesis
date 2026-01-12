@@ -16,6 +16,7 @@ deps/usr/
 deps/src/
 /home/matth/Thesis/deps/AutoEncoderToolkit
 data/models/
+gifs/
 data/latent_data
 data/Lux_models
 data/NODE_models/
