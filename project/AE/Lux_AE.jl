@@ -85,7 +85,7 @@ get_data_args(args) = get_data(
             split = args.split, 
             t_training = args.t_training)
 
-function get_data(batch_size, path;t_training=10, n_training=500, n_test=500, split=0.2, verbose=true, showplot=true)
+function get_data(batch_size, path;t_training=10, n_training=500, n_test=500, split=0.2, verbose=true, showplot=true, plotpath=nothing)
 
     simdata = load_simdata(path)
     preprocess_data!(simdata; verbose=verbose)
@@ -113,7 +113,11 @@ function get_data(batch_size, path;t_training=10, n_training=500, n_test=500, sp
 
     plt = train_force_plot(simdata; train_idx=train_idx, val_idx=val_idx, test_idx=test_idx)
     showplot && display(plt)
-
+    if !isnothing(plotpath)
+        savefig(plt, plotpath)
+        @info "training force plot saved to $plotpath"
+    end
+    
     # compute normaliser on training data only and then normalise each batch
     _, normalizer = normalize_batch(simdata.u[:, :, :, train_idx_combined]; normalizer=nothing)
 

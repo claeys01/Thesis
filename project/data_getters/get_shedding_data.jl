@@ -1,5 +1,5 @@
 using WaterLily
-import WaterLily: ∂, @loop
+import WaterLily: ∂, @loop, pressure_force
 using Revise
 using JLD2
 
@@ -20,8 +20,6 @@ includet("../custom.jl")
 includet("../utils/SimDataTypes.jl")
 
 using .SimDataTypes
-
-
 
 function reorder_center_out(arr)
     n = length(arr)
@@ -71,14 +69,14 @@ function data_run(sim::AbstractSimulation, time_max, save_path; sample_instance=
         sim_step!(sim)
         verbose && sim_info(sim)
         if sim_time(sim) > sample_instance
-            raw_force = WaterLily.pressure_force(sim)
+            raw_force = pressure_force(sim)
             scaled_force = Float32.(raw_force./(0.5sim.L*sim.U^2)) # scale the forces!
             sample_counter += 1
             print("Sampling Data - ")
             push!(force, scaled_force)
             push!(u_list, copy(sim.flow.u))               # make a snapshot copy
             push!(μ₀_list, copy(sim.flow.μ₀))             # make a snapshot copy
-            push!(ε, mean(kinetic_energy_diffusion(copy(sim.flow.u); ν=copy(sim.flow.ν))))
+            push!(ε, mean(kinetic_energy_dissipation(copy(sim.flow.u); ν=copy(sim.flow.ν))))
             push!(time, Float32(round(sim_time(sim),digits=4)))
             push!(Δt, Float32(round(sim.flow.Δt[end], digits=3)))
         end
@@ -200,8 +198,8 @@ function plot_sampled_period(simdata::Any, period_path::AbstractString, save_dir
 end
 
 if abspath(PROGRAM_FILE) == (@__FILE__) || isinteractive()
-    n=2^7
-    Re = 250
+    n=2^8
+    Re = 2500
 
     # Build save_dir and ensure it exists
     save_dir = string("data/datasets/RE",Re, "/2e", Int(log2(n)), "/" )

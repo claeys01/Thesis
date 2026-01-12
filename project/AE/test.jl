@@ -44,6 +44,7 @@ data, loaders, normalizer = get_data(
             n_test = args.test_downsample,
             split = 0.2,
             t_training = args.t_training,
+            plotpath="jemoeder.png"
         )
 # enc = Encoder(args, verbose=true)
 # dec = Decoder(args, verbose=true)

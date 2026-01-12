@@ -106,7 +106,7 @@ function make_test_gif(AE_path::String, NODE_path::String)
         frame(anim, p)
         @info "$i / $(length(downsample_idx))"
     end
-    gif(anim, "test.gif"; fps=15, show_msg=false)
+    gif(anim, "gifs/AENODE_sim.gif"; fps=15, show_msg=false)
 end
 
 if abspath(PROGRAM_FILE) == (@__FILE__) || isinteractive()

@@ -1,5 +1,5 @@
 using WaterLily
-import WaterLily: ∂, @loop, @inside, inside_u
+import WaterLily: ∂, @loop, @inside, inside_u, S, conv_diff!
 using JLD2
 using Random
 using Statistics
@@ -22,7 +22,7 @@ function grad_p(flow::Flow)
 end
 
 function RHS(flow::Flow{N};λ=WaterLily.quick,kwargs...) where N
-    RHS = WaterLily.conv_diff!(flow.f,flow.u⁰,flow.σ,λ;ν=flow.ν,perdir=flow.perdir) - grad_p(flow)
+    RHS = conv_diff!(flow.f,flow.u⁰,flow.σ,λ;ν=flow.ν,perdir=flow.perdir) - grad_p(flow)
     return RHS
 end
 
@@ -33,7 +33,6 @@ end
 function preprocess_data!(data::SimData;
                           verbose::Bool = true)
 
-    time = data.time
 
     # --- boundary clipping on u and μ₀ ---
     @inline function clip_time_series(ts)
@@ -65,17 +64,15 @@ function strain_field(u)
     end
     Tp = eltype(u)
     D = ndims(u) - 1
-    dims= size(u)
-    spatial = Tuple(size(u)[1:end-1])
-    Sfield = zeros(Tp, dims..., D) 
+    spatial = Tuple(all_dims[1:end-1])
+    Sfield = zeros(Tp, size(u)..., D) 
     @loop Sfield[I,:,:] .= S(I, u) over I ∈ CartesianIndices(spatial)
-
     return Sfield   
 end
 
-function kinetic_energy_diffusion(u::AbstractArray; ν::Real=1.0)
+function kinetic_energy_dissipation(u::AbstractArray; ν::Real=1.0)
     S = strain_field(u)
-    ε = 2f0 * ν .* sum(S .^ 2, dims = (3, 4))  # sum over i,j
+    ε = 2 * ν .* sum(S .^ 2, dims = (3, 4))  # sum over i,j
     ε = dropdims(ε, dims = (3, 4))
     return ε
 end
