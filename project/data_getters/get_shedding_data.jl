@@ -47,7 +47,6 @@ end
 
 function data_run(sim::AbstractSimulation, time_max, save_path; sample_instance=50, verbose=false, sample_single_period=false, single_period_direction=:rising)
   
-
     # Temporary storage while sampling
     time   = Float32[]
     Δt     = Float32[]

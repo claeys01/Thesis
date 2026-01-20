@@ -3,7 +3,10 @@ import WaterLily: ∂, @loop, @inside, inside_u, S, conv_diff!
 using JLD2
 using Random
 using Statistics
+
 includet("utils/SimDataTypes.jl")
+includet("simulations/vortex_shedding_biot_savart.jl")
+
 
 using .SimDataTypes
 
@@ -57,17 +60,21 @@ end
 
 ispow2(n::Integer) = n > 0 && (n & (n - 1)) == 0
 
+
+#assume that the field u contains ghost cells
 function strain_field(u)
-    all_dims = size(u)                    
-    if !ispow2(all_dims[1]) 
-        u = dropdims(remove_ghosts(u), dims = 4)
-    end
-    Tp = eltype(u)
-    D = ndims(u) - 1
-    spatial = Tuple(all_dims[1:end-1])
-    Sfield = zeros(Tp, size(u)..., D) 
-    @loop Sfield[I,:,:] .= S(I, u) over I ∈ CartesianIndices(spatial)
-    return Sfield   
+    Tp = eltype(u); D = ndims(u) - 1
+    Stensor = zeros(Tp, size(u)..., D)
+    # Stensor = zero(Tp)
+    @loop Stensor[I,:, :] .= S(I, u) over I ∈ inside_u(u)
+    return Stensor   
+end
+
+function div_field(u::AbstractArray)
+    n, m, _ = size(u)
+    div_field = zeros(eltype(u), n, m)
+    @inside div_field[I] = WaterLily.div(I,u)
+    return div_field
 end
 
 function kinetic_energy_dissipation(u::AbstractArray; ν::Real=1.0)
@@ -75,6 +82,38 @@ function kinetic_energy_dissipation(u::AbstractArray; ν::Real=1.0)
     ε = 2 * ν .* sum(S .^ 2, dims = (3, 4))  # sum over i,j
     ε = dropdims(ε, dims = (3, 4))
     return ε
+end
+
+# replacing flow field with simulations
+function insert_prediction!(sim::AbstractSimulation, û::AbstractArray{T,3}) where {T}
+    sim_size = size(sim.flow.u); pred_size = size(û)
+    @assert pred_size == (sim_size[1]-2, sim_size[2]-2, sim_size[3]) "simulation and prediction sizes do not match"
+    sim.flow.u[2:end-1, 2:end-1, :] .= û
+    return sim
+end
+
+function impose_biot_bc_on_snapshot(û::AbstractArray{T,3}; return_sim=false) where {T}
+
+    sim = circle_shedding_biot(;mem=Array, Re=2500, n=2^8, m=2^8, perturb=false)
+    insert_prediction!(sim, û)
+
+    # measure!(sim)
+    t = WaterLily.time(sim.flow)
+    U = BiotSavartBCs.BCTuple(sim.flow.uBC, t, T)
+
+    ω = BiotSavartBCs.MLArray(sim.flow.f)  # same layout as flow.f
+    BiotSavartBCs.fill_ω!(ω, sim.flow.u)
+
+    sim.ω = ω
+    sim.tar = Array.(collect_targets(sim.ω,()))
+    sim.ftar = flatten_targets(sim.tar)
+
+    BiotSavartBCs.biot_project!(sim.flow, sim.pois, sim.ω, sim.x₀, sim.tar, sim.ftar, U; w=10000000, fmm=sim.fmm)
+    if return_sim
+        return sim
+    else
+        return sim.flow.u
+    end
 end
 
 function zero_crossing(y; direction=:both, eps=0.0)

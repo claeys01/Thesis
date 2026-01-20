@@ -5,9 +5,8 @@ using Plots
 using Revise 
 using JLD2
 
-includet("../custom.jl")
 
-function circle_shedding_biot(;Re=250, U=1, n = 2^7,m = 2^7, mem=Array)
+function circle_shedding_biot(;Re=250, U=1, n = 2^7,m = 2^7, mem=Array, perturb=true)
     
     radius = Float32(m / 16) # radius of the circle relative to the height of the domain
     center = (Float32(n/4), Float32(m/2)) # location of the circle relative to the height of the domain
@@ -23,11 +22,9 @@ function circle_shedding_biot(;Re=250, U=1, n = 2^7,m = 2^7, mem=Array)
         2f0radius; ν=visc, # defining viscosity
         body=AutoBody(sdf), 
         mem=mem)
-    perturb!(sim; noise=0.1)
+    perturb && perturb!(sim; noise=0.1)
     return sim
 end
-
-
 
 
 function get_forces!(sim,t)
@@ -35,7 +32,6 @@ function get_forces!(sim,t)
     force = WaterLily.pressure_force(sim)
     force./(0.5sim.L*sim.U^2) # scale the forces!
 end
-
 
 
 
