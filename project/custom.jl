@@ -61,28 +61,53 @@ end
 ispow2(n::Integer) = n > 0 && (n & (n - 1)) == 0
 
 
-#assume that the field u contains ghost cells
-function strain_field(u)
-    Tp = eltype(u); D = ndims(u) - 1
-    Stensor = zeros(Tp, size(u)..., D)
-    # Stensor = zero(Tp)
-    @loop Stensor[I,:, :] .= S(I, u) over I ∈ inside_u(u)
-    return Stensor   
+function strain_field(u::AbstractArray{T,N}) where {T,N}
+    if N == 3
+        H, W, C = size(u)
+        S_tensor = zeros(T, H, W, C, C)
+        @loop S_tensor[I, :, :] .= S(I, u) over I ∈ inside_u(u)
+        return S_tensor
+    elseif N == 4
+        H, W, C, t = size(u)
+        S_tensor = zeros(T, H, W, C, C, t)
+        for i in 1:t
+            S_tensor[:, :, :, :, i] = strain_field(u[: ,: ,: ,i])
+        end
+        return S_tensor
+    else
+        throw(ArgumentError("strain_field expects a 3- or 4-dimensional array"))
+    end
 end
 
-function div_field(u::AbstractArray)
-    n, m, _ = size(u)
-    div_field = zeros(eltype(u), n, m)
-    @inside div_field[I] = WaterLily.div(I,u)
-    return div_field
-end
 
-function kinetic_energy_dissipation(u::AbstractArray; ν::Real=1.0)
+function kinetic_energy_dissipation(u::AbstractArray{T,N}; ν::Real=1.0, avg=false) where {T, N}
     S = strain_field(u)
     ε = 2 * ν .* sum(S .^ 2, dims = (3, 4))  # sum over i,j
     ε = dropdims(ε, dims = (3, 4))
-    return ε
+    avg ? vec(dropdims(mean(ε; dims=(1,2)); dims=(1,2))) :  ε
 end
+
+
+function div_field(u::AbstractArray{T,N}; avg=false) where {T,N}
+    if N == 3
+        H, W, _ = size(u)
+        div_mat = zeros(T, H, W)
+        @inside div_mat[I] = WaterLily.div(I,u)
+        return div_mat
+    elseif N == 4
+        H, W, _, t = size(u)
+        div_field_arr = zeros(T, H, W, t)
+        for i in 1:t
+            div_field_arr[:, :, i] = div_field(u[:, :, :, i])
+        end
+        # return div_field_arr
+        avg ? (return vec(dropdims(mean(div_field_arr; dims=(1,2)); dims=(1,2)))) : (return div_field_arr)
+    else
+        throw(ArgumentError("div_field expects a 3- or 4-dimensional array"))
+    end
+end
+
+
 
 # replacing flow field with simulations
 function insert_prediction!(sim::AbstractSimulation, û::AbstractArray{T,3}) where {T}
@@ -92,27 +117,37 @@ function insert_prediction!(sim::AbstractSimulation, û::AbstractArray{T,3}) wh
     return sim
 end
 
-function impose_biot_bc_on_snapshot(û::AbstractArray{T,3}; return_sim=false) where {T}
+function impose_biot_bc_on_snapshot(û::AbstractArray{T,N}; return_sim=false) where {T, N}
+    if N == 3
+        sim = circle_shedding_biot(;mem=Array, Re=2500, n=2^8, m=2^8, perturb=false)
+        insert_prediction!(sim, û)
 
-    sim = circle_shedding_biot(;mem=Array, Re=2500, n=2^8, m=2^8, perturb=false)
-    insert_prediction!(sim, û)
+        # measure!(sim)
+        t = WaterLily.time(sim.flow)
+        U = BiotSavartBCs.BCTuple(sim.flow.uBC, t, N) # hier mss nog een foutje
 
-    # measure!(sim)
-    t = WaterLily.time(sim.flow)
-    U = BiotSavartBCs.BCTuple(sim.flow.uBC, t, T)
+        ω = BiotSavartBCs.MLArray(sim.flow.f)  # same layout as flow.f
+        BiotSavartBCs.fill_ω!(ω, sim.flow.u)
 
-    ω = BiotSavartBCs.MLArray(sim.flow.f)  # same layout as flow.f
-    BiotSavartBCs.fill_ω!(ω, sim.flow.u)
+        sim.ω = ω
+        sim.tar = Array.(collect_targets(sim.ω,()))
+        sim.ftar = flatten_targets(sim.tar)
 
-    sim.ω = ω
-    sim.tar = Array.(collect_targets(sim.ω,()))
-    sim.ftar = flatten_targets(sim.tar)
-
-    BiotSavartBCs.biot_project!(sim.flow, sim.pois, sim.ω, sim.x₀, sim.tar, sim.ftar, U; w=10000000, fmm=sim.fmm)
-    if return_sim
-        return sim
+        BiotSavartBCs.biot_project!(sim.flow, sim.pois, sim.ω, sim.x₀, sim.tar, sim.ftar, U; w=0, fmm=sim.fmm)
+        if return_sim
+            return sim
+        else
+            return sim.flow.u
+        end
+    elseif N == 4
+        H, W, C, t = size(û)
+        snapshot_arr = zeros(T, H+2, W+2, C, t)
+        for i in 1:t
+            snapshot_arr[:, :, :, i] =  impose_biot_bc_on_snapshot(û[:, :, :, i])
+        end
+        return snapshot_arr
     else
-        return sim.flow.u
+        throw(ArgumentError("impose_biot_bc_on_snapshot expects a 3- or 4-dimensional array"))
     end
 end
 

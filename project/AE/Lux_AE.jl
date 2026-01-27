@@ -23,7 +23,7 @@ Base.@kwdef mutable struct LuxArgs
     test_downsample::Int = 200
     split::Float64 = 0.2
     n_periods::Int = 3                   # amount of shedding periods to use for training data
-    epochs::Int = 200                    # number of epochs
+    epochs::Int = 1                    # number of epochs
     seed::Int = 42                       # random seed
     n_reconstruct::Int = 2               # sampling size for output
     test_loss::Bool = true
@@ -78,14 +78,14 @@ end
 
 
 get_data_args(args) = get_data(
-            args.batch_size,
-            args.full_data_path;
-            n_training = args.train_downsample,
-            n_test = args.test_downsample, 
-            split = args.split, 
-            t_training = args.t_training)
+    args.batch_size,
+    args.full_data_path;
+    n_training=args.train_downsample,
+    n_test=args.test_downsample,
+    split=args.split,
+    t_training=args.t_training)
 
-function get_data(batch_size, path;t_training=10, n_training=500, n_test=500, split=0.2, verbose=true, showplot=true, plotpath=nothing)
+function get_data(batch_size, path; t_training=10, n_training=500, n_test=500, split=0.2, verbose=true, showplot=true, plotpath=nothing)
 
     simdata = load_simdata(path)
     preprocess_data!(simdata; verbose=verbose)
@@ -96,7 +96,7 @@ function get_data(batch_size, path;t_training=10, n_training=500, n_test=500, sp
     if N < 2
         error("get_data: need at least 2 samples to create train/validation split (got $N)")
     end
-    
+
     train_idxs_full = findall(t -> t < t_training, simdata.time)
     train_idx_combined = downsample_equal(train_idxs_full, n_training)
     # Split into train / val by downsampling evenly from the combined pool
@@ -109,7 +109,7 @@ function get_data(batch_size, path;t_training=10, n_training=500, n_test=500, sp
         # Remove validation indices from train
         train_idx = setdiff(train_idx_combined, val_idx)
     end
-    test_idx = downsample_equal(collect(last(train_idx_combined)+1 : N), n_test)
+    test_idx = downsample_equal(collect(last(train_idx_combined)+1:N), n_test)
 
     plt = train_force_plot(simdata; train_idx=train_idx, val_idx=val_idx, test_idx=test_idx)
     showplot && display(plt)
@@ -117,24 +117,24 @@ function get_data(batch_size, path;t_training=10, n_training=500, n_test=500, sp
         savefig(plt, plotpath)
         @info "training force plot saved to $plotpath"
     end
-    
+
     # compute normaliser on training data only and then normalise each batch
     _, normalizer = normalize_batch(simdata.u[:, :, :, train_idx_combined]; normalizer=nothing)
 
 
     data = (
-        TrainData = EpochData(get_data_in(simdata.u, simdata.μ₀; idx=train_idx)...),
-        ValData =   EpochData(get_data_in(simdata.u, simdata.μ₀; idx=val_idx)...),
-        TestData =  EpochData(get_data_in(simdata.u, simdata.μ₀; idx=test_idx)...)
+        TrainData=EpochData(get_data_in(simdata.u, simdata.μ₀; idx=train_idx)...),
+        ValData=EpochData(get_data_in(simdata.u, simdata.μ₀; idx=val_idx)...),
+        TestData=EpochData(get_data_in(simdata.u, simdata.μ₀; idx=test_idx)...)
     )
-    
+
     simdata = nothing
 
     # DataLoaders over indices only (lightweight)
     loaders = (
-        train_loader = DataLoader(collect(1:length(train_idx)); batchsize=batch_size, shuffle=true),
-        val_loader   = DataLoader(collect(1:length(val_idx));   batchsize=batch_size, shuffle=false),
-        test_loader  = DataLoader(collect(1:length(test_idx));  batchsize=batch_size, shuffle=false)
+        train_loader=DataLoader(collect(1:length(train_idx)); batchsize=batch_size, shuffle=true),
+        val_loader=DataLoader(collect(1:length(val_idx)); batchsize=batch_size, shuffle=false),
+        test_loader=DataLoader(collect(1:length(test_idx)); batchsize=batch_size, shuffle=false)
     )
 
 
@@ -145,17 +145,17 @@ end
 
 function build_batch(data::EpochData, idx; normalizer=nothing)
     if isnothing(normalizer)
-        Xin   = data.Xin[:, :, :, idx]
-        Xout  = data.Xout[:, :, :, idx]
-        μ₀    = data.μ₀[:, :, :, idx]
+        Xin = data.Xin[:, :, :, idx]
+        Xout = data.Xout[:, :, :, idx]
+        μ₀ = data.μ₀[:, :, :, idx]
     else
         @assert isa(normalizer, Normalizer) "normaliser must be of type Normalizer"
         Xout, _ = normalize_batch(data.Xout[:, :, :, idx]; normalizer=normalizer)
-        μ₀    = data.μ₀[:, :, :, idx]
+        μ₀ = data.μ₀[:, :, :, idx]
         Xin = cat(Xout, μ₀; dims=3)
     end
     return (Xin, Xout, μ₀)
-end 
+end
 
 struct Encoder{L} <: AbstractLuxWrapperLayer{:layers}
     layers::L
@@ -181,32 +181,32 @@ end
 
 
 Encoder(args::LuxArgs; verbose=true) = Encoder_parametric(args.input_dim, args.latent_dim;
-                            n_conv=args.n_conv, n_dense=args.n_dense, C_base=args.C_base,
-                            conv_kernel=args.conv_kernel, pool_kernel=args.pool_kernel,
-                            stride=args.stride, dense_traj=args.dense_traj, verbose=verbose)
+    n_conv=args.n_conv, n_dense=args.n_dense, C_base=args.C_base,
+    conv_kernel=args.conv_kernel, pool_kernel=args.pool_kernel,
+    stride=args.stride, dense_traj=args.dense_traj, verbose=verbose)
 
 # Parametric encoder constructor
 function Encoder_parametric(input_size::Tuple{Int,Int,Int}, latent_dim::Int;
-                           n_conv=4, n_dense=3, C_base=8, conv_kernel=3,
-                           pool_kernel=2, stride=1, dense_traj=nothing, verbose=true)
+    n_conv=4, n_dense=3, C_base=8, conv_kernel=3,
+    pool_kernel=2, stride=1, dense_traj=nothing, verbose=true)
     H, W, C_in = input_size
     # Build convolutional layers
     enc_layers = []
     enc_channels = []
-    
+
     push!(enc_layers, enc_layer(conv_kernel, pool_kernel, C_in, C_base, stride))
     push!(enc_channels, (C_in, C_base))
-    
-    for i in 1:(n_conv - 1)
+
+    for i in 1:(n_conv-1)
         C1 = C_base * 2^(i - 1)
         C2 = C_base * 2^i
-        
+
         push!(enc_channels, (C1, C2))
         is_last = (i == n_conv - 1)  # this is the last conv block
         push!(enc_layers,
-              enc_layer(conv_kernel, pool_kernel, C1, C2, stride; BN = !is_last))        
+            enc_layer(conv_kernel, pool_kernel, C1, C2, stride; BN=!is_last))
     end
-    
+
     # Calculate output size after convolutions
     rng = Xoshiro(0)
     dummy = rand(Float32, H, W, C_in, 2)
@@ -214,15 +214,15 @@ function Encoder_parametric(input_size::Tuple{Int,Int,Int}, latent_dim::Int;
     temp_p, temp_st = Lux.setup(rng, temp_conv)
     temp_st = LuxCore.testmode(temp_st)
     temp_out, _ = temp_conv(dummy, temp_p, temp_st)
-    H_temp, B_temp, C_temp ,_ = size(temp_out)
+    H_temp, B_temp, C_temp, _ = size(temp_out)
     dense_in = H_temp * B_temp * C_temp
-    
+
     # Build dense layers
     dense_layers = Any[FlattenLayer()]
     dense_nodes = []
-    
-    for k in 0:(n_dense - 2)
-        nodes = Int.(dense_in .* 1 ./ (2^k, 2^(k+1)))
+
+    for k in 0:(n_dense-2)
+        nodes = Int.(dense_in .* 1 ./ (2^k, 2^(k + 1)))
         if nodes[end] ≤ latent_dim
             @warn "Requested amount of dense layers to high for amount of convs"
             break
@@ -231,11 +231,11 @@ function Encoder_parametric(input_size::Tuple{Int,Int,Int}, latent_dim::Int;
         push!(dense_layers, Dense(nodes...))
         push!(dense_layers, relu)
     end
-    
+
     final_nodes = (isempty(dense_nodes) ? dense_in : dense_nodes[end][end], latent_dim)
     push!(dense_nodes, final_nodes)
     push!(dense_layers, Dense(final_nodes...))
-    
+
     if verbose
         enc_channel_str = join(["$(c[1])→$(c[2])" for c in enc_channels], " -> ")
         dense_str = join(["$(c[1])→$(c[2])" for c in dense_nodes], " -> ")
@@ -257,7 +257,7 @@ function Encoder_parametric(input_size::Tuple{Int,Int,Int}, latent_dim::Int;
     layers = Chain(enc_layers..., dense_layers...)
     return Encoder(layers)
 end
-    
+
 
 
 function (encoder::Encoder)(x, ps, st)
@@ -272,7 +272,7 @@ end
 
 function upsample2(x, p)
     H, W, _, _ = size(x)
-    return NNlib.upsample_bilinear(x; size=(p*H, p*W))
+    return NNlib.upsample_bilinear(x; size=(p * H, p * W))
 end
 
 function dec_layer(k, p, Cin, Cout, stride)
@@ -285,15 +285,15 @@ function dec_layer(k, p, Cin, Cout, stride)
 end
 
 Decoder(args::LuxArgs; verbose=true) = Decoder_parametric(args.output_dim, args.latent_dim;
-                         n_conv=args.n_conv, n_dense=args.n_dense, C_base=args.C_base,
-                        conv_kernel=args.conv_kernel, pool_kernel=args.pool_kernel,
-                        stride=args.stride, verbose=verbose)
+    n_conv=args.n_conv, n_dense=args.n_dense, C_base=args.C_base,
+    conv_kernel=args.conv_kernel, pool_kernel=args.pool_kernel,
+    stride=args.stride, verbose=verbose)
 
 
 function construct_dense_nodes(n_dense::Int, latent_dim::Int, dense_max::Int)
     dense_nodes = []
-     for k in 0:(n_dense - 2)
-        nodes = Int.(dense_max .* 1 ./ (2^k, 2^(k+1)))
+    for k in 0:(n_dense-2)
+        nodes = Int.(dense_max .* 1 ./ (2^k, 2^(k + 1)))
         if nodes[end] ≤ latent_dim
             @warn "Amount of requested dense layers to high, stopping early"
             break
@@ -304,24 +304,24 @@ function construct_dense_nodes(n_dense::Int, latent_dim::Int, dense_max::Int)
 end
 
 function Decoder_parametric(output_size::Tuple{Int,Int,Int}, latent_dim::Int;
-                           n_conv=4, n_dense=3, C_base=8, conv_kernel=3,
-                           pool_kernel=2, stride=1, verbose=true)
+    n_conv=4, n_dense=3, C_base=8, conv_kernel=3,
+    pool_kernel=2, stride=1, verbose=true)
     H, W, C_out = output_size
-    
+
     # Calculate compression ratio from encoder
     # This should match the encoder's final spatial size
     cr = pool_kernel^n_conv
     h_lat, w_lat = div(H, cr), div(W, cr)
     channels_mid = C_base * 2^(n_conv - 1)
-    
+
     # Build dense layers (reverse of encoder)
     dense_layers = []
     dense_out = h_lat * w_lat * channels_mid
-    
+
     # Calculate dense layer sizes
     dense_nodes = []
-     for k in 0:(n_dense - 2)
-        nodes = Int.(dense_out .* 1 ./ (2^k, 2^(k+1)))
+    for k in 0:(n_dense-2)
+        nodes = Int.(dense_out .* 1 ./ (2^k, 2^(k + 1)))
         if nodes[end] ≤ latent_dim
             break
         end
@@ -332,7 +332,7 @@ function Decoder_parametric(output_size::Tuple{Int,Int,Int}, latent_dim::Int;
     push!(dense_nodes, final_nodes)
     dense_nodes = reverse(reverse.(dense_nodes))
 
-    
+
     # Build dense chain
     for (i, (n_in, n_out)) in enumerate(dense_nodes)
         push!(dense_layers, Dense(n_in, n_out))
@@ -340,7 +340,7 @@ function Decoder_parametric(output_size::Tuple{Int,Int,Int}, latent_dim::Int;
             push!(dense_layers, relu)
         end
     end
-    
+
     # Reshape layer
     reshape_layer = x -> reshape(x, h_lat, w_lat, channels_mid, size(x, 2))
     rng = Xoshiro(0)
@@ -349,24 +349,24 @@ function Decoder_parametric(output_size::Tuple{Int,Int,Int}, latent_dim::Int;
     # Build deconvolutional layers
     dec_layers = Any[reshape_layer]
     dec_channels = []
-    
+
     C1_dec = C_base * 2^(n_conv - 1)
     C2_dec = C_base * 2^(n_conv - 2)
-    
+
     for i in 1:(n_conv)
         push!(dec_channels, (C1_dec, C2_dec))
         push!(dec_layers, dec_layer(conv_kernel, pool_kernel, C1_dec, C2_dec, stride))
         C1_dec, C2_dec = C2_dec, max(1, Int(C2_dec ÷ 2))
     end
-    
+
     # Final output layer
     C_last = dec_channels[end][end]
     push!(dec_channels, (C_last, C_out))
     push!(dec_layers,
-            # Chain( x -> upsample2(x, pool_kernel), 
-            Conv((conv_kernel, conv_kernel), C_last => C_out; pad=SamePad(), stride=stride)
-            )
-    
+        # Chain( x -> upsample2(x, pool_kernel), 
+        Conv((conv_kernel, conv_kernel), C_last => C_out; pad=SamePad(), stride=stride)
+    )
+
     # Smoothing layer
     push!(dec_channels, (C_out, C_out))
     push!(dec_layers, Conv((conv_kernel, conv_kernel), C_out => C_out; pad=SamePad(), stride=stride))
@@ -388,7 +388,7 @@ function Decoder_parametric(output_size::Tuple{Int,Int,Int}, latent_dim::Int;
         @info "  Sizes: $dims_str"
         @info "  Conv: $dec_channel_str"
     end
-    
+
     layers = Chain(dense_layers..., dec_layers...)
     return Decoder(layers)
 end
@@ -399,12 +399,12 @@ function (dec::Decoder)(z, ps, st)
     return x̂, st_new
 end
 
-struct AE{E, D} <: AbstractLuxContainerLayer{(:encoder, :decoder)}
+struct AE{E,D} <: AbstractLuxContainerLayer{(:encoder, :decoder)}
     encoder::E
     decoder::D
 end
 
-AE(enc::Encoder, dec::Decoder) = AE{typeof(enc), typeof(dec)}(enc, dec)
+AE(enc::Encoder, dec::Decoder) = AE{typeof(enc),typeof(dec)}(enc, dec)
 
 function (m::AE)(x, ps, st)
     # encoder pass
@@ -412,7 +412,7 @@ function (m::AE)(x, ps, st)
     # decoder pass
     x̂, st_dec = m.decoder(z, ps.decoder, st.decoder)
     # return reconstruction + updated state tree
-    return x̂, (encoder = st_enc, decoder = st_dec)
+    return x̂, (encoder=st_enc, decoder=st_dec)
 end
 
 # losses
@@ -457,8 +457,10 @@ function batch_corrs(x, x̂)
     rbatch = zeros(Float32, nchan, nbatch)
     for b in 1:nbatch
         for c in 1:nchan
-            rbatch[c, b] = cor(vec(view(x, :, :, c, b)),
-                vec(view(x̂, :, :, c, b)))
+            # move to CPU to avoid scalar indexing inside Statistics.cor
+            xc = vec(Array(@view x[:, :, c, b]))
+            x̂c = vec(Array(@view x̂[:, :, c, b]))
+            rbatch[c, b] = cor(xc, x̂c)
         end
     end
     return Float32.(mean(rbatch; dims=2)[:])  # average over batch dimension, as Float32
@@ -466,7 +468,7 @@ end
 
 Zygote.@nograd batch_corrs
 
-function total_loss(m::AE, ps, st, 
+function total_loss(m::AE, ps, st,
     x_in::AbstractArray,        # (u,v,mask)
     x_target::AbstractArray,    # (u,v)
     μ₀::AbstractArray;          # (H,W,1,B)  1 outside / 0 inside
@@ -483,8 +485,8 @@ function total_loss(m::AE, ps, st,
 
     # 4) Reconstruction + optional extra losses
     Linside = 0f0
-    L2div   = 0f0
-    Lrec    = 0f0
+    L2div = 0f0
+    Lrec = 0f0
 
     if λmask != 0f0
         Lrec, Linside = masked_loss(x_target, x̂, μ₀; loss=loss)

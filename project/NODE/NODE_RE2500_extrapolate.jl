@@ -77,7 +77,7 @@ end
 function extrapolate_node(params_path; test_downsample::Int = -1, total_downsample::Int = -1, ylim=(-1, 1), verbose::Bool = false)
     train_node, args = load_node(params_path; verbose=false)
 
-    data = load_datasets(args; test_downsample=test_downsample, total_downsample=total_downsample, verbose=verbose)
+    data = load_datasets(args; total_downsample=total_downsample, verbose=verbose)
     test_node, total_node = make_nodes(train_node, data.t_test, data.tspan_test, data.t_total, data.tspan_total)
     
     ẑ_train, ẑ_test = predict_array(train_node, data.z0_train), predict_array(test_node, data.z0_test)
@@ -99,8 +99,9 @@ end
 # ---- Script guard ----
 
 if abspath(PROGRAM_FILE) == (@__FILE__) || isinteractive()
-    params_path = "data/NODE_models/2025-12-23_14-30-58/node_params.jld2"
-    # params_path = "data/NODE_models/2025-12-21_16-05-13/node_params.jld2"
-    # extrapolate_node(params_path)
+    # params_path = "data/NODE_models/2025-12-23_14-30-58/node_params.jld2"
+    params_path = "data/saved_models/NODE/16/RE2500/multiple_shoot_adam_250/node_params.jld2"
+    # plt, _ = extrapolate_node(params_path)
+    # display(plt)
 end
 

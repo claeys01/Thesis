@@ -19,7 +19,6 @@ function L_ss(dec, ẑ_next, u_next)
 end
 
 
-
 function AENodeAsses(AE_path::String, NODE_path::String; saveplot=false)
     # 1. load the trained AE and NODE
     # 2. reconstruct the ẑ with the decoder ψ(ẑ(t+Δt)) of train and test range
@@ -62,7 +61,6 @@ function AENodeAsses(AE_path::String, NODE_path::String; saveplot=false)
     AE_train_per_snapshot_error_arr = []
     AE_test_per_snapshot_error_arr = []
     t_down = []
-
 
     Δt_pred = 40
     downsample_idx = downsample_equal(idx, 500)
