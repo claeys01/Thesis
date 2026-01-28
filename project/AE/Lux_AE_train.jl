@@ -51,7 +51,7 @@ function train(; kws...)
 
     # # initialize encoder and decoder
     if args.retrain 
-        (enc, dec, ae, ps, st) = load_trained_AE(args.checkpoint_path; return_params=true)
+        (enc, dec, ae, ps, st) = load_trained_AE(args.checkpoint_path; return_params=true, testmode=false)
         @info "Retraining model saved at $(args.checkpoint_path)"
     else
         enc = Encoder(args, verbose=true)

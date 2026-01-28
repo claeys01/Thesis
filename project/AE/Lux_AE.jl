@@ -136,9 +136,6 @@ function get_data(batch_size, path; t_training=10, n_training=500, n_test=500, s
         val_loader=DataLoader(collect(1:length(val_idx)); batchsize=batch_size, shuffle=false),
         test_loader=DataLoader(collect(1:length(test_idx)); batchsize=batch_size, shuffle=false)
     )
-
-
-
     return data, loaders, normalizer
 end
 
@@ -514,7 +511,7 @@ Load a saved Lux checkpoint (expects keys "ps","st","args", "normalizer" optiona
 Returns (encoder, decoder, ae) by default. If `return_params=true` returns
 (encoder, decoder, ae, ps, st) where `ps` and `st` have been moved to `device`.
 """
-function load_trained_AE(checkpoint_path::String; device=cpu_device(), return_params::Bool=false)
+function load_trained_AE(checkpoint_path::String; device=cpu_device(), return_params::Bool=false, testmode::Bool=true)
     checkpoint = JLD2.load(checkpoint_path)
 
     ps = get(checkpoint, "ps", nothing)
@@ -539,7 +536,7 @@ function load_trained_AE(checkpoint_path::String; device=cpu_device(), return_pa
     if st !== nothing
         st = device(st)
     end
-
+    testmode ? st = LuxCore.testmode(st) : st = st
     return return_params ? (enc, dec, ae, ps, st, args) : (enc, dec, ae, args)
 end
 

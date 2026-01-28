@@ -1,64 +1,26 @@
-using ComponentArrays, Lux, DiffEqFlux, OrdinaryDiffEq, Optimization, OptimizationOptimJL,
-      OptimizationOptimisers, Random, Plots
+includet("NODE_core.jl")
+includet("../AE/Lux_AE.jl")
 
-rng = Xoshiro(0)
-u0 = Float32[2.0; 0.0]
-datasize = 30
-tspan = (0.0f0, 1.5f0)
-tsteps = range(tspan[1], tspan[2]; length = datasize)
-@show tsteps
-function trueODEfunc(du, u, p, t)
-    true_A = [-0.1 2.0; -2.0 -0.1]
-    du .= ((u .^ 3)'true_A)'
-end
+args = NodeArgs()
+@show typeof(args)
+z, t, tspan, z0 = get_NODE_data(args.train_latent_path; downsample=args.downsample)
 
-prob_trueode = ODEProblem(trueODEfunc, u0, tspan)
-ode_data = Array(solve(prob_trueode, Tsit5(); saveat = tsteps))
-@show typeof(ode_data), size(ode_data)
 
-# dudt2 = Chain(x -> x .^ 3, Dense(2, 50, tanh), Dense(50, 2))
-# p, st = Lux.setup(rng, dudt2)
-# prob_neuralode = NeuralODE(dudt2, tspan, Tsit5(); saveat = tsteps)
+node = NODE(args.latent_dim, args.dense_mult; 
+            tspan=tspan, t=t, activation=args.activation, 
+            solver=args.solver, abstol=args.abstol, reltol=args.reltol)
+setup_lux!(node)
 
-# function predict_neuralode(p)
-#     Array(prob_neuralode(u0, p, st)[1])
-# end
+@show typeof(node)
 
-# function loss_neuralode(p)
-#     pred = predict_neuralode(p)
-#     loss = sum(abs2, ode_data .- pred)
-#     return loss
-# end
+AEargs = LuxArgs()
 
-# # Do not plot by default for the documentation
-# # Users should change doplot=true to see the plots callbacks
-# function callback(state, l; doplot = false)
-#     println(l)
-#     # plot current prediction against data
-#     if doplot
-#         pred = predict_neuralode(state.u)
-#         plt = scatter(tsteps, ode_data[1, :]; label = "data")
-#         scatter!(plt, tsteps, pred[1, :]; label = "prediction")
-#         display(plot(plt))
-#     end
-#     return false
-# end
+enc = Encoder(AEargs, verbose=true)
+dec = Decoder(AEargs, verbose=true)
+ae = AE(enc, dec)
+rng = Xoshiro(args.seed)
+ps, st = Lux.setup(rng, ae)
 
-# pinit = ComponentArray(p)
-# callback((; u = pinit), loss_neuralode(pinit); doplot = true)
+# @show  typeof(enc), typeof(dec)
+@show typeof(ae)
 
-# # use Optimization.jl to solve the problem
-# adtype = Optimization.AutoZygote()
-
-# optf = Optimization.OptimizationFunction((x, p) -> loss_neuralode(x), adtype)
-# optprob = Optimization.OptimizationProblem(optf, pinit)
-
-# result_neuralode = Optimization.solve(
-#     optprob, OptimizationOptimisers.Adam(0.05); callback = callback, maxiters = 300)
-
-# optprob2 = remake(optprob; u0 = result_neuralode.u)
-
-# result_neuralode2 = Optimization.solve(
-#     optprob2, Optim.BFGS(; initial_stepnorm = 0.01); callback, allow_f_increases = false)
-
-# callback((; u = result_neuralode2.u), loss_neuralode(result_neuralode2.u); doplot = true)

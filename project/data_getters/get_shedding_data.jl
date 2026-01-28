@@ -12,8 +12,6 @@ function ensure_parent_dir(path::AbstractString)
     return dir
 end
 
-
-
 # includet("simulations/vortex_shedding.jl")
 includet("../simulations/vortex_shedding_biot_savart.jl")
 includet("../custom.jl")
@@ -197,7 +195,7 @@ function plot_sampled_period(simdata::Any, period_path::AbstractString, save_dir
 end
 
 if abspath(PROGRAM_FILE) == (@__FILE__) || isinteractive()
-    n=2^8
+    n = 2^8
     Re = 2500
 
     # Build save_dir and ensure it exists

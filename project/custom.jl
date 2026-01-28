@@ -140,6 +140,7 @@ function impose_biot_bc_on_snapshot(û::AbstractArray{T,N}; return_sim=false) w
             return sim.flow.u
         end
     elseif N == 4
+        return_sim && @warn "returning an array of BiotSimulations, might not be usefull"
         H, W, C, t = size(û)
         snapshot_arr = zeros(T, H+2, W+2, C, t)
         for i in 1:t
