@@ -43,7 +43,6 @@ function AENodeAsses(AE_path::String, NODE_path::String; saveplot=false)
     test_idx = collect(last(train_idx)+1 : N)
     idx = collect(1:N)
 
-
     # u_train, u_test = simdata.u[train_idx], simdata.u[test_idx]
     #   load node data
     _, t_train, _, z0_train = get_NODE_data(node_args.train_latent_path; downsample=-1, verbose=false)

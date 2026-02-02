@@ -189,22 +189,24 @@ function zero_crossing(y; direction=:both, eps=0.0)
     return idx
 end
 
-function train_force_plot(simdata::Any; train_idx=nothing, val_idx=nothing, test_idx=nothing)
-    forces = simdata.force
-    time = simdata.time
+function train_force_plot(forces::Vector{Vector{Float32}}, time::Vector{Float32}; train_idx=nothing, val_idx=nothing, test_idx=nothing, show_zeros=true)
     drag = first.(forces)
     lift = last.(forces)
-
     zero_idxs = zero_crossing(lift; direction=:rising)
-    
 
-    plt = plot(time, [drag, lift],
-        labels=["drag" "lift"],
-        colors=[:red, :blue],
-        xlabel="tU/L",
+    # plt = plot(time, [drag, lift],
+    #     labels=["drag" "lift"],
+    #     colors=[:red, :blue],
+    #     xlabel="tU/L",
+    #     ylabel="Pressure force coefficients",
+    #     legend=:topright, 
+    #     linewidth=1.5)
+
+    plt = plot(xlabel="tU/L",
         ylabel="Pressure force coefficients",
-        legend=:topright, 
-        linewidth=1.5)
+        legend=:topright) 
+    plot!(plt, time, drag, label="drag", color=:red, linewidth=1.5)
+    plot!(plt, time, lift, label="lift", color=:blue, linewidth=1.5)
 
 
     if !isnothing(val_idx) && !isempty(val_idx)
@@ -219,8 +221,6 @@ function train_force_plot(simdata::Any; train_idx=nothing, val_idx=nothing, test
         # Add vertical shaded region for train/val
         vspan!(plt, [time[first(train_range)], time[last(train_range)]];
             fillcolor=:green, alpha=0.1, label="train/val region")
-        
-
     end
  
     # Highlight test region
@@ -233,12 +233,20 @@ function train_force_plot(simdata::Any; train_idx=nothing, val_idx=nothing, test
         
     end
     # Annotate zero crossings
-    for (i, idx) in enumerate(zero_idxs)
-        shift = i % 2
-        scatter!(plt, [time[idx]], [lift[idx]]; label=false, color=:black, markersize=3)
-        annotate!(plt, time[idx], lift[idx] + 0.1 -(shift*0.2) , text(string(round(time[idx],digits = 3)), 8, :right))
+    if show_zeros
+        for (i, idx) in enumerate(zero_idxs)
+            shift = i % 2
+            scatter!(plt, [time[idx]], [lift[idx]]; label=false, color=:black, markersize=3)
+            annotate!(plt, time[idx], lift[idx] + 0.1 -(shift*0.2) , text(string(round(time[idx],digits = 3)), 8, :right))
+        end
     end
 
     # display(plt)
     return plt
+end
+
+function train_force_plot(simdata::SimData; 
+        train_idx=nothing, val_idx=nothing, test_idx=nothing, show_zeros=true)
+   train_force_plot(simdata.force, simdata.time; 
+        train_idx=train_idx, val_idx=val_idx, test_idx=test_idx, show_zeros=show_zeros)
 end

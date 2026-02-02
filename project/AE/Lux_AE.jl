@@ -85,18 +85,10 @@ get_data_args(args) = get_data(
     split=args.split,
     t_training=args.t_training)
 
-function get_data(batch_size, path; t_training=10, n_training=500, n_test=500, split=0.2, verbose=true, showplot=true, plotpath=nothing)
+get_idxs(simdata::SimData, args::LuxArgs) = get_idxs(simdata, args.t_training, args.train_downsample, args.test_downsample; split=args.split)
 
-    simdata = load_simdata(path)
-    preprocess_data!(simdata; verbose=verbose)
-
-    # normalizer from X only (physics channels)
+function get_idxs(simdata::SimData, t_training, n_training, n_test; split=0.2)
     N = size(simdata.u, 4)
-
-    if N < 2
-        error("get_data: need at least 2 samples to create train/validation split (got $N)")
-    end
-
     train_idxs_full = findall(t -> t < t_training, simdata.time)
     train_idx_combined = downsample_equal(train_idxs_full, n_training)
     # Split into train / val by downsampling evenly from the combined pool
@@ -110,6 +102,35 @@ function get_data(batch_size, path; t_training=10, n_training=500, n_test=500, s
         train_idx = setdiff(train_idx_combined, val_idx)
     end
     test_idx = downsample_equal(collect(last(train_idx_combined)+1:N), n_test)
+    return train_idx, val_idx, test_idx
+end
+
+function get_data(batch_size, path; t_training=10, n_training=500, n_test=500, split=0.2, verbose=true, showplot=true, plotpath=nothing)
+
+    simdata = load_simdata(path)
+    preprocess_data!(simdata; verbose=verbose)
+
+    # normalizer from X only (physics channels)
+    N = size(simdata.u, 4)
+
+    if N < 2
+        error("get_data: need at least 2 samples to create train/validation split (got $N)")
+    end
+
+    # train_idxs_full = findall(t -> t < t_training, simdata.time)
+    # train_idx_combined = downsample_equal(train_idxs_full, n_training)
+    # # Split into train / val by downsampling evenly from the combined pool
+    # n_val = clamp(round(Int, length(train_idx_combined) * split), 0, length(train_idx_combined))
+    # if n_val == 0
+    #     @error "No validation data created"
+    # else
+    #     # Downsample evenly to get validation indices
+    #     val_idx = downsample_equal(train_idx_combined, n_val)
+    #     # Remove validation indices from train
+    #     train_idx = setdiff(train_idx_combined, val_idx)
+    # end
+    # test_idx = downsample_equal(collect(last(train_idx_combined)+1:N), n_test)
+    train_idx, val_idx, test_idx = get_idxs(simdata, t_training, n_training, n_test; split=split)
 
     plt = train_force_plot(simdata; train_idx=train_idx, val_idx=val_idx, test_idx=test_idx)
     showplot && display(plt)
