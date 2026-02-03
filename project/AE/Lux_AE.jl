@@ -16,7 +16,7 @@ Base.@kwdef mutable struct LuxArgs
     Autodiff::Any = AutoZygote()
     λdiv::Float64 = 0.0                  # divergence loss weight
     λmask::Float64 = 0.0                 # weight of body mask loss
-    loss::Symbol = :L2                   # loss function for reconstruction (:L1, :L2, :charb)
+    loss::Symbol = :L1                   # loss function for reconstruction (:L1, :L2, :charb)
     batch_size::Int = 50                 # batch size
     t_training::Float64 = 16.603
     train_downsample::Int = 200          # amount of data used for training
