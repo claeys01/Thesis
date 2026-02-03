@@ -61,17 +61,18 @@ end
 ispow2(n::Integer) = n > 0 && (n & (n - 1)) == 0
 
 
-function strain_field(u::AbstractArray{T,N}) where {T,N}
+function strain_field(u::AbstractArray{T,N}; buff::Int64=1) where {T,N}
     if N == 3
         H, W, C = size(u)
         S_tensor = zeros(T, H, W, C, C)
-        @loop S_tensor[I, :, :] .= S(I, u) over I ∈ inside_u(u)
-        return S_tensor
+        scalar_mat = zeros(T, H, W)
+        @loop S_tensor[I, :, :] .= S(I, u) over I ∈ inside(scalar_mat; buff=buff)
+        return remove_buff(S_tensor, buff)
     elseif N == 4
         H, W, C, t = size(u)
-        S_tensor = zeros(T, H, W, C, C, t)
+        S_tensor = zeros(T, H-2*buff, W-2*buff, C, C, t)
         for i in 1:t
-            S_tensor[:, :, :, :, i] = strain_field(u[: ,: ,: ,i])
+            S_tensor[:, :, :, :, i] .= strain_field(u[: ,: ,: ,i]; buff=buff)
         end
         return S_tensor
     else
@@ -80,25 +81,35 @@ function strain_field(u::AbstractArray{T,N}) where {T,N}
 end
 
 
-function kinetic_energy_dissipation(u::AbstractArray{T,N}; ν::Real=1.0, avg=false) where {T, N}
-    S = strain_field(u)
+function kinetic_energy_dissipation(u::AbstractArray{T,N}; ν::Real=1.0, avg::Bool=false, buff::Int64=1) where {T, N}
+    S = strain_field(u; buff=buff)
     ε = 2 * ν .* sum(S .^ 2, dims = (3, 4))  # sum over i,j
     ε = dropdims(ε, dims = (3, 4))
+    @show size(ε)
     avg ? vec(dropdims(mean(ε; dims=(1,2)); dims=(1,2))) :  ε
 end
 
+function remove_buff(arr::AbstractArray{T, N}, buff::Int) where {T,N}
+    if N == 2
+        return arr[1+buff:end-buff, 1+buff:end-buff]
+    elseif N == 4
+        return arr[1+buff:end-buff, 1+buff:end-buff, :, :]
+    else
+        @error "remove buff for $N dimensions not implemented"
+    end
+end
 
-function div_field(u::AbstractArray{T,N}; avg=false) where {T,N}
+function div_field(u::AbstractArray{T,N}; avg=false, buff=1) where {T,N}
     if N == 3
         H, W, _ = size(u)
         div_mat = zeros(T, H, W)
-        @inside div_mat[I] = WaterLily.div(I,u)
-        return div_mat
+        @loop div_mat[I] = WaterLily.div(I,u) over I ∈ WaterLily.inside(div_mat; buff=buff)
+        return remove_buff(div_mat, buff)
     elseif N == 4
         H, W, _, t = size(u)
-        div_field_arr = zeros(T, H, W, t)
+        div_field_arr = zeros(T, H-2*buff, W-2*buff, t)
         for i in 1:t
-            div_field_arr[:, :, i] = div_field(u[:, :, :, i])
+            div_field_arr[:, :, i] = div_field(u[:, :, :, i]; buff=buff)
         end
         # return div_field_arr
         avg ? (return vec(dropdims(mean(div_field_arr; dims=(1,2)); dims=(1,2)))) : (return div_field_arr)

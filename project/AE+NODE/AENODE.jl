@@ -30,7 +30,10 @@ function AENODE(AE_path::String, NODE_path::String)
 end
 
 # a function that predicts the new flow field of a simulation for a selected amount of timesteps, 
-function predict_n(aenode::AENODE, u::AbstractArray, μ₀::AbstractArray, nₜ::Int64, t₀::Float32; Δt::Float32=0.35f0, return_traj::Bool=true)
+function predict_n(aenode::AENODE, u::AbstractArray, μ₀::AbstractArray, nₜ::Int64, t₀::Float32; 
+                Δt::Float32=0.35f0, 
+                return_traj::Bool=false, 
+                impose_biot::Bool=true)
     @assert size(u) == size(μ₀) "u and μ₀ must be the same size"
     if !ispow2(size(u, 1)) || !ispow2(size(μ₀, 1))
         u, μ₀ = remove_ghosts(u), remove_ghosts(μ₀)
@@ -51,9 +54,13 @@ function predict_n(aenode::AENODE, u::AbstractArray, μ₀::AbstractArray, nₜ:
     # decompress latent prediction
     û, _ = aenode.decoder(ẑ, aenode.ae_params.decoder, aenode.ae_state.decoder)
     û = denormalize_batch(û, aenode.normalizer) .* repeat(μ₀, 1, 1, 1, length(t))
-
+    û = û[:,:,:,2:end]
     # if desired, return trajectory of flow fields, or return end of trajectory as a simulation object
-    return_traj ? (return impose_biot_bc_on_snapshot(û)) : (return impose_biot_bc_on_snapshot(û[:, :, :, end]))
+    if impose_biot
+        return_traj ? (return impose_biot_bc_on_snapshot(û)) : (return impose_biot_bc_on_snapshot(û[:, :, :, end]))
+    else
+        return_traj ? (return û) : (return û[:, :, :, end])
+    end
 end
 
 function predict_n(aenode::AENODE, sim::BiotSimulation, nₜ::Int64;
