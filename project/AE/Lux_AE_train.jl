@@ -1,24 +1,16 @@
-using JLD2
-using Lux
+includet("Lux_AE.jl")
+includet("../utils/Lux_AE_reconstructer.jl")
+includet("../utils/Lux_AE_loss_plot.jl")
+
 using Random
 using ProgressMeter
 using Plots
 using Dates
 using Optimisers
-using Enzyme
-using Zygote
 using DrWatson: struct2dict
 
 using TimerOutputs
 const to = TimerOutput()
-
-includet("../custom.jl")
-includet("Lux_AE.jl")
-includet("../utils/Lux_AE_reconstructer.jl")
-includet("../utils/Lux_AE_loss_plot.jl")
-
-# hyperparameters to tune
-
 
 function train(; kws...)
 

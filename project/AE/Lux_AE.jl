@@ -3,6 +3,8 @@ using NNlib
 using Statistics
 using MLUtils
 using Zygote
+using Enzyme
+using Zygote
 
 
 includet("../utils/AE_normalizer.jl")
@@ -10,19 +12,18 @@ includet("../custom.jl")
 includet("../utils/SimDataTypes.jl")
 using .SimDataTypes
 
-Base.@kwdef mutable struct LuxArgs
-    η::Float64 = 1e-3                    # learning rate
-    λ::Float64 = 9e-4                    # regularization parameter
-    Autodiff::Any = AutoZygote()
-    λdiv::Float64 = 0.0                  # divergence loss weight
-    λmask::Float64 = 0.0                 # weight of body mask loss
+Base.@kwdef struct LuxArgs
+    η::Float = 1e-3                    # learning rate
+    λ::Float = 9e-4                    # regularization parameter
+    Autodiff::Any = AutoEnzyme()
+    λdiv::Float = 0.0                  # divergence loss weight
+    λmask::Float = 0.0                 # weight of body mask loss
     loss::Symbol = :L1                   # loss function for reconstruction (:L1, :L2, :charb)
     batch_size::Int = 50                 # batch size
-    t_training::Float64 = 16.603
+    t_training::Float = 16.603
     train_downsample::Int = 200          # amount of data used for training
     test_downsample::Int = 200
-    split::Float64 = 0.2
-    n_periods::Int = 3                   # amount of shedding periods to use for training data
+    split::Float = 0.2
     epochs::Int = 1                    # number of epochs
     seed::Int = 42                       # random seed
     n_reconstruct::Int = 2               # sampling size for output
@@ -36,7 +37,6 @@ Base.@kwdef mutable struct LuxArgs
     pool_kernel::Int = 2                 # DO NOT CHANGE
     n_conv::Int = 6                      # number of convolutional layers
     n_dense::Int = 2                     # number of dense layers in bottleneck
-    dense_traj::Union{Nothing,Any} = nothing
     latent_dim::Int = 16                 # latent dimension
     stride::Int = 1                      # stride for convolutions
     C_base::Int = 8                      # first amount of channels for convs
@@ -90,46 +90,28 @@ get_idxs(simdata::SimData, args::LuxArgs) = get_idxs(simdata, args.t_training, a
 function get_idxs(simdata::SimData, t_training, n_training, n_test; split=0.2)
     N = size(simdata.u, 4)
     train_idxs_full = findall(t -> t < t_training, simdata.time)
-    train_idx_combined = downsample_equal(train_idxs_full, n_training)
+    trainval_idx = downsample_equal(train_idxs_full, n_training)
     # Split into train / val by downsampling evenly from the combined pool
-    n_val = clamp(round(Int, length(train_idx_combined) * split), 0, length(train_idx_combined))
+    n_val = clamp(round(Int, length(trainval_idx) * split), 0, length(trainval_idx))
     if n_val == 0
         @error "No validation data created"
     else
         # Downsample evenly to get validation indices
-        val_idx = downsample_equal(train_idx_combined, n_val)
+        val_idx = downsample_equal(trainval_idx, n_val)
         # Remove validation indices from train
-        train_idx = setdiff(train_idx_combined, val_idx)
+        train_idx = setdiff(trainval_idx, val_idx)
     end
-    test_idx = downsample_equal(collect(last(train_idx_combined)+1:N), n_test)
+    test_idx = downsample_equal(collect(last(trainval_idx)+1:N), n_test)
     return train_idx, val_idx, test_idx
 end
 
 function get_data(batch_size, path; t_training=10, n_training=500, n_test=500, split=0.2, verbose=true, showplot=true, plotpath=nothing)
-
     simdata = load_simdata(path)
     preprocess_data!(simdata; verbose=verbose)
 
-    # normalizer from X only (physics channels)
     N = size(simdata.u, 4)
+    N < 2 && error("get_data: need at least 2 samples to create train/validation split (got $N)")
 
-    if N < 2
-        error("get_data: need at least 2 samples to create train/validation split (got $N)")
-    end
-
-    # train_idxs_full = findall(t -> t < t_training, simdata.time)
-    # train_idx_combined = downsample_equal(train_idxs_full, n_training)
-    # # Split into train / val by downsampling evenly from the combined pool
-    # n_val = clamp(round(Int, length(train_idx_combined) * split), 0, length(train_idx_combined))
-    # if n_val == 0
-    #     @error "No validation data created"
-    # else
-    #     # Downsample evenly to get validation indices
-    #     val_idx = downsample_equal(train_idx_combined, n_val)
-    #     # Remove validation indices from train
-    #     train_idx = setdiff(train_idx_combined, val_idx)
-    # end
-    # test_idx = downsample_equal(collect(last(train_idx_combined)+1:N), n_test)
     train_idx, val_idx, test_idx = get_idxs(simdata, t_training, n_training, n_test; split=split)
 
     plt = train_force_plot(simdata; train_idx=train_idx, val_idx=val_idx, test_idx=test_idx)
@@ -140,8 +122,7 @@ function get_data(batch_size, path; t_training=10, n_training=500, n_test=500, s
     end
 
     # compute normaliser on training data only and then normalise each batch
-    _, normalizer = normalize_batch(simdata.u[:, :, :, train_idx_combined]; normalizer=nothing)
-
+    _, normalizer = normalize_batch(simdata.u[:, :, :, train_idx]; normalizer=nothing)
 
     data = (
         TrainData=EpochData(get_data_in(simdata.u, simdata.μ₀; idx=train_idx)...),
@@ -150,7 +131,6 @@ function get_data(batch_size, path; t_training=10, n_training=500, n_test=500, s
     )
 
     simdata = nothing
-
     # DataLoaders over indices only (lightweight)
     loaders = (
         train_loader=DataLoader(collect(1:length(train_idx)); batchsize=batch_size, shuffle=true),
@@ -201,12 +181,12 @@ end
 Encoder(args::LuxArgs; verbose=true) = Encoder_parametric(args.input_dim, args.latent_dim;
     n_conv=args.n_conv, n_dense=args.n_dense, C_base=args.C_base,
     conv_kernel=args.conv_kernel, pool_kernel=args.pool_kernel,
-    stride=args.stride, dense_traj=args.dense_traj, verbose=verbose)
+    stride=args.stride, verbose=verbose)
 
 # Parametric encoder constructor
 function Encoder_parametric(input_size::Tuple{Int,Int,Int}, latent_dim::Int;
     n_conv=4, n_dense=3, C_base=8, conv_kernel=3,
-    pool_kernel=2, stride=1, dense_traj=nothing, verbose=true)
+    pool_kernel=2, stride=1, verbose=true)
     H, W, C_in = input_size
     # Build convolutional layers
     enc_layers = []
@@ -435,7 +415,7 @@ end
 
 # losses
 # recon_loss(x, x̂) = mean(abs2, x̂ .- x)                # MSE
-div_loss_L2(u) = mean(abs2, divergence_field(u))     # L2 of divergence field
+div_loss_L2(u::AbstractArray) = mean(abs2, div_field(u; buff=1))     # L2 of divergence field
 
 function recon_loss(x, x̂; loss=:L2)
     Lrec = 0.0
