@@ -12,18 +12,18 @@ includet("../custom.jl")
 includet("../utils/SimDataTypes.jl")
 using .SimDataTypes
 
-Base.@kwdef struct LuxArgs
-    η::Float = 1e-3                    # learning rate
-    λ::Float = 9e-4                    # regularization parameter
-    Autodiff::Any = AutoEnzyme()
-    λdiv::Float = 0.0                  # divergence loss weight
-    λmask::Float = 0.0                 # weight of body mask loss
+Base.@kwdef mutable struct LuxArgs
+    η::Float64 = 1e-3                    # learning rate
+    λ::Float64 = 9e-4                    # regularization parameter
+    Autodiff::Any = AutoZygote()
+    λdiv::Float64 = 0.0                  # divergence loss weight
+    λmask::Float64 = 0.0                 # weight of body mask loss
     loss::Symbol = :L1                   # loss function for reconstruction (:L1, :L2, :charb)
     batch_size::Int = 50                 # batch size
-    t_training::Float = 16.603
+    t_training::Float64 = 16.603
     train_downsample::Int = 200          # amount of data used for training
     test_downsample::Int = 200
-    split::Float = 0.2
+    split::Float64 = 0.2
     epochs::Int = 1                    # number of epochs
     seed::Int = 42                       # random seed
     n_reconstruct::Int = 2               # sampling size for output
