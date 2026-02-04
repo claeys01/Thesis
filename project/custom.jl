@@ -66,8 +66,11 @@ function strain_field(u::AbstractArray{T,N}; buff::Int64=1) where {T,N}
         H, W, C = size(u)
         S_tensor = zeros(T, H, W, C, C)
         scalar_mat = zeros(T, H, W)
-        @loop S_tensor[I, :, :] .= S(I, u) over I ∈ inside(scalar_mat; buff=buff)
-        return remove_buff(S_tensor, buff)
+        for I in inside(scalar_mat; buff=buff)
+            S_tensor[I, :, :] .= S(I, u)
+        end
+        # @loop S_tensor[I, :, :] .= S(I, u) over I ∈ inside(scalar_mat; buff=buff)
+        # return remove_buff(S_tensor, buff)
     elseif N == 4
         H, W, C, t = size(u)
         S_tensor = zeros(T, H-2*buff, W-2*buff, C, C, t)
@@ -104,13 +107,16 @@ function div_field(u::AbstractArray{T,N}; avg=false, buff=1) where {T,N}
         H, W, _ = size(u)
         div_mat = zeros(T, H, W)
         @loop div_mat[I] = WaterLily.div(I,u) over I ∈ WaterLily.inside(div_mat; buff=buff)
+        # for I in WaterLily.inside(div_mat; buff=buff)
+        #     @allowscalar div_mat[I] = WaterLily.div(I,u)
+        # end
         return remove_buff(div_mat, buff)
     elseif N == 4
         H, W, _, t = size(u)
-        div_field_arr = zeros(T, H-2*buff, W-2*buff, t)
-        for i in 1:t
-            div_field_arr[:, :, i] = div_field(u[:, :, :, i]; buff=buff)
-        end
+        # div_field_arr = zeros(T, H-2*buff, W-2*buff, t)
+        # for i in 1:t
+        #     @allowscalar div_field_arr[:, :, i] = div_field(u[:, :, :, i]; buff=buff)
+        # end
         # return div_field_arr
         avg ? (return vec(dropdims(mean(div_field_arr; dims=(1,2)); dims=(1,2)))) : (return div_field_arr)
     else

@@ -33,12 +33,13 @@ function train(; kws...)
 
     if args.use_gpu
         Reactant.set_default_backend("gpu")
-        # device = reactant_device(; force=true)    
+        device = reactant_device(; force=true)    
     else
-        Reactant.set_default_backend("cpu")
+        # Reactant.set_default_backend("cpu")
+        device = cpu_device()
+        # device = reactant_device(; force=true)    
     end
 
-    device = reactant_device(; force=true)    
     @show device
 
     normalizer = Normalizer(device(Float32.(normalizer.μ)), device(Float32.(normalizer.σ)), normalizer.method)
@@ -72,6 +73,9 @@ function train(; kws...)
     !ispath(args.save_path) && mkpath(args.save_path)
 
     loss_func = make_loss_function(args, normalizer)
+
+    @info "Compiling inference function"
+    inference_fn = @compile loss_func(ae, train_state.parameters, LuxCore.testmode(train_state.states), batch0)
 
     # Pre-allocate loss arrays
     max_iters = args.epochs * length(train_loader)
@@ -132,7 +136,9 @@ function train(; kws...)
                     val_batch = @timeit to "get validation data" device.(build_batch(ValData, val_idx))
                     # Forward pass only (no gradients)
                     st_test = LuxCore.testmode(train_state.states)
-                    val_loss, _, val_stats = @timeit to "validation loss" loss_func(ae, train_state.parameters, st_test, val_batch)
+                    # val_loss, _, val_stats = @timeit to "validation loss" loss_func(ae, train_state.parameters, st_test, val_batch)
+                    val_loss, _, val_stats = @timeit to "validation loss" inference_fn(ae, train_state.parameters, st_test, val_batch)
+
                     _, _, _, val_corr = val_stats
                     val_sum += val_loss
                     n_val += 1
@@ -157,7 +163,10 @@ function train(; kws...)
                         test_batch = @timeit to "get test batch" device.(build_batch(TestData, test_idx))
                         # Forward pass only
                         st_test = LuxCore.testmode(train_state.states)
-                        test_loss, _, test_stats = @timeit to "get test loss" loss_func(ae, train_state.parameters, st_test, test_batch)
+                        # test_loss, _, test_stats = @timeit to "get test loss" loss_func(ae, train_state.parameters, st_test, test_batch)
+                        
+                        test_loss, _, test_stats = @timeit to "get test loss" inference_fn(ae, train_state.parameters, st_test, test_batch)
+
                         _, _, _, test_corr = test_stats
                         test_sum += test_loss
                         n_test += 1
@@ -174,7 +183,7 @@ function train(; kws...)
     end
 
     # save model
-    timestamp = Dates.format(now(), "MMdd_HHmm")
+    timestamp = Dates.format(now(), "udd-HHMM")
     tag = run_tag(args)
     save_folder = joinpath(args.save_path, "$(timestamp)__$(tag)")
     !ispath(save_folder) && mkpath(save_folder)
@@ -183,13 +192,18 @@ function train(; kws...)
 
 
     let cpu = cpu_device()
-        ps = cpu(train_state.parameters)
-        st = cpu(train_state.states)
+        ps = train_state.parameters |> cpu
+        st = train_state.states |> cpu
         args = struct2dict(args)
+        normalizer_cpu = Normalizer(
+            Array(normalizer.μ),
+            Array(normalizer.σ),
+            normalizer.method
+        )
         JLD2.save(filepath,
             "ps", ps,
             "st", st,
-            "normalizer", normalizer,
+            "normalizer", normalizer_cpu,
             "args", args,
         )
 
