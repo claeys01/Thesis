@@ -5,6 +5,7 @@ using MLUtils
 using Zygote
 using Enzyme
 using Zygote
+using Reactant
 
 
 includet("../utils/AE_normalizer.jl")
@@ -15,7 +16,7 @@ using .SimDataTypes
 Base.@kwdef mutable struct LuxArgs
     η::Float64 = 1e-3                    # learning rate
     λ::Float64 = 9e-4                    # regularization parameter
-    Autodiff::Any = AutoZygote()
+    Autodiff::Any = AutoEnzyme()
     λdiv::Float64 = 0.0                  # divergence loss weight
     λmask::Float64 = 0.0                 # weight of body mask loss
     loss::Symbol = :L1                   # loss function for reconstruction (:L1, :L2, :charb)
@@ -115,7 +116,7 @@ function get_data(batch_size, path; t_training=10, n_training=500, n_test=500, s
     train_idx, val_idx, test_idx = get_idxs(simdata, t_training, n_training, n_test; split=split)
 
     plt = train_force_plot(simdata; train_idx=train_idx, val_idx=val_idx, test_idx=test_idx)
-    showplot && display(plt)
+    # showplot && display(plt)
     if !isnothing(plotpath)
         savefig(plt, plotpath)
         @info "training force plot saved to $plotpath"
@@ -449,21 +450,31 @@ function masked_loss(x, x̂, μ₀; loss=:L2)
     return Lrec, Linside
 end
 
+
+
 function batch_corrs(x, x̂)
+    # Move entire arrays to CPU first
+    # @show typeof(x), typeof(x̂)
+    # x_cpu = Array(x)
+    # x̂_cpu = Array(x̂)
+    # @show typeof(x), typeof(x̂)
+
     @assert size(x) == size(x̂)
+
     nx, ny, nchan, nbatch = size(x)
     rbatch = zeros(Float32, nchan, nbatch)
     for b in 1:nbatch
         for c in 1:nchan
-            # move to CPU to avoid scalar indexing inside Statistics.cor
-            xc = vec(Array(@view x[:, :, c, b]))
-            x̂c = vec(Array(@view x̂[:, :, c, b]))
+            xc = vec(@view x[:, :, c, b])
+            x̂c = vec(@view x̂[:, :, c, b])
             rbatch[c, b] = cor(xc, x̂c)
         end
     end
-    return Float32.(mean(rbatch; dims=2)[:])  # average over batch dimension, as Float32
+    return Float32.(mean(rbatch; dims=2)[:])
 end
 
+using EnzymeCore
+EnzymeCore.EnzymeRules.inactive(::typeof(batch_corrs), args...) = nothing
 Zygote.@nograd batch_corrs
 
 function total_loss(m::AE, ps, st,

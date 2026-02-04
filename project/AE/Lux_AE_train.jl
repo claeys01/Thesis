@@ -32,10 +32,14 @@ function train(; kws...)
     train_loader, validation_loader, test_loader = loaders
 
     if args.use_gpu
-        device = gpu_device()
+        Reactant.set_default_backend("gpu")
+        # device = reactant_device(; force=true)    
     else
-        device = cpu_device()
+        Reactant.set_default_backend("cpu")
     end
+
+    device = reactant_device(; force=true)    
+    @show device
 
     normalizer = Normalizer(device(Float32.(normalizer.μ)), device(Float32.(normalizer.σ)), normalizer.method)
 
@@ -59,9 +63,15 @@ function train(; kws...)
 
     train_state = Training.TrainState(ae, ps, st, opt)
 
+    @info "Compiling model with reactant"
+    batch0 = device.(build_batch(TrainData, first(train_loader)))
+    x0 = batch0[1]
+    _ = @compile ae(x0, train_state.parameters, LuxCore.testmode(train_state.states))
+
+
     !ispath(args.save_path) && mkpath(args.save_path)
 
-    loss_func = make_loss_function(args, device, normalizer)
+    loss_func = make_loss_function(args, normalizer)
 
     # Pre-allocate loss arrays
     max_iters = args.epochs * length(train_loader)
@@ -93,7 +103,7 @@ function train(; kws...)
             # ---- TRAIN ----
             @timeit to "train" begin
                 for train_idx in train_loader
-                    batch = @timeit to "get training batch" build_batch(TrainData, train_idx)
+                    batch = @timeit to "get training batch" device.(build_batch(TrainData, train_idx))
                     _, loss, stats, train_state = @timeit to "single_train_step!" Training.single_train_step!(
                         args.Autodiff, loss_func, batch, train_state; return_gradients=Val(false)
                     )
@@ -119,7 +129,7 @@ function train(; kws...)
             val_corr_total = zeros(Float32, 2)
             @timeit to "validation" begin
                 for val_idx in validation_loader
-                    val_batch = @timeit to "get validation data" build_batch(ValData, val_idx)
+                    val_batch = @timeit to "get validation data" device.(build_batch(ValData, val_idx))
                     # Forward pass only (no gradients)
                     st_test = LuxCore.testmode(train_state.states)
                     val_loss, _, val_stats = @timeit to "validation loss" loss_func(ae, train_state.parameters, st_test, val_batch)
@@ -144,7 +154,7 @@ function train(; kws...)
                     test_corr_mean = (0.0, 0.0)
                     test_corr_total = zeros(Float32, 2)
                     for test_idx in test_loader
-                        test_batch = @timeit to "get test batch" build_batch(TestData, test_idx)
+                        test_batch = @timeit to "get test batch" device.(build_batch(TestData, test_idx))
                         # Forward pass only
                         st_test = LuxCore.testmode(train_state.states)
                         test_loss, _, test_stats = @timeit to "get test loss" loss_func(ae, train_state.parameters, st_test, test_batch)
@@ -244,15 +254,16 @@ function run_tag(args)
     ], "_")
 end
 
-function make_loss_function(args, device, normalizer)
+function make_loss_function(args, normalizer)
     function loss_function(m, ps, st, batch)
-        x_in, x_target, μ₀ = batch
+        # x_in, x_target, μ₀ = batch
 
-        # Move to GPU/CPU
-        x_in_dev = device(x_in)
-        x_target_dev = device(x_target)
-        μ₀_dev = device(μ₀)
+        # # Move to GPU/CPU
+        # x_in_dev = device(x_in)
+        # x_target_dev = device(x_target)
+        # μ₀_dev = device(μ₀)
 
+        x_in_dev, x_target_dev, μ₀_dev = batch # assume batch is already on device
         # Optional normalization
         if args.normalize
             uvmask = x_in_dev
