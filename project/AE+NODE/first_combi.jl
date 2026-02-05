@@ -96,26 +96,32 @@ function AENodeAsses(AE_path::String, NODE_path::String; saveplot=false)
     end
     # @show mean(per_snapshot_error_arr)
     plt = plot(
-    t_down,
-    combi_per_snapshot_error_arr;
-    label = "$Δt_pred step prediction MAE",
-    lw = 1.5,
-    color = :black,
-    xlabel = "Time",
-    ylabel = "Mean absolute reconstruction error",
-    title = "$Δt_pred step AE–NODE prediction error",
-    legend = :topright,
-    grid = :on,
-    framestyle = :box,
+        t_down,
+        combi_per_snapshot_error_arr;
+        label = "$Δt_pred step prediction MAE",
+        lw = 1.5,
+        color = :black,
+        xlabel = "Time",
+        ylabel = "Mean absolute reconstruction error",
+        title = "$Δt_pred step AE–NODE prediction error",
+        legend = :topright,
+        grid = :on,
+        framestyle = :box,
     )
     
     plot!(
-    plt, 
-    t_down,
-    AE_per_snapshot_error_arr;
-    label = "AE MAE (ground truth)",
-    lw = 1.5,
-    color = :red,
+        plt,
+        t_down,
+        AE_per_snapshot_error_arr;
+        label = "AE MAE (ground truth)",
+        lw = 1.5,
+        color = :black,
+        xlabel = "Time",
+        ylabel = "Mean absolute reconstruction error",
+        title = "$Δt_pred step AE–NODE prediction error",
+        legend = :topright,
+        grid = :on,
+        framestyle = :box,
     )
 
     # optional: horizontal mean line

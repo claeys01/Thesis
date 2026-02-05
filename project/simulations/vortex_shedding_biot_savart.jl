@@ -40,8 +40,9 @@ if abspath(PROGRAM_FILE) == (@__FILE__) || isinteractive()
     # n=2^8
     # sim = circle_shedding_biot(mem=Array, Re=2500, n=n, m=n)
     # t_end = 50
+    # sim_step!(sim, t_end; verbose=true)
     # sim_gif!(sim; duration=t_end, remeasure=true, clims=(-5, 5), 
-                    # ylims=(0, n+2), xlims=(0,n+2), showaxis=false, background_color_outside=:match)
+    #                 ylims=(0, n+2), xlims=(0,n+2), showaxis=false, background_color_outside=:match)
     # u = sim.flow.u
     # u = remove_ghosts(u)[:,:,:,end]
     # strain = strain_field(u)
