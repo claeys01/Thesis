@@ -105,6 +105,7 @@ function div_field(u::AbstractArray{T,N}; avg=false, buff=1) where {T,N}
         div_mat = zeros(T, H, W)
         @loop div_mat[I] = WaterLily.div(I,u) over I ∈ WaterLily.inside(div_mat; buff=buff)
         return remove_buff(div_mat, buff)
+        # return div_mat
     elseif N == 4
         H, W, _, t = size(u)
         div_field_arr = zeros(T, H-2*buff, W-2*buff, t)
@@ -260,4 +261,143 @@ function train_force_plot(simdata::SimData;
         train_idx=nothing, val_idx=nothing, test_idx=nothing, show_zeros=true)
    train_force_plot(simdata.force, simdata.time; 
         train_idx=train_idx, val_idx=val_idx, test_idx=test_idx, show_zeros=show_zeros)
+end
+
+function velocity_gradient_vectorized(u::AbstractArray{T,3}; buff=1) where T
+    # Using central differences for cross-terms (like WaterLily's ∂(i,j,I,u) for i≠j)
+    # and one-sided differences for inline terms (like WaterLily's ∂(i,I,u))
+    H, W, _, = size(u)
+
+    i_range = (1+buff):(H-buff)
+    j_range = (1+buff):(W-buff)
+
+    # Inline terms: ∂uᵢ/∂xᵢ uses one-sided difference: u[I+δ(i),i] - u[I,i]
+    # ∂u/∂x: u[i+1,j,1] - u[i,j,1]
+    dudx = u[i_range .+ 1, j_range, 1] .- u[i_range, j_range, 1]    
+
+    # ∂v/∂y: u[i,j+1,2] - u[i,j,2]  
+    dvdy = u[i_range, j_range .+ 1, 2] .- u[i_range, j_range, 2]
+
+    # Cross terms: ∂uᵢ/∂xⱼ (i≠j) uses central difference / 4 (WaterLily convention)
+    # ∂u/∂y: (u[I+δy] + u[I+δy+δx] - u[I-δy] - u[I-δy+δx]) / 4
+    #      = (u[i,j+1,1] + u[i+1,j+1,1] - u[i,j-1,1] - u[i+1,j-1,1])/4
+    dudy = (u[i_range, j_range .+ 1, 1] .+ u[i_range .+ 1, j_range .+ 1, 1]
+          .- u[i_range, j_range .- 1, 1] .- u[i_range .+ 1, j_range .- 1, 1]) ./ 4
+
+    
+    # ∂v/∂x: (u[I+δx] + u[I+δx+δy] - u[I-δx] - u[I-δx+δy]) / 4
+    #      = (u[i+1,j,2] + u[i+1,j+1,2] - u[i-1,j,2] - u[i-1,j+1,2])/4
+    dvdx = (u[i_range .+ 1, j_range, 2] .+ u[i_range .+ 1, j_range .+ 1, 2]
+          .- u[i_range .- 1, j_range, 2] .- u[i_range .- 1, j_range .+ 1, 2]) ./ 4    
+    return dudx, dudy, dvdx, dvdy
+end
+
+function velocity_gradient_vectorized(u::AbstractArray{T,4}; buff=1) where T
+    H, W, _, B = size(u)
+    
+    i_range = (1+buff):(H-buff)
+    j_range = (1+buff):(W-buff)
+    
+    # Diagonal terms
+    dudx = u[i_range .+ 1, j_range, 1, :] .- u[i_range, j_range, 1, :]
+    dvdy = u[i_range, j_range .+ 1, 2, :] .- u[i_range, j_range, 2, :]
+    
+    # Off-diagonal terms (4-point stencil)
+    dudy = (u[i_range, j_range .+ 1, 1, :] .+ u[i_range .+ 1, j_range .+ 1, 1, :]
+          .- u[i_range, j_range .- 1, 1, :] .- u[i_range .+ 1, j_range .- 1, 1, :]) ./ 4
+    
+    dvdx = (u[i_range .+ 1, j_range, 2, :] .+ u[i_range .+ 1, j_range .+ 1, 2, :]
+          .- u[i_range .- 1, j_range, 2, :] .- u[i_range .- 1, j_range .+ 1, 2, :]) ./ 4
+    
+    return dudx, dudy, dvdx, dvdy
+end
+
+
+function div_vectorized(u::AbstractArray{T,3}; buff=1) where T
+    H, W, _ = size(u)
+
+    i_range = (1+buff):(H-buff)
+    j_range = (1+buff):(W-buff)
+    
+    dudx = u[i_range .+ 1, j_range, 1] .- u[i_range, j_range, 1]
+    dvdy = u[i_range, j_range .+ 1, 2] .- u[i_range, j_range, 2]
+    
+    return dudx .+ dvdy
+end
+
+# Batched version
+function div_vectorized(u::AbstractArray{T,4}; buff=1) where T
+    H, W, _, B = size(u)
+    
+    i_range = (1+buff):(H-buff)
+    j_range = (1+buff):(W-buff)
+    
+    dudx = u[i_range .+ 1, j_range, 1, :] .- u[i_range, j_range, 1, :]
+    dvdy = u[i_range, j_range .+ 1, 2, :] .- u[i_range, j_range, 2, :]
+    
+    return dudx .+ dvdy
+end
+
+function curl_vectorized(u::AbstractArray{T,3}; buff=1) where T
+    H, W, _ = size(u)
+    i_range = (1+buff):(H-buff)
+    j_range = (1+buff):(W-buff)
+    
+    # ∂v/∂x (4-point stencil)
+    dvdx = (u[i_range .+ 1, j_range, 2] .+ u[i_range .+ 1, j_range .+ 1, 2]
+          .- u[i_range .- 1, j_range, 2] .- u[i_range .- 1, j_range .+ 1, 2]) ./ 4
+    
+    # ∂u/∂y (4-point stencil)
+    dudy = (u[i_range, j_range .+ 1, 1] .+ u[i_range .+ 1, j_range .+ 1, 1]
+          .- u[i_range, j_range .- 1, 1] .- u[i_range .+ 1, j_range .- 1, 1]) ./ 4
+    
+    return dvdx .- dudy
+end
+
+function curl_vectorized(u::AbstractArray{T,4}; buff=1) where T
+    H, W, _, B = size(u)
+    i_range = (1+buff):(H-buff)
+    j_range = (1+buff):(W-buff)
+    
+    dvdx = (u[i_range .+ 1, j_range, 2, :] .+ u[i_range .+ 1, j_range .+ 1, 2, :]
+          .- u[i_range .- 1, j_range, 2, :] .- u[i_range .- 1, j_range .+ 1, 2, :]) ./ 4
+    
+    dudy = (u[i_range, j_range .+ 1, 1, :] .+ u[i_range .+ 1, j_range .+ 1, 1, :]
+          .- u[i_range, j_range .- 1, 1, :] .- u[i_range .+ 1, j_range .- 1, 1, :]) ./ 4
+    
+    return dvdx .- dudy
+end
+
+function strain_rate_vectorized(u::AbstractArray{T,3}; buff=1) where T
+    dudx, dudy, dvdx, dvdy = velocity_gradient_vectorized(u; buff=buff)
+    
+    S11 = dudx                      # ∂u/∂x
+    S22 = dvdy                      # ∂v/∂y
+    S12 = (dudy .+ dvdx) ./ 2       # 0.5*(∂u/∂y + ∂v/∂x)
+    
+    return S11, S12, S22
+end
+
+function strain_rate_vectorized(u::AbstractArray{T,4}; buff=1) where T
+    dudx, dudy, dvdx, dvdy = velocity_gradient_vectorized(u; buff=buff)
+    
+    S11 = dudx
+    S22 = dvdy
+    S12 = (dudy .+ dvdx) ./ 2
+    
+    return S11, S12, S22
+end
+
+function rotation_rate_vectorized(u::AbstractArray{T,3}; buff=1) where T
+    dudx, dudy, dvdx, dvdy = velocity_gradient_vectorized(u; buff=buff)
+    
+    # Ω12 = 0.5*(∂u/∂y - ∂v/∂x) = -Ω21
+    Ω12 = (dudy .- dvdx) ./ 2
+    return Ω12
+end
+
+function rotation_rate_vectorized(u::AbstractArray{T,4}; buff=1) where T
+    dudx, dudy, dvdx, dvdy = velocity_gradient_vectorized(u; buff=buff)
+    Ω12 = (dudy .- dvdx) ./ 2
+    return Ω12
 end
