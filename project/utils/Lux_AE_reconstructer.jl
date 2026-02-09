@@ -139,7 +139,7 @@ end
 
 if abspath(PROGRAM_FILE) == (@__FILE__) || isinteractive()
     checkpoint = "data/saved_models/u/Lux/256h_16l/RE2500/2e8/2e8_u_200e_4096n_16l_norm_pooling_ups_mu_L1/checkpoint.jld2"
-    visualize_reconstructions(checkpoint)
+    # visualize_reconstructions(checkpoint)
 
 end
 

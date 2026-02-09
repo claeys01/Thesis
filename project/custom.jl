@@ -8,7 +8,7 @@ includet("utils/SimDataTypes.jl")
 includet("simulations/vortex_shedding_biot_savart.jl")
 
 
-using .SimDataTypes
+using .SimDataTypes: SimData, EpochData
 
 
 function scalar_grad(field::AbstractArray)
