@@ -98,10 +98,10 @@ end
 
 # ---- Script guard ----
 
-if abspath(PROGRAM_FILE) == (@__FILE__) || isinteractive()
-    # params_path = "data/NODE_models/2025-12-23_14-30-58/node_params.jld2"
-    params_path = "data/saved_models/NODE/16/RE2500/multiple_shoot_adam_250/node_params.jld2"
-    # plt, _ = extrapolate_node(params_path)
-    # display(plt)
-end
+# if abspath(PROGRAM_FILE) == (@__FILE__) || isinteractive()
+#     # params_path = "data/NODE_models/2025-12-23_14-30-58/node_params.jld2"
+#     params_path = "data/saved_models/NODE/16/RE2500/multiple_shoot_adam_250/node_params.jld2"
+#     # plt, _ = extrapolate_node(params_path)
+#     # display(plt)
+# end
 
