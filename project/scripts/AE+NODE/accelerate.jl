@@ -1,12 +1,4 @@
-using Revise
-using Random
-using Plots
-Random.seed!(42)
-includet("AENODE.jl")
-
-
-using TimerOutputs
-const to = TimerOutput()
+using Thesis
 
 sim = circle_shedding_biot(;mem=Array, Re=2500, n=2^8, m=2^8, perturb=true)
 

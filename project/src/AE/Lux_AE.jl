@@ -13,8 +13,10 @@ Base.@kwdef mutable struct LuxArgs
     η::Float64 = 1e-3                    # learning rate
     λ::Float64 = 9e-4                    # regularization parameter
     Autodiff::Any = AutoZygote()
-    λdiv::Float64 = 10.0                 # divergence loss weight
+    λdiv::Float64 = 0.0                 # divergence loss weight
     λmask::Float64 = 0.0                 # weight of body mask loss
+    λstrain::Float64 = 0.0
+    λcurl::Float64 = 0.0
     loss::Symbol = :L1                   # loss function for reconstruction (:L1, :L2, :charb)
     batch_size::Int = 40                 # batch size
     t_training::Float64 = 16.603
@@ -25,7 +27,6 @@ Base.@kwdef mutable struct LuxArgs
     seed::Int = 42                       # random seed
     n_reconstruct::Int = 2               # sampling size for output
     test_loss::Bool = true
-    field::String = "u"
     use_gpu::Bool = false                # use GPU
     clip_bc::Bool = true                 # removes the ghost cells from the snapshot
     input_dim::Tuple{Int,Int,Int} = (2^8, 2^8, 4)   # flow field size with μ₀ concatenated

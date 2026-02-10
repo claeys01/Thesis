@@ -106,11 +106,13 @@ include("simulations/vortex_shedding_biot_savart.jl")
 include("simulations/vortex_shedding.jl")
 
 # Core model definitions
-include("Lux_AE.jl")
-include("Lux_AE_train.jl")
+include("AE/Lux_AE.jl")
+include("AE/Lux_AE_train.jl")
 
 # NODE components
-include("NODE_core.jl")
+include("NODE/NODE_core.jl")
+include("NODE/NODE_train.jl")
+
 
 # Combined AE+NODE
 include("AENODE.jl")

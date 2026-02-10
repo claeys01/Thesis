@@ -1,10 +1,3 @@
-# using JLD2
-# using Random
-# using Plots
-# using Lux
-# using MLUtils: DataLoader
-
-
 function visualize_reconstructions(checkpoint_path::Union{String,Nothing}=nothing;
                                    device=cpu_device())
     """
@@ -56,7 +49,7 @@ function visualize_reconstructions(checkpoint_path::Union{String,Nothing}=nothin
     # ids = randperm(span)[1:args.n_reconstruct]
     ids = randperm(span)[1]
 
-    @info "Selected $(args.n_reconstruct) $(args.field) snapshots with indices $ids for reconstruction"
+    @info "Selected $(args.n_reconstruct) snapshots with indices $ids for reconstruction"
     # prepare plotting grid: each sample has C rows; three columns (input, recon, colorbar-only)
     plots = []
     dirs = ["x" , "y"]

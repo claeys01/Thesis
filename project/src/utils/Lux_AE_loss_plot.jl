@@ -1,7 +1,3 @@
-# using JLD2, Plots
-# using Printf
-
-
 default(
     # fontfamily = "Computer Modern",         # looks LaTeX-y if you have it
     linewidth  = 1.0,

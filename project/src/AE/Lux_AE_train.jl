@@ -284,11 +284,5 @@ function make_loss_function(args, device, normalizer)
 end
 
 
-if abspath(PROGRAM_FILE) == (@__FILE__)
-    # include("Lux_AE.jl")
-    # include("../utils/Lux_AE_reconstructer.jl")
-    # include("../utils/Lux_AE_loss_plot.jl")
-    # using Thesis
-    # train()
-end
+
 

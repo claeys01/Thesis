@@ -1,13 +1,3 @@
-# using Revise
-
-# includet("../NODE/NODE_core.jl")
-# includet("../AE/Lux_AE.jl")
-# includet("../simulations/vortex_shedding_biot_savart.jl")
-# includet("../custom.jl")
-# includet("../utils/AE_normalizer.jl")
-
-
-
 mutable struct AENODE{P,S}
     encoder::Encoder
     decoder::Decoder
