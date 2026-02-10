@@ -1,14 +1,14 @@
-using WaterLily
-import WaterLily: ∂, @loop, @inside, inside_u, S, conv_diff!
-using JLD2
-using Random
-using Statistics
+# using WaterLily
+# import WaterLily: ∂, @loop, @inside, inside_u, S, conv_diff!
+# using JLD2
+# using Random
+# using Statistics
 
-includet("utils/SimDataTypes.jl")
-includet("simulations/vortex_shedding_biot_savart.jl")
+# includet("utils/SimDataTypes.jl")
+# includet("simulations/vortex_shedding_biot_savart.jl")
 
 
-using .SimDataTypes: SimData, EpochData
+# using .SimDataTypes: SimData, EpochData
 
 
 function scalar_grad(field::AbstractArray)

@@ -16,8 +16,15 @@ using DrWatson: struct2dict
 
 # Progress & Timing
 using ProgressMeter
-using TimerOutputs
+@reexport using TimerOutputs  # <-- Changed: now @timeit is available to users
+const to = TimerOutput()
 using Dates
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Visualization - Always loaded (needed by custom.jl and other modules)
+# ═══════════════════════════════════════════════════════════════════════════════
+using Plots
+using Printf
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Machine Learning Stack
@@ -34,9 +41,9 @@ using Zygote
 using Enzyme
 
 # Neural ODEs
-using DifferentialEquations
-using SciMLSensitivity
-using ComponentArrays
+using DiffEqFlux
+using OrdinaryDiffEq
+using Optimization, OptimizationOptimisers, OptimizationPolyalgorithms
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # GPU/Accelerator Support (conditional loading)
@@ -48,11 +55,27 @@ const USE_CUDA = Ref(false)
 function __init__()
     if get(ENV, "THESIS_USE_CUDA", "false") == "true"
         try
-            @eval using CUDA
-            USE_CUDA[] = true
-            @info "CUDA loaded successfully"
+            @eval begin
+                using CUDA
+                using cuDNN
+            end
+            
+            # Verify CUDA is functional
+            if CUDA.functional()
+                USE_CUDA[] = true
+                @info "CUDA loaded successfully" device=CUDA.device() capability=CUDA.capability(CUDA.device())
+                
+                # Verify cuDNN is available
+                if cuDNN.has_cudnn()
+                    @info "cuDNN loaded successfully" version=cuDNN.version()
+                else
+                    @warn "cuDNN loaded but not functional"
+                end
+            else
+                @warn "CUDA loaded but not functional (no GPU detected)"
+            end
         catch e
-            @warn "CUDA requested but failed to load: $e"
+            @warn "CUDA/cuDNN requested but failed to load" exception=(e, catch_backtrace())
         end
     end
 end
@@ -63,36 +86,8 @@ end
 using WaterLily
 import WaterLily: ∂, @loop, @inside, inside_u, S, conv_diff!, δ, CI, inside
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# Visualization (conditional for HPC)
-# ═══════════════════════════════════════════════════════════════════════════════
-const PLOTS_LOADED = Ref(false)
-
-function load_plots()
-    if !PLOTS_LOADED[]
-        @eval begin
-            using Plots
-            using Printf
-        end
-        PLOTS_LOADED[] = true
-    end
-end
-
-macro with_plots(expr)
-    quote
-        if get(ENV, "THESIS_HEADLESS", "false") != "true"
-            load_plots()
-            $(esc(expr))
-        else
-            @info "Skipping plotting (headless mode)"
-        end
-    end
-end
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# Profiling & Debugging
-# ═══════════════════════════════════════════════════════════════════════════════
-const to = TimerOutput()
+using BiotSavartBCs
+using BiotSavartBCs: BiotSimulation
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Project Includes - Order matters for dependencies!
@@ -103,29 +98,29 @@ include("utils/SimDataTypes.jl")
 using .SimDataTypes: SimData, EpochData, LatentData
 
 include("utils/AE_normalizer.jl")
+# Custom functions (depends on WaterLily)
+include("utils/custom.jl")
 
 # Simulations
 include("simulations/vortex_shedding_biot_savart.jl")
 include("simulations/vortex_shedding.jl")
 
-# Custom functions (depends on WaterLily)
-include("custom.jl")
-
 # Core model definitions
-include("AE/Lux_AE.jl")
-include("AE/Lux_AE_train.jl")
+include("Lux_AE.jl")
+include("Lux_AE_train.jl")
 
 # NODE components
-include("NODE/NODE_core.jl")
+include("NODE_core.jl")
 
 # Combined AE+NODE
-include("AE+NODE/AENODE.jl")
+include("AENODE.jl")
 
 # Reconstruction utilities
 include("utils/Lux_AE_reconstructer.jl")
+include("utils/Lux_AE_loss_plot.jl")
 
 # Data getters
-include("data_getters/Lux_get_latent_data.jl")
+# include("data_getters/Lux_get_latent_data.jl")
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Exports - Types
@@ -189,7 +184,7 @@ export get_latent_data
 # ═══════════════════════════════════════════════════════════════════════════════
 # Exports - Utilities
 # ═══════════════════════════════════════════════════════════════════════════════
-export to, @timeit
+export to  # Just export the TimerOutput instance, not @timeit (already re-exported)
 export @with_plots, load_plots
 export is_hpc, get_device
 export cpu_device, gpu_device

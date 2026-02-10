@@ -1,16 +1,16 @@
-using DiffEqFlux
-using OrdinaryDiffEq
-using Lux
-using Random
-using ComponentArrays
-using JLD2
-using NNlib
-using Optimization, OptimizationOptimisers, OptimizationPolyalgorithms
-using Plots
+# using DiffEqFlux
+# using OrdinaryDiffEq
+# using Lux
+# using Random
+# using ComponentArrays
+# using JLD2
+# using NNlib
+# using Optimization, OptimizationOptimisers, OptimizationPolyalgorithms
+# using Plots
 
 
-includet("../custom.jl")
-includet("../AE/Lux_AE.jl")
+# includet("../custom.jl")
+# includet("../AE/Lux_AE.jl")
 
 Base.@kwdef mutable struct NodeArgs
     η = 0.01                    # learning rate

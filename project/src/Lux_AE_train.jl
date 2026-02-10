@@ -1,12 +1,4 @@
-using Random
-using ProgressMeter
-using Plots
-using Dates
-using Optimisers
-using DrWatson: struct2dict
-
-using TimerOutputs
-const to = TimerOutput()
+# using Thesis
 
 function train(; kws...)
 
@@ -14,26 +6,25 @@ function train(; kws...)
     args = LuxArgs(; kws...)
     args.seed > 0 && Random.seed!(args.seed)
 
-    # load RHS data and normalizer
-
+    # load data and normalizer
     data, loaders, normalizer = @timeit to "get_data" get_data(
             args.batch_size,
             args.full_data_path;
             n_training = args.train_downsample,
             n_test = args.test_downsample,
-            split = 0.2,
+            split = args.split,
             t_training = args.t_training,
         )
     TrainData, ValData, TestData = data
     train_loader, validation_loader, test_loader = loaders
 
-    if args.use_gpu
-        # using CUDA
-        # using cuDNN
-        device = gpu_device()
-    else
-        device = cpu_device()
-    end
+    # if args.use_gpu
+    #     device = gpu_device()
+    # else
+    #     device = cpu_device()
+    # end
+
+    device = get_device()
 
     normalizer = Normalizer(device(Float32.(normalizer.μ)), device(Float32.(normalizer.σ)), normalizer.method)
 
@@ -79,19 +70,24 @@ function train(; kws...)
 
     iter = 0
 
+    # quick checks
+    args.use_gpu && @info "CUDA.functional()" CUDA.functional()
+    args.use_gpu && @info "CUDA device" CUDA.device()
+
     # training
     @info "Start Training, total $(args.epochs) epochs"
     val_mean = 1
     
     for epoch = 1:args.epochs
+        epoch_start = time()
         @timeit to "epoch" begin
             @info "Epoch $(epoch)/$(args.epochs)"
             
-            train_progress = Progress(length(train_loader); desc="Training")
+            # train_progress = Progress(length(train_loader); desc="Training")
             # ---- TRAIN ----
             @timeit to "train" begin
                 for train_idx in train_loader
-                    batch = @timeit to "get training batch" build_batch(TrainData, train_idx)
+                    batch = @timeit to "get training batch" build_batch(TrainData, train_idx) |> device
                     _, loss, stats, train_state = @timeit to "single_train_step!" Training.single_train_step!(
                         args.Autodiff, loss_func, batch, train_state; return_gradients=Val(false)
                     )
@@ -106,10 +102,10 @@ function train(; kws...)
                     train_corrs[iter] = corrs
 
                     # progress meter
-                    next!(train_progress; showvalues=[(:loss, loss)])
+                    # next!(train_progress; showvalues=[(:loss, loss)])
                 end
             end
-            finish!(train_progress)
+            # finish!(train_progress)
 
             # ---- VALIDATION (epoch-level) ----
             val_sum = 0.0
@@ -117,7 +113,7 @@ function train(; kws...)
             val_corr_total = zeros(Float32, 2)
             @timeit to "validation" begin
                 for val_idx in validation_loader
-                    val_batch = @timeit to "get validation data" build_batch(ValData, val_idx)
+                    val_batch = @timeit to "get validation data" build_batch(ValData, val_idx) |> device
                     # Forward pass only (no gradients)
                     st_test = LuxCore.testmode(train_state.states)
                     val_loss, _, val_stats = @timeit to "validation loss" loss_func(ae, train_state.parameters, st_test, val_batch)
@@ -136,13 +132,13 @@ function train(; kws...)
             # ----- TEST (On whole dataset)
             if args.test_loss
                 @timeit to "test" begin
-                    test_progress = Progress(length(test_loader); desc="Test", color=:red)
+                    # test_progress = Progress(length(test_loader); desc="Test", color=:red)
                     test_sum = 0.0
                     n_test = 0
                     test_corr_mean = (0.0, 0.0)
                     test_corr_total = zeros(Float32, 2)
                     for test_idx in test_loader
-                        test_batch = @timeit to "get test batch" build_batch(TestData, test_idx)
+                        test_batch = @timeit to "get test batch" build_batch(TestData, test_idx) |> device
                         # Forward pass only
                         st_test = LuxCore.testmode(train_state.states)
                         test_loss, _, test_stats = @timeit to "get test loss" loss_func(ae, train_state.parameters, st_test, test_batch)
@@ -151,7 +147,7 @@ function train(; kws...)
                         n_test += 1
                         test_corr_total .+= test_corr
                         test_corr_mean = vec((test_corr_total / max(n_test, 1)))
-                        next!(test_progress; showvalues=[("Loss", test_loss), ("Corrs", test_corr_mean)])
+                        # next!(test_progress; showvalues=[("Loss", test_loss), ("Corrs", test_corr_mean)])
                     end
                     test_mean = Float32(test_sum / max(n_test, 1))
                     push!(test_losses, test_mean)
@@ -159,10 +155,24 @@ function train(; kws...)
                 end
             end
         end
+        # ---- epoch end: print concise summary ----
+        epoch_time = time() - epoch_start
+        test_corr_str = "($(round(test_corr_mean[1]; digits=3)), $(round(test_corr_mean[2]; digits=3)))"
+
+        println(join([
+            "Epoch $(epoch)/$(args.epochs)",
+            "time=$(round(epoch_time; digits=3))s",
+            "train_loss=$(round(train_losses[iter]; digits=4))",
+            "train_corr=($(round(train_corrs[iter][1]; digits=3)), $(round(train_corrs[iter][2]; digits=3)))",
+            "val_loss=$(round(val_mean; digits=4))",
+            "val_corr=($(round(val_corr_mean[1]; digits=3)), $(round(val_corr_mean[2]; digits=3)))",
+            "test_loss=$(round(test_mean; digits=4))",
+            "test_corr=$(test_corr_str)"
+        ], " | "))
     end
 
     # save model
-    timestamp = Dates.format(now(), "MMdd_HHmm")
+    timestamp = Dates.format(now(), "udd-HHMM")
     tag = run_tag(args)
     save_folder = joinpath(args.save_path, "$(timestamp)__$(tag)")
     !ispath(save_folder) && mkpath(save_folder)
@@ -274,11 +284,11 @@ function make_loss_function(args, device, normalizer)
 end
 
 
-if abspath(PROGRAM_FILE) == (@__FILE__) || isinteractive()
-    include("Lux_AE.jl")
-    include("../utils/Lux_AE_reconstructer.jl")
-    include("../utils/Lux_AE_loss_plot.jl")
-
-    train()
+if abspath(PROGRAM_FILE) == (@__FILE__)
+    # include("Lux_AE.jl")
+    # include("../utils/Lux_AE_reconstructer.jl")
+    # include("../utils/Lux_AE_loss_plot.jl")
+    # using Thesis
+    # train()
 end
 

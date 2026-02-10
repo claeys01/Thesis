@@ -1,22 +1,22 @@
-using Lux
-using NNlib
-using Statistics
-using MLUtils
-using Zygote
-using Enzyme
+# using Lux
+# using NNlib
+# using Statistics
+# using MLUtils
+# using Zygote
+# using Enzyme
 
-include("../custom.jl")
-include("../utils/AE_normalizer.jl")
-# include("../utils/SimDataTypes.jl")
+# include("../custom.jl")
+# include("../utils/AE_normalizer.jl")
+# # include("../utils/SimDataTypes.jl")
 
 Base.@kwdef mutable struct LuxArgs
     η::Float64 = 1e-3                    # learning rate
     λ::Float64 = 9e-4                    # regularization parameter
     Autodiff::Any = AutoZygote()
-    λdiv::Float64 = 10                  # divergence loss weight
+    λdiv::Float64 = 10.0                 # divergence loss weight
     λmask::Float64 = 0.0                 # weight of body mask loss
     loss::Symbol = :L1                   # loss function for reconstruction (:L1, :L2, :charb)
-    batch_size::Int = 50                 # batch size
+    batch_size::Int = 40                 # batch size
     t_training::Float64 = 16.603
     train_downsample::Int = 200          # amount of data used for training
     test_downsample::Int = 200
@@ -32,7 +32,7 @@ Base.@kwdef mutable struct LuxArgs
     output_dim::Tuple{Int,Int,Int} = (2^8, 2^8, 2)  # size of reconstructed RHS field
     conv_kernel::Int = 3                 # DO NOT CHANGE
     pool_kernel::Int = 2                 # DO NOT CHANGE
-    n_conv::Int = 2                      # number of convolutional layers
+    n_conv::Int = 6                      # number of convolutional layers
     n_dense::Int = 2                     # number of dense layers in bottleneck
     latent_dim::Int = 16                 # latent dimension
     stride::Int = 1                      # stride for convolutions
@@ -97,7 +97,7 @@ end
 
 function load_simdata(path)
     @load path simdata
-    return simdata::SimData
+    return simdata
 end
 
 function downsample_equal(v::AbstractVector, M::Integer)
