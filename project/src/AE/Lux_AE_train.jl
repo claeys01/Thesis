@@ -1,6 +1,6 @@
 # using Thesis
 
-function train(; kws...)
+function train_AE(; kws...)
 
     # load hyperparamters
     args = LuxArgs(; kws...)

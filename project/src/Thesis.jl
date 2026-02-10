@@ -145,7 +145,7 @@ export BiotSimulation
 # ═══════════════════════════════════════════════════════════════════════════════
 # Exports - AE Functions
 # ═══════════════════════════════════════════════════════════════════════════════
-export train
+export train_AE
 export load_trained_AE
 export visualize_reconstructions
 export total_loss, recon_loss, div_loss_L2, masked_loss
