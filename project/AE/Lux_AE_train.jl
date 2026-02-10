@@ -1,7 +1,3 @@
-includet("Lux_AE.jl")
-includet("../utils/Lux_AE_reconstructer.jl")
-includet("../utils/Lux_AE_loss_plot.jl")
-
 using Random
 using ProgressMeter
 using Plots
@@ -32,6 +28,8 @@ function train(; kws...)
     train_loader, validation_loader, test_loader = loaders
 
     if args.use_gpu
+        # using CUDA
+        # using cuDNN
         device = gpu_device()
     else
         device = cpu_device()
@@ -41,7 +39,7 @@ function train(; kws...)
 
     @info "Training on $device"
 
-    # # initialize encoder and decoder
+    # initialize encoder and decoder
     if args.retrain 
         (enc, dec, ae, ps, st) = load_trained_AE(args.checkpoint_path; return_params=true, testmode=false)
         @info "Retraining model saved at $(args.checkpoint_path)"
@@ -277,6 +275,10 @@ end
 
 
 if abspath(PROGRAM_FILE) == (@__FILE__) || isinteractive()
+    include("Lux_AE.jl")
+    include("../utils/Lux_AE_reconstructer.jl")
+    include("../utils/Lux_AE_loss_plot.jl")
+
     train()
 end
 

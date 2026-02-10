@@ -4,9 +4,7 @@ using Plots
 using Lux
 using MLUtils: DataLoader
 
-includet("../AE/Lux_AE.jl")
-includet("../custom.jl")
-includet("../utils/AE_normalizer.jl")
+
 
 
 
@@ -137,9 +135,11 @@ function visualize_reconstructions(checkpoint_path::Union{String,Nothing}=nothin
     return p
 end
 
-if abspath(PROGRAM_FILE) == (@__FILE__) || isinteractive()
+if abspath(PROGRAM_FILE) == (@__FILE__)
+    include("../AE/Lux_AE.jl")
+    include("../custom.jl")
+    include("../utils/AE_normalizer.jl")
     checkpoint = "data/saved_models/u/Lux/256h_16l/RE2500/2e8/2e8_u_200e_4096n_16l_norm_pooling_ups_mu_L1/checkpoint.jld2"
     # visualize_reconstructions(checkpoint)
-
 end
 

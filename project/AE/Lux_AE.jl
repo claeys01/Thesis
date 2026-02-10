@@ -5,11 +5,9 @@ using MLUtils
 using Zygote
 using Enzyme
 
-
-includet("../utils/AE_normalizer.jl")
-includet("../custom.jl")
-includet("../utils/SimDataTypes.jl")
-# using .SimDataTypes: SimData, EpddddochData
+include("../custom.jl")
+include("../utils/AE_normalizer.jl")
+# include("../utils/SimDataTypes.jl")
 
 Base.@kwdef mutable struct LuxArgs
     η::Float64 = 1e-3                    # learning rate
@@ -34,7 +32,7 @@ Base.@kwdef mutable struct LuxArgs
     output_dim::Tuple{Int,Int,Int} = (2^8, 2^8, 2)  # size of reconstructed RHS field
     conv_kernel::Int = 3                 # DO NOT CHANGE
     pool_kernel::Int = 2                 # DO NOT CHANGE
-    n_conv::Int = 6                      # number of convolutional layers
+    n_conv::Int = 2                      # number of convolutional layers
     n_dense::Int = 2                     # number of dense layers in bottleneck
     latent_dim::Int = 16                 # latent dimension
     stride::Int = 1                      # stride for convolutions

@@ -1,7 +1,6 @@
 using JLD2, Plots
 using Printf
 
-includet("../AE/Lux_AE.jl")
 
 default(
     # fontfamily = "Computer Modern",         # looks LaTeX-y if you have it
@@ -207,6 +206,7 @@ function plot_losses(loss_trajectory_path::AbstractString, checkpoint_path::Abst
     return p
 
 end
+
 
 checkpoint = "data/Lux_models/2025-12-18_14-27-49/checkpoint.jld2"
 losses = "data/Lux_models/2025-12-18_14-27-49/loss_trajectory.jld2"
