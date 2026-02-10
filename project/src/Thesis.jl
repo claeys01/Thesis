@@ -1,0 +1,250 @@
+module Thesis
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Core Dependencies
+# ═══════════════════════════════════════════════════════════════════════════════
+using Reexport
+
+# Numerics & Arrays
+using Statistics
+using Random
+using LinearAlgebra
+
+# Data handling
+using JLD2
+using DrWatson: struct2dict
+
+# Progress & Timing
+using ProgressMeter
+using TimerOutputs
+using Dates
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Machine Learning Stack
+# ═══════════════════════════════════════════════════════════════════════════════
+@reexport using Lux
+using LuxCore
+using NNlib
+using MLUtils
+using MLUtils: DataLoader
+using Optimisers
+
+# Automatic differentiation
+using Zygote
+using Enzyme
+
+# Neural ODEs
+using DifferentialEquations
+using SciMLSensitivity
+using ComponentArrays
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# GPU/Accelerator Support (conditional loading)
+# ═══════════════════════════════════════════════════════════════════════════════
+using Reactant
+
+const USE_CUDA = Ref(false)
+
+function __init__()
+    if get(ENV, "THESIS_USE_CUDA", "false") == "true"
+        try
+            @eval using CUDA
+            USE_CUDA[] = true
+            @info "CUDA loaded successfully"
+        catch e
+            @warn "CUDA requested but failed to load: $e"
+        end
+    end
+end
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Simulation Dependencies
+# ═══════════════════════════════════════════════════════════════════════════════
+using WaterLily
+import WaterLily: ∂, @loop, @inside, inside_u, S, conv_diff!, δ, CI, inside
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Visualization (conditional for HPC)
+# ═══════════════════════════════════════════════════════════════════════════════
+const PLOTS_LOADED = Ref(false)
+
+function load_plots()
+    if !PLOTS_LOADED[]
+        @eval begin
+            using Plots
+            using Printf
+        end
+        PLOTS_LOADED[] = true
+    end
+end
+
+macro with_plots(expr)
+    quote
+        if get(ENV, "THESIS_HEADLESS", "false") != "true"
+            load_plots()
+            $(esc(expr))
+        else
+            @info "Skipping plotting (headless mode)"
+        end
+    end
+end
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Profiling & Debugging
+# ═══════════════════════════════════════════════════════════════════════════════
+const to = TimerOutput()
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Project Includes - Order matters for dependencies!
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# Utilities first (no internal dependencies)
+include("utils/SimDataTypes.jl")
+using .SimDataTypes: SimData, EpochData, LatentData
+
+include("utils/AE_normalizer.jl")
+
+# Simulations
+include("simulations/vortex_shedding_biot_savart.jl")
+include("simulations/vortex_shedding.jl")
+
+# Custom functions (depends on WaterLily)
+include("custom.jl")
+
+# Core model definitions
+include("AE/Lux_AE.jl")
+include("AE/Lux_AE_train.jl")
+
+# NODE components
+include("NODE/NODE_core.jl")
+
+# Combined AE+NODE
+include("AE+NODE/AENODE.jl")
+
+# Reconstruction utilities
+include("utils/Lux_AE_reconstructer.jl")
+
+# Data getters
+include("data_getters/Lux_get_latent_data.jl")
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Exports - Types
+# ═══════════════════════════════════════════════════════════════════════════════
+export SimData, EpochData, LatentData
+export LuxArgs, NodeArgs
+export Encoder, Decoder, AE
+export NODE, AENODE
+export Normalizer
+export BiotSimulation
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Exports - AE Functions
+# ═══════════════════════════════════════════════════════════════════════════════
+export train
+export load_trained_AE
+export visualize_reconstructions
+export total_loss, recon_loss, div_loss_L2, masked_loss
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Exports - NODE Functions
+# ═══════════════════════════════════════════════════════════════════════════════
+export load_node
+export predict_array
+export predict_n
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Exports - Normalizer Functions
+# ═══════════════════════════════════════════════════════════════════════════════
+export normalize_batch, denormalize_batch
+export load_normalizer
+export compute_normalizer
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Exports - Simulation Functions
+# ═══════════════════════════════════════════════════════════════════════════════
+export circle_shedding_biot
+export sim_time
+export impose_biot_bc_on_snapshot
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Exports - Custom/Physics Functions
+# ═══════════════════════════════════════════════════════════════════════════════
+export div_field, div_field_vectorized
+export curl_field, curl_vectorized
+export velocity_gradient_vectorized
+export strain_rate_vectorized, rotation_rate_vectorized
+export strain_field
+export kinetic_energy_dissipation
+export scalar_grad, grad_p
+export RHS
+export remove_ghosts, remove_buff
+export preprocess_data!
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Exports - Data Functions
+# ═══════════════════════════════════════════════════════════════════════════════
+export build_batch
+export get_latent_data
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Exports - Utilities
+# ═══════════════════════════════════════════════════════════════════════════════
+export to, @timeit
+export @with_plots, load_plots
+export is_hpc, get_device
+export cpu_device, gpu_device
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Environment & Device Utilities
+# ═══════════════════════════════════════════════════════════════════════════════
+
+"""
+    is_hpc()
+
+Check if running on HPC cluster (SLURM, PBS, or LSF).
+"""
+function is_hpc()
+    return haskey(ENV, "SLURM_JOB_ID") || 
+           haskey(ENV, "PBS_JOBID") || 
+           haskey(ENV, "LSB_JOBID") ||
+           get(ENV, "THESIS_HPC", "false") == "true"
+end
+
+"""
+    get_device(; prefer_gpu=true)
+
+Get the appropriate compute device.
+Returns `gpu_device()` if CUDA is available and requested, otherwise `cpu_device()`.
+"""
+function get_device(; prefer_gpu=true)
+    if prefer_gpu && USE_CUDA[]
+        return gpu_device()
+    else
+        return cpu_device()
+    end
+end
+
+"""
+    set_seed!(seed::Int)
+
+Set random seed for reproducibility across all RNGs.
+"""
+function set_seed!(seed::Int)
+    Random.seed!(seed)
+    if USE_CUDA[]
+        @eval CUDA.seed!(seed)
+    end
+end
+
+export set_seed!
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Convenience Re-exports
+# ═══════════════════════════════════════════════════════════════════════════════
+export DataLoader
+export Chain, Dense, Conv, BatchNorm, MaxPool, Upsample
+export relu, tanh, sigmoid
+export WrappedFunction, SamePad
+export struct2dict
+
+end # module Thesis
