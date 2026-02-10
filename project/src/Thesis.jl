@@ -60,14 +60,22 @@ function __init__()
                 using cuDNN
             end
             
-            # Verify CUDA is functional
-            if CUDA.functional()
+            # Use invokelatest to call methods from newly loaded packages
+            cuda_functional = Base.invokelatest(CUDA.functional)
+            
+            if cuda_functional
                 USE_CUDA[] = true
-                @info "CUDA loaded successfully" device=CUDA.device() capability=CUDA.capability(CUDA.device())
+                
+                # Get device info using invokelatest
+                dev = Base.invokelatest(CUDA.device)
+                cap = Base.invokelatest(CUDA.capability, dev)
+                @info "CUDA loaded successfully" device=dev capability=cap
                 
                 # Verify cuDNN is available
-                if cuDNN.has_cudnn()
-                    @info "cuDNN loaded successfully" version=cuDNN.version()
+                has_cudnn = Base.invokelatest(cuDNN.has_cudnn)
+                if has_cudnn
+                    cudnn_ver = Base.invokelatest(cuDNN.version)
+                    @info "cuDNN loaded successfully" version=cudnn_ver
                 else
                     @warn "cuDNN loaded but not functional"
                 end
@@ -229,7 +237,7 @@ Set random seed for reproducibility across all RNGs.
 function set_seed!(seed::Int)
     Random.seed!(seed)
     if USE_CUDA[]
-        @eval CUDA.seed!(seed)
+        Base.invokelatest(CUDA.seed!, seed)
     end
 end
 
