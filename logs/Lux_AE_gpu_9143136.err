@@ -1,0 +1,10 @@
+ERROR: SystemError: opening file "/home/mfbclaeys/Thesis/project/script/hpc_train.jl": No such file or directory
+Stacktrace:
+ [1] include(mod::Module, _path::String)
+   @ Base ./Base.jl:562
+ [2] exec_options(opts::Base.JLOptions)
+   @ Base ./client.jl:323
+ [3] _start()
+   @ Base ./client.jl:531
+srun: error: gpu019: task 0: Exited with exit code 1
+srun: launch/slurm: _step_signal: Terminating StepId=9143136.0

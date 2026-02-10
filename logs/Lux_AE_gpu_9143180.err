@@ -1,0 +1,171 @@
+Precompiling Thesis...
+  43621.8 ms  ✓ Thesis
+  1 dependency successfully precompiled in 120 seconds. 697 already precompiled.
+┌ Warning: CUDA/cuDNN requested but failed to load
+│   exception =
+│    ArgumentError: Package Thesis does not have CUDA in its dependencies:
+│    - You may have a partially installed environment. Try `Pkg.instantiate()`
+│      to ensure all packages in the environment are installed.
+│    - Or, if you have Thesis checked out for development and have
+│      added CUDA as a dependency but haven't updated your primary
+│      environment's manifest file, try `Pkg.resolve()`.
+│    - Otherwise you may need to report an issue with Thesis
+│    Stacktrace:
+│      [1] macro expansion
+│        @ ./loading.jl:2299 [inlined]
+│      [2] macro expansion
+│        @ ./lock.jl:273 [inlined]
+│      [3] __require(into::Module, mod::Symbol)
+│        @ Base ./loading.jl:2271
+│      [4] #invoke_in_world#3
+│        @ ./essentials.jl:1089 [inlined]
+│      [5] invoke_in_world
+│        @ ./essentials.jl:1086 [inlined]
+│      [6] require(into::Module, mod::Symbol)
+│        @ Base ./loading.jl:2260
+│      [7] top-level scope
+│        @ ~/Thesis/project/src/Thesis.jl:59
+│      [8] eval
+│        @ ./boot.jl:430 [inlined]
+│      [9] __init__()
+│        @ Thesis ~/Thesis/project/src/Thesis.jl:58
+│     [10] run_module_init(mod::Module, i::Int64)
+│        @ Base ./loading.jl:1378
+│     [11] register_restored_modules(sv::Core.SimpleVector, pkg::Base.PkgId, path::String)
+│        @ Base ./loading.jl:1366
+│     [12] _include_from_serialized(pkg::Base.PkgId, path::String, ocachepath::String, depmods::Vector{Any}, ignore_native::Nothing; register::Bool)
+│        @ Base ./loading.jl:1254
+│     [13] _include_from_serialized (repeats 2 times)
+│        @ ./loading.jl:1210 [inlined]
+│     [14] _require_search_from_serialized(pkg::Base.PkgId, sourcepath::String, build_id::UInt128, stalecheck::Bool; reasons::Dict{String, Int64}, DEPOT_PATH::Vector{String})
+│        @ Base ./loading.jl:2057
+│     [15] _require(pkg::Base.PkgId, env::String)
+│        @ Base ./loading.jl:2527
+│     [16] __require_prelocked(uuidkey::Base.PkgId, env::String)
+│        @ Base ./loading.jl:2388
+│     [17] #invoke_in_world#3
+│        @ ./essentials.jl:1089 [inlined]
+│     [18] invoke_in_world
+│        @ ./essentials.jl:1086 [inlined]
+│     [19] _require_prelocked(uuidkey::Base.PkgId, env::String)
+│        @ Base ./loading.jl:2375
+│     [20] macro expansion
+│        @ ./loading.jl:2314 [inlined]
+│     [21] macro expansion
+│        @ ./lock.jl:273 [inlined]
+│     [22] __require(into::Module, mod::Symbol)
+│        @ Base ./loading.jl:2271
+│     [23] #invoke_in_world#3
+│        @ ./essentials.jl:1089 [inlined]
+│     [24] invoke_in_world
+│        @ ./essentials.jl:1086 [inlined]
+│     [25] require(into::Module, mod::Symbol)
+│        @ Base ./loading.jl:2260
+│     [26] include(mod::Module, _path::String)
+│        @ Base ./Base.jl:562
+│     [27] exec_options(opts::Base.JLOptions)
+│        @ Base ./client.jl:323
+│     [28] _start()
+│        @ Base ./client.jl:531
+└ @ Thesis ~/Thesis/project/src/Thesis.jl:78
+[ Info: Starting HPC AE training job
+[ Info:   SLURM_JOB_ID: 9143180
+[ Info:   SLURM_NTASKS: 1
+[ Info:   SLURM_CPUS_PER_TASK: 8
+[ Info:   Hostname: gpu019
+┌ Warning: Opening file with JLD2.MmapIO failed, falling back to IOStream
+└ @ JLD2 ~/.julia/packages/JLD2/hbsZG/src/JLD2.jl:162
+ERROR: LoadError: SystemError: opening file "data/datasets/RE2500/2e8/U_128_full.jld2": No such file or directory
+Stacktrace:
+  [1] systemerror(p::String, errno::Int32; extrainfo::Nothing)
+    @ Base ./error.jl:176
+  [2] systemerror
+    @ ./error.jl:176
+  [3] systemerror
+    @ ./error.jl:175 [inlined]
+  [4] open(fname::String; lock::Bool, read::Bool, write::Bool, create::Bool, truncate::Bool, append::Bool)
+    @ Base ./iostream.jl:295
+  [5] open
+    @ ./iostream.jl:277 [inlined]
+  [6] openfile
+    @ ~/.julia/packages/JLD2/hbsZG/src/JLD2.jl:152 [inlined]
+  [7] openfile(T::Type, fname::String, wr::Bool, create::Bool, truncate::Bool, fallback::Type)
+    @ JLD2 ~/.julia/packages/JLD2/hbsZG/src/JLD2.jl:163
+  [8] jldopen(fname::String, wr::Bool, create::Bool, truncate::Bool, iotype::Type{JLD2.MmapIO}; fallback::Type{IOStream}, compress::Bool, mmaparrays::Bool, typemap::Function, parallel_read::Bool, plain::Bool)
+    @ JLD2 ~/.julia/packages/JLD2/hbsZG/src/JLD2.jl:227
+  [9] jldopen
+    @ ~/.julia/packages/JLD2/hbsZG/src/JLD2.jl:174 [inlined]
+ [10] #jldopen#23
+    @ ~/.julia/packages/JLD2/hbsZG/src/JLD2.jl:297 [inlined]
+ [11] jldopen (repeats 2 times)
+    @ ~/.julia/packages/JLD2/hbsZG/src/JLD2.jl:290 [inlined]
+ [12] jldopen(f::Function, args::String; kws::@Kwargs{})
+    @ JLD2 ~/.julia/packages/JLD2/hbsZG/src/loadsave.jl:2
+ [13] jldopen
+    @ ~/.julia/packages/JLD2/hbsZG/src/loadsave.jl:1 [inlined]
+ [14] macro expansion
+    @ ~/.julia/packages/JLD2/hbsZG/src/loadsave.jl:152 [inlined]
+ [15] load_simdata(path::String)
+    @ Thesis ~/Thesis/project/src/AE/Lux_AE.jl:100
+ [16] get_data(batch_size::Int64, path::String; t_training::Float64, n_training::Int64, n_test::Int64, split::Float64, verbose::Bool, showplot::Bool, plotpath::Nothing)
+    @ Thesis ~/Thesis/project/src/AE/Lux_AE.jl:146
+ [17] get_data
+    @ ~/Thesis/project/src/AE/Lux_AE.jl:145 [inlined]
+ [18] train(; kws::@Kwargs{})
+    @ Thesis ~/Thesis/project/src/AE/Lux_AE_train.jl:10
+ [19] train
+    @ ~/Thesis/project/src/AE/Lux_AE_train.jl:3 [inlined]
+ [20] main()
+    @ Main ~/Thesis/project/scripts/hpc_train.jl:24
+ [21] top-level scope
+    @ ~/Thesis/project/scripts/hpc_train.jl:27
+in expression starting at /home/mfbclaeys/Thesis/project/scripts/hpc_train.jl:27
+
+caused by: SystemError: opening file "data/datasets/RE2500/2e8/U_128_full.jld2": No such file or directory
+Stacktrace:
+  [1] systemerror(p::String, errno::Int32; extrainfo::Nothing)
+    @ Base ./error.jl:176
+  [2] systemerror
+    @ ./error.jl:176
+  [3] systemerror
+    @ ./error.jl:175 [inlined]
+  [4] open(fname::String; lock::Bool, read::Bool, write::Bool, create::Bool, truncate::Bool, append::Bool)
+    @ Base ./iostream.jl:295
+  [5] open
+    @ ./iostream.jl:277 [inlined]
+  [6] JLD2.MmapIO(fname::String, write::Bool, create::Bool, truncate::Bool)
+    @ JLD2 ~/.julia/packages/JLD2/hbsZG/src/io/mmapio.jl:101
+  [7] openfile
+    @ ~/.julia/packages/JLD2/hbsZG/src/JLD2.jl:155 [inlined]
+  [8] openfile(T::Type, fname::String, wr::Bool, create::Bool, truncate::Bool, fallback::Type)
+    @ JLD2 ~/.julia/packages/JLD2/hbsZG/src/JLD2.jl:160
+  [9] jldopen(fname::String, wr::Bool, create::Bool, truncate::Bool, iotype::Type{JLD2.MmapIO}; fallback::Type{IOStream}, compress::Bool, mmaparrays::Bool, typemap::Function, parallel_read::Bool, plain::Bool)
+    @ JLD2 ~/.julia/packages/JLD2/hbsZG/src/JLD2.jl:227
+ [10] jldopen
+    @ ~/.julia/packages/JLD2/hbsZG/src/JLD2.jl:174 [inlined]
+ [11] #jldopen#23
+    @ ~/.julia/packages/JLD2/hbsZG/src/JLD2.jl:297 [inlined]
+ [12] jldopen (repeats 2 times)
+    @ ~/.julia/packages/JLD2/hbsZG/src/JLD2.jl:290 [inlined]
+ [13] jldopen(f::Function, args::String; kws::@Kwargs{})
+    @ JLD2 ~/.julia/packages/JLD2/hbsZG/src/loadsave.jl:2
+ [14] jldopen
+    @ ~/.julia/packages/JLD2/hbsZG/src/loadsave.jl:1 [inlined]
+ [15] macro expansion
+    @ ~/.julia/packages/JLD2/hbsZG/src/loadsave.jl:152 [inlined]
+ [16] load_simdata(path::String)
+    @ Thesis ~/Thesis/project/src/AE/Lux_AE.jl:100
+ [17] get_data(batch_size::Int64, path::String; t_training::Float64, n_training::Int64, n_test::Int64, split::Float64, verbose::Bool, showplot::Bool, plotpath::Nothing)
+    @ Thesis ~/Thesis/project/src/AE/Lux_AE.jl:146
+ [18] get_data
+    @ ~/Thesis/project/src/AE/Lux_AE.jl:145 [inlined]
+ [19] train(; kws::@Kwargs{})
+    @ Thesis ~/Thesis/project/src/AE/Lux_AE_train.jl:10
+ [20] train
+    @ ~/Thesis/project/src/AE/Lux_AE_train.jl:3 [inlined]
+ [21] main()
+    @ Main ~/Thesis/project/scripts/hpc_train.jl:24
+ [22] top-level scope
+    @ ~/Thesis/project/scripts/hpc_train.jl:27
+srun: error: gpu019: task 0: Exited with exit code 1
+srun: launch/slurm: _step_signal: Terminating StepId=9143180.0

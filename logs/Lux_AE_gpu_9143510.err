@@ -1,0 +1,130 @@
+Precompiling SpecialFunctionsExt...
+   5730.3 ms  ✓ CUDA → SpecialFunctionsExt
+  1 dependency successfully precompiled in 7 seconds. 114 already precompiled.
+Precompiling ChainRulesCoreExt...
+   6228.3 ms  ✓ WeightInitializers → CUDAExt
+   6235.7 ms  ✓ CUDA → ChainRulesCoreExt
+   6232.8 ms  ✓ MLDataDevices → CUDAExt
+  3 dependencies successfully precompiled in 8 seconds. 133 already precompiled.
+Precompiling EnzymeCoreExt...
+   5574.0 ms  ✓ CUDA → EnzymeCoreExt
+  1 dependency successfully precompiled in 7 seconds. 109 already precompiled.
+Precompiling cuDNN...
+   1967.5 ms  ✓ CUDNN_jll
+   7557.0 ms  ✓ cuDNN
+  2 dependencies successfully precompiled in 11 seconds. 101 already precompiled.
+┌ Warning: CUDA/cuDNN requested but failed to load
+│   exception =
+│    MethodError: no method matching functional()
+│    The applicable method may be too new: running in world age 27291, while current world is 27352.
+│    
+│    Closest candidates are:
+│      functional(!Matched::Bool) (method too new to be called from this world context.)
+│       @ CUDA ~/.julia/packages/CUDA/FJf6p/src/initialization.jl:20
+│      functional() (method too new to be called from this world context.)
+│       @ CUDA ~/.julia/packages/CUDA/FJf6p/src/initialization.jl:20
+│    
+│    Stacktrace:
+│      [1] __init__()
+│        @ Thesis ~/Thesis/project/src/Thesis.jl:64
+│      [2] run_module_init(mod::Module, i::Int64)
+│        @ Base ./loading.jl:1378
+│      [3] register_restored_modules(sv::Core.SimpleVector, pkg::Base.PkgId, path::String)
+│        @ Base ./loading.jl:1366
+│      [4] _include_from_serialized(pkg::Base.PkgId, path::String, ocachepath::String, depmods::Vector{Any}, ignore_native::Nothing; register::Bool)
+│        @ Base ./loading.jl:1254
+│      [5] _include_from_serialized (repeats 2 times)
+│        @ ./loading.jl:1210 [inlined]
+│      [6] _require_search_from_serialized(pkg::Base.PkgId, sourcepath::String, build_id::UInt128, stalecheck::Bool; reasons::Dict{String, Int64}, DEPOT_PATH::Vector{String})
+│        @ Base ./loading.jl:2057
+│      [7] _require(pkg::Base.PkgId, env::String)
+│        @ Base ./loading.jl:2527
+│      [8] __require_prelocked(uuidkey::Base.PkgId, env::String)
+│        @ Base ./loading.jl:2388
+│      [9] #invoke_in_world#3
+│        @ ./essentials.jl:1089 [inlined]
+│     [10] invoke_in_world
+│        @ ./essentials.jl:1086 [inlined]
+│     [11] _require_prelocked(uuidkey::Base.PkgId, env::String)
+│        @ Base ./loading.jl:2375
+│     [12] macro expansion
+│        @ ./loading.jl:2314 [inlined]
+│     [13] macro expansion
+│        @ ./lock.jl:273 [inlined]
+│     [14] __require(into::Module, mod::Symbol)
+│        @ Base ./loading.jl:2271
+│     [15] #invoke_in_world#3
+│        @ ./essentials.jl:1089 [inlined]
+│     [16] invoke_in_world
+│        @ ./essentials.jl:1086 [inlined]
+│     [17] require(into::Module, mod::Symbol)
+│        @ Base ./loading.jl:2260
+│     [18] include(mod::Module, _path::String)
+│        @ Base ./Base.jl:562
+│     [19] exec_options(opts::Base.JLOptions)
+│        @ Base ./client.jl:323
+│     [20] _start()
+│        @ Base ./client.jl:531
+└ @ Thesis ~/Thesis/project/src/Thesis.jl:78
+Precompiling ArrayInterfaceCUDAExt...
+   5572.0 ms  ✓ ArrayInterface → ArrayInterfaceCUDAExt
+  1 dependency successfully precompiled in 7 seconds. 105 already precompiled.
+Precompiling NNlibCUDAExt...
+   6022.3 ms  ✓ NNlib → NNlibCUDAExt
+  1 dependency successfully precompiled in 7 seconds. 107 already precompiled.
+Precompiling NNlibCUDACUDNNExt...
+   6240.6 ms  ✓ NNlib → NNlibCUDACUDNNExt
+  1 dependency successfully precompiled in 8 seconds. 110 already precompiled.
+Precompiling cuDNNExt...
+   6021.0 ms  ✓ LuxLib → CUDAExt
+   6019.5 ms  ✓ MLDataDevices → cuDNNExt
+   6064.4 ms  ✓ LuxLib → cuDNNExt
+  3 dependencies successfully precompiled in 14 seconds. 147 already precompiled.
+Precompiling CUDAForwardDiffExt...
+   5811.0 ms  ✓ LuxLib → CUDAForwardDiffExt
+  1 dependency successfully precompiled in 8 seconds. 164 already precompiled.
+Precompiling DiffEqBaseCUDAExt...
+   6177.7 ms  ✓ DiffEqBase → DiffEqBaseCUDAExt
+  1 dependency successfully precompiled in 9 seconds. 188 already precompiled.
+Precompiling LinearSolveCUDAExt...
+   6335.6 ms  ✓ LinearSolve → LinearSolveCUDAExt
+  1 dependency successfully precompiled in 8 seconds. 162 already precompiled.
+Precompiling SparseMatrixColoringsCUDAExt...
+   5512.5 ms  ✓ SparseMatrixColorings → SparseMatrixColoringsCUDAExt
+  1 dependency successfully precompiled in 7 seconds. 104 already precompiled.
+Precompiling ReactantCUDAExt...
+  30157.3 ms  ✓ Reactant → ReactantCUDAExt
+  1 dependency successfully precompiled in 33 seconds. 151 already precompiled.
+Precompiling WaterLilyCUDAExt...
+   5731.7 ms  ✓ WaterLily → WaterLilyCUDAExt
+  1 dependency successfully precompiled in 7 seconds. 132 already precompiled.
+[ Info: Starting HPC AE training job
+[ Info:   SLURM_JOB_ID: 9143510
+[ Info:   SLURM_NTASKS: 1
+[ Info:   SLURM_CPUS_PER_TASK: 8
+[ Info:   Hostname: gpu011
+┌ Warning: type Main.SimDataTypes.SimData does not exist in workspace; reconstructing
+└ @ JLD2 ~/.julia/packages/JLD2/hbsZG/src/data/reconstructing_datatypes.jl:588
+ERROR: LoadError: MethodError: no method matching preprocess_data!(::JLD2.ReconstructedMutable{:SimData, (:time, :Δt, :u, :μ₀, :force, :ε, :period_ranges, :reordered_ranges, :single_period_idx), Tuple{Any, Any, Any, Any, Any, Any, Any, Any, UnitRange{Int64}}}; verbose::Bool)
+The function `preprocess_data!` exists, but no method is defined for this combination of argument types.
+
+Closest candidates are:
+  preprocess_data!(!Matched::SimData; verbose)
+   @ Thesis ~/Thesis/project/src/utils/custom.jl:23
+
+Stacktrace:
+ [1] get_data(batch_size::Int64, path::String; t_training::Float64, n_training::Int64, n_test::Int64, split::Float64, verbose::Bool, showplot::Bool, plotpath::Nothing)
+   @ Thesis ~/Thesis/project/src/AE/Lux_AE.jl:147
+ [2] get_data
+   @ ~/Thesis/project/src/AE/Lux_AE.jl:145 [inlined]
+ [3] train(; kws::@Kwargs{})
+   @ Thesis ~/Thesis/project/src/AE/Lux_AE_train.jl:10
+ [4] train
+   @ ~/Thesis/project/src/AE/Lux_AE_train.jl:3 [inlined]
+ [5] main()
+   @ Main ~/Thesis/project/scripts/hpc_train.jl:24
+ [6] top-level scope
+   @ ~/Thesis/project/scripts/hpc_train.jl:27
+in expression starting at /home/mfbclaeys/Thesis/project/scripts/hpc_train.jl:27
+srun: error: gpu011: task 0: Exited with exit code 1
+srun: launch/slurm: _step_signal: Terminating StepId=9143510.0

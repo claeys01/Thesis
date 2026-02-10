@@ -1,10 +1,20 @@
+authors = ["Matthias Claeys <matthias.claeys2002@gmail.com>"]
 name = "Thesis"
 uuid = "97b3223e-e305-4a68-ba81-d5250dd518cd"
-authors = ["Matthias Claeys <matthias.claeys2002@gmail.com>"]
 version = "0.1.0"
+
+[compat]
+CUDA = "5.9.6"
+Dates = "1.11.0"
+LinearAlgebra = "1.11.0"
+LuxCore = "1.5.3"
+Printf = "1.11.0"
+Statistics = "1.11.1"
+cuDNN = "1.4.6"
 
 [deps]
 BiotSavartBCs = "ec5a6caf-bdf7-41d0-b8e1-5fafde84e19f"
+CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
 ComponentArrays = "b0b7db55-cfe3-40fc-9ded-d10e2dbeff66"
 ConcreteStructs = "2569d6c7-a4a2-43d3-a901-331e8e4be471"
 Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
@@ -38,10 +48,5 @@ WaterLily = "ed894a53-35f9-47f1-b17f-85db9237eebd"
 Zygote = "e88e6eb3-aa80-5325-afca-941959d7151f"
 cuDNN = "02a925ec-e4fe-4b08-9a7e-0d78e3d38ccd"
 
-[compat]
-Dates = "1.11.0"
-LinearAlgebra = "1.11.0"
-LuxCore = "1.5.3"
-Printf = "1.11.0"
-Statistics = "1.11.1"
-cuDNN = "1.4.6"
+[extras]
+CUDA_Runtime_jll = "76a88914-d11a-5bdc-97e0-2f5a05c973a2"

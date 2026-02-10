@@ -23,11 +23,11 @@ Base.@kwdef mutable struct LuxArgs
     train_downsample::Int = 200          # amount of data used for training
     test_downsample::Int = 200
     split::Float64 = 0.2
-    epochs::Int = 1                    # number of epochs
+    epochs::Int = 10                    # number of epochs
     seed::Int = 42                       # random seed
     n_reconstruct::Int = 2               # sampling size for output
     test_loss::Bool = true
-    use_gpu::Bool = false                # use GPU
+    use_gpu::Bool = true                # use GPU
     clip_bc::Bool = true                 # removes the ghost cells from the snapshot
     input_dim::Tuple{Int,Int,Int} = (2^8, 2^8, 4)   # flow field size with μ₀ concatenated
     output_dim::Tuple{Int,Int,Int} = (2^8, 2^8, 2)  # size of reconstructed RHS field
