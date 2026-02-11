@@ -1,9 +1,9 @@
 # using Thesis
 
-function train_AE(; kws...)
+function train_AE(args::LuxArgs; )
 
     # load hyperparamters
-    args = LuxArgs(; kws...)
+    # args = LuxArgs(; kws...)
     args.seed > 0 && Random.seed!(args.seed)
 
     # load data and normalizer
@@ -71,8 +71,8 @@ function train_AE(; kws...)
     iter = 0
 
     # quick checks
-    args.use_gpu && @info "CUDA.functional()" CUDA.functional()
-    args.use_gpu && @info "CUDA device" CUDA.device()
+    (USE_CUDA[] & args.use_gpu) && @info "CUDA.functional()" CUDA.functional()
+    (USE_CUDA[] & args.use_gpu) && @info "CUDA device" CUDA.device()
 
     # training
     @info "Start Training, total $(args.epochs) epochs"

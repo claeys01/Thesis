@@ -1,7 +1,7 @@
 using Thesis
 
 
-train()
+train_AE(LuxArgs(epochs=1))
 # gc.gc()
 # using Thesis
 # using JLD2
