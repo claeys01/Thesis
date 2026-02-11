@@ -2,11 +2,9 @@ using Thesis
 
 
 function get_latent_data(checkpoint_path::String; save_path::Union{String,Tuple{String,String},Nothing}=nothing, batch_size=1024)
-    enc, _, _, ps, st, args = load_trained_AE(checkpoint_path; return_params=true)
-    st = LuxCore.testmode(st)
+    enc, _, _, ps, st, args = load_trained_AE(checkpoint_path; return_params=true, testmode=true)
 
-    checkpoint = JLD2.load(checkpoint_path)
-    normalizer = checkpoint["normalizer"]
+    normalizer = load_normalizer(checkpoint_path)
 
     simdata = load_simdata(args.full_data_path)
     N =size(simdata.u, 4)
@@ -32,7 +30,7 @@ function get_latent_data(checkpoint_path::String; save_path::Union{String,Tuple{
 
     @info "Computing latents for training data"
     train_idx = findall(t -> t < args.t_training, simdata.time)
-    TrainData = EpochData(get_data_in(simdata.u, simdata.μ₀; idx=train_idx)...)
+    TrainData = EpochData(Thesis.get_data_in(simdata.u, simdata.μ₀; idx=train_idx)...)
     t_train = simdata.time[train_idx]
     train_loader = DataLoader(train_idx, batchsize=batch_size, shuffle=false)
     train_latent = LatentData(
@@ -44,7 +42,7 @@ function get_latent_data(checkpoint_path::String; save_path::Union{String,Tuple{
 
     @info "Computing latents for test data"
     test_idx = collect(last(train_idx)+1 : N)
-    TestData = EpochData(get_data_in(simdata.u, simdata.μ₀; idx=test_idx)...)
+    TestData = EpochData(Thesis.get_data_in(simdata.u, simdata.μ₀; idx=test_idx)...)
     t_test = simdata.time[test_idx]
     n_test = size(t_test, 1)
     test_loader = DataLoader(collect(1 : n_test); batchsize=batch_size, shuffle=false)
@@ -56,7 +54,7 @@ function get_latent_data(checkpoint_path::String; save_path::Union{String,Tuple{
     GC.gc()
 
     @info "Computing latents for whole data"
-    TotalData = EpochData(get_data_in(simdata.u, simdata.μ₀)...)
+    TotalData = EpochData(Thesis.get_data_in(simdata.u, simdata.μ₀)...)
     total_idx = collect(1:N)
     total_loader = DataLoader(total_idx, batchsize=batch_size, shuffle=false)
     total_latent = LatentData(
@@ -77,7 +75,7 @@ function get_latent_data(checkpoint_path::String; save_path::Union{String,Tuple{
             test_path   = string(root, "_test",   ext)
         elseif isa(save_path, Tuple) && length(save_path) == 2
             train_path, test_path = save_path
-        elses
+        else
             error("save_path must be nothing, a String, or a Tuple{String,String}")
         end
 
@@ -89,14 +87,10 @@ function get_latent_data(checkpoint_path::String; save_path::Union{String,Tuple{
 
         @info "Saving total latents to $save_path"
         @save save_path latent_data = total_latent
-
-
     end
 
     return train_latent, test_latent
 end
 
-checkpoint = "data/saved_models/u/Lux/256h_16l/RE2500/2e8/Feb11-1156__E1000_HW256x256_C4to2_nc6_nd2_z16_C8_lr0p001_wd0p0009_bs16_NY_LL1/checkpoint.jld2"
-save_path = "data/latent_data/16/RE2500/2e8/U_128_latent.jld2"
-train_latent, test_latent = get_latent_data(checkpoint; save_path=save_path)
+
 nothing

@@ -20,9 +20,9 @@ Base.@kwdef mutable struct NodeArgs
     group_size = 20
     continuity_term = 200
     save_path = "data/models/NODE_models"   # results dir
-    train_latent_path = "data/latent_data/16/RE2500/2e8/U_128_latent_train.jld2"
-    test_latent_path = "data/latent_data/16/RE2500/2e8/U_128_latent_test.jld2"
-    total_latent_path = "data/latent_data/16/RE2500/2e8/U_128_latent.jld2"
+    train_latent_path = "data/latent_data/16/RE2500/2e8/U_128_latent_E1000_train.jld2"
+    test_latent_path =  "data/latent_data/16/RE2500/2e8/U_128_latent_E1000_test.jld2"
+    total_latent_path = "data/latent_data/16/RE2500/2e8/U_128_latent_E1000.jld2"
 end
 
 function get_NODE_data(latent_path; downsample=-1, verbose=true)

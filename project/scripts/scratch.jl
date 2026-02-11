@@ -1,26 +1,15 @@
 using Thesis
+using Plots
+using Revise
 
+include("/home/matth/Thesis/project/scripts/data_getters/get_latent_data.jl")
 
-train_AE(LuxArgs(epochs=1))
-# gc.gc()
-# using Thesis
-# using JLD2
+checkpoint = "data/saved_models/u/Lux/256h_16l/RE2500/2e8/Feb11-1231__E200_HW256x256_C4to2_nc6_nd2_z16_C8_lr0p001_wd0p0009_bs16_NY_LL1/checkpoint.jld2"
+save_path = "data/latent_data/16/RE2500/2e8/U_128_latent_E200.jld2"
+train_latent, test_latent = get_latent_data(checkpoint; save_path=save_path)
 
-# # Load the old data (as ReconstructedMutable)
-# old_data = JLD2.load("data/datasets/RE2500/2e8/U_128_full.jld2", "simdata")
-
-# # Convert to proper SimData
-# simdata = SimData(
-#     time = old_data.time,
-#     Δt = old_data.Δt,
-#     u = old_data.u,
-#     μ₀ = old_data.μ₀,
-#     force = old_data.force,
-#     ε = old_data.ε,
-#     period_ranges = old_data.period_ranges,
-#     reordered_ranges = old_data.reordered_ranges,
-#     single_period_idx = old_data.single_period_idx
-# )
-
-# # Re-save with correct type
-# JLD2.save("data/datasets/RE2500/2e8/U_128_full.jld2", "simdata", simdata)
+Thesis.train_NODE(NodeArgs(
+    train_latent_path = "data/latent_data/16/RE2500/2e8/U_128_latent_E200_train.jld2",
+    test_latent_path =  "data/latent_data/16/RE2500/2e8/U_128_latent_E200_test.jld2",
+    total_latent_path = "data/latent_data/16/RE2500/2e8/U_128_latent_E200.jld2"
+))

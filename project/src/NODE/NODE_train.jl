@@ -1,14 +1,3 @@
-# using Revise
-# using NNlib
-# using Optimization, OptimizationOptimisers
-# using Dates
-# using ProgressMeter
-# using OptimizationPolyalgorithms
-
-
-# includet("NODE_core.jl")
-# includet("NODE_RE2500_extrapolate.jl")
-
 make_optimiser(opt, η) = hasmethod(opt, Tuple{Float64}) ? opt(η) :
                          hasmethod(opt, Tuple{}) ? opt() :
                          error("Unsupported optimiser constructor: $(opt)")
@@ -32,7 +21,6 @@ function train_NODE(args; kws...)
     optprob = Optimization.OptimizationProblem(optf, pinit)
 
     # progress bar used by callback (created with known maxiters)
-
     maxiters = args.maxiters
     if args.optimiser === OptimizationPolyalgorithms.PolyOpt
         maxiters *= 2
@@ -87,7 +75,9 @@ function train_NODE(args; kws...)
 
     # saving the model
     @info "Saving model and plots"
-    out_dir = joinpath("data", "NODE_models", Dates.format(now(), "yyyy-mm-dd_HH-MM-SS"))
+    timestamp = Dates.format(now(), "udd-HHMM")
+
+    out_dir = joinpath("data", "NODE_models", timestamp)
     mkpath(out_dir)
 
     # save optimized parameters

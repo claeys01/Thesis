@@ -43,6 +43,7 @@ using Enzyme
 # Neural ODEs
 using DiffEqFlux
 using OrdinaryDiffEq
+using ComponentArrays
 using Optimization, OptimizationOptimisers, OptimizationPolyalgorithms
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -92,7 +93,7 @@ end
 # Simulation Dependencies
 # ═══════════════════════════════════════════════════════════════════════════════
 using WaterLily
-import WaterLily: ∂, @loop, @inside, inside_u, S, conv_diff!, δ, CI, inside
+import WaterLily: ∂, @loop, @inside, inside_u, S, conv_diff!, δ, CI, inside, flood
 
 using BiotSavartBCs
 using BiotSavartBCs: BiotSimulation
@@ -114,20 +115,22 @@ include("simulations/vortex_shedding_biot_savart.jl")
 include("simulations/vortex_shedding.jl")
 
 # Core model definitions
-include("AE/Lux_AE.jl")
-include("AE/Lux_AE_train.jl")
+include("AE/AE.jl")
+include("AE/AE_train.jl")
 
 # NODE components
 include("NODE/NODE_core.jl")
 include("NODE/NODE_train.jl")
+include("NODE/NODE_PostTrain.jl")
+
 
 
 # Combined AE+NODE
 include("AENODE.jl")
 
 # Reconstruction utilities
-include("utils/Lux_AE_reconstructer.jl")
-include("utils/Lux_AE_loss_plot.jl")
+include("utils/AE_reconstructer.jl")
+include("utils/AE_loss_plot.jl")
 
 # Data getters
 # include("data_getters/Lux_get_latent_data.jl")
@@ -171,6 +174,7 @@ export compute_normalizer
 export circle_shedding_biot
 export sim_time
 export impose_biot_bc_on_snapshot
+export flood 
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Exports - Custom/Physics Functions
@@ -252,5 +256,8 @@ export Chain, Dense, Conv, BatchNorm, MaxPool, Upsample
 export relu, tanh, sigmoid
 export WrappedFunction, SamePad
 export struct2dict
+
+# JLD2 macros
+export @save, @load
 
 end # module Thesis

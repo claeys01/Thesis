@@ -1,10 +1,4 @@
-using Revise
-using Random
-using Plots
-
-Random.seed!(42)
-includet("AENODE.jl")
-includet("../NODE/NODE_RE2500_extrapolate.jl")
+using Thesis
 
 function physical_ass(AE_path::String, NODE_path::String; saveplot=false)
     sim = circle_shedding_biot(;Re=2500, n=2^8, m=2^8, perturb=false)
@@ -14,8 +8,8 @@ function physical_ass(AE_path::String, NODE_path::String; saveplot=false)
 
     aenode = AENODE(AE_path, node_path)
 
-    _, t_train, _, _ = get_NODE_data(aenode.node_args.train_latent_path; downsample=-1,  verbose=false)    
-    _, t_test,  _, _ = get_NODE_data(aenode.node_args.test_latent_path;  downsample=-1,  verbose=false)   
+    _, t_train, _, _ = Thesis.get_NODE_data(aenode.node_args.train_latent_path; downsample=-1,  verbose=false)    
+    _, t_test,  _, _ = Thesis.get_NODE_data(aenode.node_args.test_latent_path;  downsample=-1,  verbose=false)   
 
     simdata = load_simdata(aenode.ae_args.full_data_path)
 
@@ -34,7 +28,7 @@ function physical_ass(AE_path::String, NODE_path::String; saveplot=false)
 
 
     # downsample data
-    total_downsample = downsample_equal(collect(1:size(time, 1)), n_pred)
+    total_downsample = Thesis.downsample_equal(collect(1:size(time, 1)), n_pred)
     t_total = time[total_downsample]
     @info "calculating database statistics"
     u_div = div_field(simdata.u[:, :, :, total_downsample]; buff=2, avg=true)
@@ -53,7 +47,7 @@ function physical_ass(AE_path::String, NODE_path::String; saveplot=false)
     return plot(div_plot, ε_plot; layout=(2, 1), size=(900, 900), )   
 end
 if abspath(PROGRAM_FILE) == (@__FILE__) || isinteractive()
-    node_path = "data/saved_models/NODE/16/RE2500/multiple_shoot_adam_250/node_params.jld2"
-    AE_path = "data/saved_models/u/Lux/256h_16l/RE2500/2e8/2e8_u_200e_4096n_16l_norm_pooling_ups_mu_L1/checkpoint.jld2"
+    node_path = "data/saved_models/NODE/16/RE2500/E200_MS_Adam_250/node_params.jld2"
+    AE_path = "data/saved_models/u/Lux/256h_16l/RE2500/2e8/E200_HW256x256_C4to2_nc6_nd2_z16_C8_lr0p001_wd0p0009_bs16_NY_LL1/checkpoint.jld2"
     physical_ass(AE_path, node_path)
 end
