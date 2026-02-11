@@ -77,6 +77,7 @@ function visualize_reconstructions(checkpoint_path::Union{String,Nothing}=nothin
             
             # Move to CPU for plotting
             x̂ = cpu(Array(x̂_dev))
+            μ₀ = cpu(Array(μ₀_dev))
             x_target = cpu(Array(x_target_cpu))
         else
             x_in = cat(x, μ₀; dims=3)
@@ -88,7 +89,8 @@ function visualize_reconstructions(checkpoint_path::Union{String,Nothing}=nothin
 
         for ch in 1:2
             mat_in = x_target[:, :, ch, 1]
-            mat_out = x̂[:, :, ch, 1]
+            mat_out = x̂[:, :, ch, 1] .* μ₀[:, :, ch, 1]
+
 
             μ = mean(mat_in)
             σ = std(mat_in)
