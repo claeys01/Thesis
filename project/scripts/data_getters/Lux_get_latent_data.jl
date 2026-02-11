@@ -1,14 +1,4 @@
-using JLD2
-using Lux
-using MLUtils
-
-
-
-includet("../AE/Lux_AE.jl")
-includet("../custom.jl")
-includet("../utils/AE_normalizer.jl")
-includet("../utils/SimDataTypes.jl")
-using .SimDataTypes
+using Thesis
 
 
 function get_latent_data(checkpoint_path::String; save_path::Union{String,Tuple{String,String},Nothing}=nothing, batch_size=1024)
@@ -106,7 +96,7 @@ function get_latent_data(checkpoint_path::String; save_path::Union{String,Tuple{
     return train_latent, test_latent
 end
 
-checkpoint = "data/saved_models/u/Lux/256h_16l/RE2500/2e8/2e8_u_200e_4096n_16l_norm_pooling_ups_mu_L1/checkpoint.jld2"
+checkpoint = "data/saved_models/u/Lux/256h_16l/RE2500/2e8/Feb11-1156__E1000_HW256x256_C4to2_nc6_nd2_z16_C8_lr0p001_wd0p0009_bs16_NY_LL1/checkpoint.jld2"
 save_path = "data/latent_data/16/RE2500/2e8/U_128_latent.jld2"
 train_latent, test_latent = get_latent_data(checkpoint; save_path=save_path)
 nothing

@@ -181,13 +181,20 @@ function train_AE(args::LuxArgs; )
 
 
     let cpu = cpu_device()
-        ps = cpu(train_state.parameters)
-        st = cpu(train_state.states)
+        # Always save on CPU for portability
+        ps_cpu = cpu(train_state.parameters)
+        st_cpu = cpu(train_state.states)
+
+        normalizer_cpu = Normalizer(
+        Array(normalizer.μ),
+        Array(normalizer.σ),
+        normalizer.method
+    )
         args = struct2dict(args)
         JLD2.save(filepath,
-            "ps", ps,
-            "st", st,
-            "normalizer", normalizer,
+            "ps", ps_cpu,
+            "st", st_cpu,
+            "normalizer", normalizer_cpu,
             "args", args,
         )
 

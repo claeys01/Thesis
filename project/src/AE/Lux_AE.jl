@@ -1,14 +1,3 @@
-# using Lux
-# using NNlib
-# using Statistics
-# using MLUtils
-# using Zygote
-# using Enzyme
-
-# include("../custom.jl")
-# include("../utils/AE_normalizer.jl")
-# # include("../utils/SimDataTypes.jl")
-
 Base.@kwdef mutable struct LuxArgs
     η::Float64 = 1e-3                    # learning rate
     λ::Float64 = 9e-4                    # regularization parameter

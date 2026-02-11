@@ -1,3 +1,6 @@
+using Thesis
+using Random
+
 function visualize_reconstructions(checkpoint_path::Union{String,Nothing}=nothing;
                                    device=cpu_device())
     """
@@ -6,41 +9,42 @@ function visualize_reconstructions(checkpoint_path::Union{String,Nothing}=nothin
     Usage:
       - provide checkpoint_path (String) -> load encoder/decoder and args from checkpoint
     """
-    # load from checkpoint
-    checkpoint = JLD2.load(checkpoint_path)
+    # # load from checkpoint
+    # checkpoint = load(checkpoint_path)
 
-    ps = checkpoint["ps"]
-    st = checkpoint["st"]
-    normalizer = checkpoint["normalizer"]
-    # reconstruct args: try LuxArgs then fallback to Args
-    args_dict = checkpoint["args"]
-    args = LuxArgs(; args_dict...)
+    # ps = checkpoint["ps"]
+    # st = checkpoint["st"]
+    # normalizer = checkpoint["normalizer"]
+    # # reconstruct args: try LuxArgs then fallback to Args
+    # args_dict = checkpoint["args"]
+    # args = LuxArgs(; args_dict...)
 
-    # determine runtime device (unless explicitly passed)
-    if device === cpu_device() && hasproperty(args, :use_gpu)
-        device = args.use_gpu ? gpu_device() : cpu_device()
-    end
-    cpu = cpu_device()
+    # # determine runtime device (unless explicitly passed)
+    # if device === cpu_device() && hasproperty(args, :use_gpu)
+    #     device = args.use_gpu ? gpu_device() : cpu_device()
+    # end
+    # cpu = cpu_device()
     
-    # move params/states to device
-    ps = device(ps)
-    st = device(st)
-    st_test = LuxCore.testmode(st)
+    # # move params/states to device
+    # ps = device(ps)
+    # st = device(st)
+    # st_test = LuxCore.testmode(st)
 
-    # Move normalizer to device if normalizing
-    if args.normalize && normalizer !== nothing
-        normalizer = Normalizer(
-            device(Float32.(normalizer.μ)),
-            device(Float32.(normalizer.σ)),
-            normalizer.method
-        )
-    end
+    # # Move normalizer to device if normalizing
+    # if args.normalize && normalizer !== nothing
+    #     normalizer = Normalizer(
+    #         device(Float32.(normalizer.μ)),
+    #         device(Float32.(normalizer.σ)),
+    #         normalizer.method
+    #     )
+    # end
 
-    enc = Encoder(args, verbose=false)
-    dec = Decoder(args, verbose=false)
+    # enc = Encoder(args, verbose=false)
+    # dec = Decoder(args, verbose=false)
 
-    ae = AE(enc, dec)
-    
+    # ae = AE(enc, dec)
+    enc, dec, ae, ps, st, args = load_trained_AE(checkpoint_path; return_params=true) .|> cpu_device()
+    normalizer = load_normalizer(checkpoint_path)
     # optional seeding
     args.seed > 0 && Random.seed!(args.seed)
 
@@ -124,4 +128,6 @@ function visualize_reconstructions(checkpoint_path::Union{String,Nothing}=nothin
     return p
 end
 
-
+if isinteractive()
+    p = visualize_reconstructions("data/saved_models/u/Lux/256h_16l/RE2500/2e8/Feb11-1156__E1000_HW256x256_C4to2_nc6_nd2_z16_C8_lr0p001_wd0p0009_bs16_NY_LL1/checkpoint.jld2")
+end
