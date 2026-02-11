@@ -5,8 +5,8 @@ ENV["THESIS_HPC"] = "true"         # Mark as HPC environment
 ENV["THESIS_USE_CUDA"] = "true"  # Uncomment if using GPU nodes
 
 # Activate the project
-using Pkg
-Pkg.activate(joinpath(@__DIR__, ".."))
+# using Pkg
+# Pkg.activate(joinpath(@__DIR__, ".."))
 
 # Load the module
 using Thesis
@@ -20,7 +20,8 @@ function main()
     @info "  Hostname: $(gethostname())"
     
     # Run training with HPC-appropriate settings
-    # train()
+    train_AE(LuxArgs(epochs=200))
+    train_AE(LuxArgs(epochs=1000))
 end
 
 main()

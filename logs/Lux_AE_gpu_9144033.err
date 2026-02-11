@@ -1,0 +1,20 @@
+┌ Info: CUDA loaded successfully
+│   device = CuDevice(0): NVIDIA A100 80GB PCIe
+└   capability = v"8.0.0"
+┌ Info: cuDNN loaded successfully
+└   version = v"8.90.7"
+[ Info: Starting HPC AE training job
+[ Info:   SLURM_JOB_ID: 9144033
+[ Info:   SLURM_NTASKS: 1
+[ Info:   SLURM_CPUS_PER_TASK: 8
+[ Info:   Hostname: gpu013
+ERROR: LoadError: UndefVarError: `train` not defined in `Main`
+Suggestion: check for spelling errors or missing imports.
+Stacktrace:
+ [1] main()
+   @ Main ~/Thesis/project/scripts/hpc_train.jl:23
+ [2] top-level scope
+   @ ~/Thesis/project/scripts/hpc_train.jl:26
+in expression starting at /home/mfbclaeys/Thesis/project/scripts/hpc_train.jl:26
+srun: error: gpu013: task 0: Exited with exit code 1
+srun: launch/slurm: _step_signal: Terminating StepId=9144033.0

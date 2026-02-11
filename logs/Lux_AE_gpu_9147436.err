@@ -1,0 +1,33 @@
+┌ Info: CUDA loaded successfully
+│   device = CuDevice(0): NVIDIA A100 80GB PCIe
+└   capability = v"8.0.0"
+┌ Info: cuDNN loaded successfully
+└   version = v"8.90.7"
+[ Info: Starting HPC AE training job
+[ Info:   SLURM_JOB_ID: 9147436
+[ Info:   SLURM_NTASKS: 1
+[ Info:   SLURM_CPUS_PER_TASK: 8
+[ Info:   Hostname: gpu019
+ERROR: LoadError: MethodError: no method matching preprocess_data!(::JLD2.ReconstructedMutable{:SimData, (:time, :Δt, :u, :μ₀, :force, :ε, :period_ranges, :reordered_ranges, :single_period_idx), Tuple{Any, Any, Any, Any, Any, Any, Any, Any, UnitRange{Int64}}}; verbose::Bool)
+The function `preprocess_data!` exists, but no method is defined for this combination of argument types.
+
+Closest candidates are:
+  preprocess_data!(!Matched::SimData; verbose)
+   @ Thesis ~/Thesis/project/src/utils/custom.jl:23
+
+Stacktrace:
+ [1] get_data(batch_size::Int64, path::String; t_training::Float64, n_training::Int64, n_test::Int64, split::Float64, verbose::Bool, showplot::Bool, plotpath::Nothing)
+   @ Thesis ~/Thesis/project/src/AE/Lux_AE.jl:147
+ [2] get_data
+   @ ~/Thesis/project/src/AE/Lux_AE.jl:145 [inlined]
+ [3] train_AE(; kws::@Kwargs{})
+   @ Thesis ~/Thesis/project/src/AE/Lux_AE_train.jl:10
+ [4] train_AE
+   @ ~/Thesis/project/src/AE/Lux_AE_train.jl:3 [inlined]
+ [5] main()
+   @ Main ~/Thesis/project/scripts/hpc_train.jl:23
+ [6] top-level scope
+   @ ~/Thesis/project/scripts/hpc_train.jl:26
+in expression starting at /home/mfbclaeys/Thesis/project/scripts/hpc_train.jl:26
+srun: error: gpu019: task 0: Exited with exit code 1
+srun: launch/slurm: _step_signal: Terminating StepId=9147436.0

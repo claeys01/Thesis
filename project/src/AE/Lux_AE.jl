@@ -18,12 +18,12 @@ Base.@kwdef mutable struct LuxArgs
     λstrain::Float64 = 0.0
     λcurl::Float64 = 0.0
     loss::Symbol = :L1                   # loss function for reconstruction (:L1, :L2, :charb)
-    batch_size::Int = 40                 # batch size
+    batch_size::Int = 16                 # batch size
     t_training::Float64 = 16.603
     train_downsample::Int = 200          # amount of data used for training
     test_downsample::Int = 200
     split::Float64 = 0.2
-    epochs::Int = 10                    # number of epochs
+    epochs::Int = 1000                    # number of epochs
     seed::Int = 42                       # random seed
     n_reconstruct::Int = 2               # sampling size for output
     test_loss::Bool = true

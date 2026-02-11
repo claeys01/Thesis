@@ -1,0 +1,19 @@
+Precompiling Thesis...
+  41011.1 ms  ✓ Thesis
+  1 dependency successfully precompiled in 146 seconds. 697 already precompiled.
+┌ Info: CUDA loaded successfully
+│   device = CuDevice(0): NVIDIA A100 80GB PCIe
+└   capability = v"8.0.0"
+┌ Info: cuDNN loaded successfully
+└   version = v"8.90.7"
+ERROR: LoadError: ParseError:
+# Error @ /home/mfbclaeys/Thesis/project/scripts/hpc_train.jl:24:5
+    train_AE(LuxArgs(epochs=200)
+    train_AE(LuxArgs(epochs=1000)
+#   └──────────────────────────┘ ── Expected `)`
+Stacktrace:
+ [1] top-level scope
+   @ ~/Thesis/project/scripts/hpc_train.jl:24
+in expression starting at /home/mfbclaeys/Thesis/project/scripts/hpc_train.jl:24
+srun: error: gpu013: task 0: Exited with exit code 1
+srun: launch/slurm: _step_signal: Terminating StepId=9148224.0

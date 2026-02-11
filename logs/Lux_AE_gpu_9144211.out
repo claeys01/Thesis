@@ -1,0 +1,7 @@
+Running on host gpu013
+Using 8 Julia threads
+Starting at Tue Feb 10 20:40:49 CET 2026
+Loading Modules
+Finished Loading Modules
+Running Lux_AE_train.jl
+Finished at Tue Feb 10 20:41:48 CET 2026
