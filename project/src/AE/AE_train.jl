@@ -1,9 +1,6 @@
 # using Thesis
 
-function train_AE(args::LuxArgs; )
-
-    # load hyperparamters
-    # args = LuxArgs(; kws...)
+function train_AE(args::LuxArgs)
     args.seed > 0 && Random.seed!(args.seed)
 
     # load data and normalizer
@@ -17,12 +14,6 @@ function train_AE(args::LuxArgs; )
         )
     TrainData, ValData, TestData = data
     train_loader, validation_loader, test_loader = loaders
-
-    # if args.use_gpu
-    #     device = gpu_device()
-    # else
-    #     device = cpu_device()
-    # end
 
     device = get_device()
 
@@ -83,7 +74,6 @@ function train_AE(args::LuxArgs; )
         @timeit to "epoch" begin
             @info "Epoch $(epoch)/$(args.epochs)"
             
-            # train_progress = Progress(length(train_loader); desc="Training")
             # ---- TRAIN ----
             @timeit to "train" begin
                 for train_idx in train_loader
@@ -100,12 +90,8 @@ function train_AE(args::LuxArgs; )
                     div_losses[iter] = Float32(L2div)
                     inside_losses[iter] = Float32(Linside)
                     train_corrs[iter] = corrs
-
-                    # progress meter
-                    # next!(train_progress; showvalues=[(:loss, loss)])
                 end
             end
-            # finish!(train_progress)
 
             # ---- VALIDATION (epoch-level) ----
             val_sum = 0.0
@@ -132,7 +118,6 @@ function train_AE(args::LuxArgs; )
             # ----- TEST (On whole dataset)
             if args.test_loss
                 @timeit to "test" begin
-                    # test_progress = Progress(length(test_loader); desc="Test", color=:red)
                     test_sum = 0.0
                     n_test = 0
                     test_corr_mean = (0.0, 0.0)
@@ -147,7 +132,6 @@ function train_AE(args::LuxArgs; )
                         n_test += 1
                         test_corr_total .+= test_corr
                         test_corr_mean = vec((test_corr_total / max(n_test, 1)))
-                        # next!(test_progress; showvalues=[("Loss", test_loss), ("Corrs", test_corr_mean)])
                     end
                     test_mean = Float32(test_sum / max(n_test, 1))
                     push!(test_losses, test_mean)
