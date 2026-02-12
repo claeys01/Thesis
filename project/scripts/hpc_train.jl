@@ -20,8 +20,8 @@ function main()
     @info "  Hostname: $(gethostname())"
     
     # Run training with HPC-appropriate settings
-    train_AE(LuxArgs(epochs=200))
-    train_AE(LuxArgs(epochs=1000))
+    train_AE(LuxArgs(epochs=200, λdiv=1000.0, λcurl=100.0))
+    train_AE(LuxArgs(epochs=1000,λdiv=1000.0, λcurl=100.0))
 end
 
 main()
