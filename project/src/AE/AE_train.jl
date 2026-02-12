@@ -76,7 +76,7 @@ function train_AE(args::LuxArgs)
     
     test_losses = Float32[]
     test_corrs  = Vector{Float32}[]
-
+    test_Lrecs = Float32[]
     iter = 0
 
     # quick checks
@@ -138,6 +138,7 @@ function train_AE(args::LuxArgs)
             if args.test_loss
                 @timeit to "test" begin
                     test_sum = 0.0
+                    test_Lrec_sum = 0.0
                     n_test = 0
                     test_corr_mean = (0.0, 0.0)
                     test_corr_total = zeros(Float32, 2)
@@ -146,15 +147,19 @@ function train_AE(args::LuxArgs)
                         # Forward pass only
                         st_test = LuxCore.testmode(train_state.states)
                         test_loss, _, test_stats = @timeit to "get test loss" loss_func(ae, train_state.parameters, st_test, test_batch)
-                        _, _, _, _, test_corr = test_stats
+                        test_Lrec, _, _, _, test_corr = test_stats
+                        
                         test_sum += test_loss
+                        test_Lrec_sum += test_Lrec
                         n_test += 1
                         test_corr_total .+= test_corr
                         test_corr_mean = vec((test_corr_total / max(n_test, 1)))
                     end
                     test_mean = Float32(test_sum / max(n_test, 1))
+                    test_Lrec_mean = Float32(test_Lrec_sum / max(n_test, 1))
                     push!(test_losses, test_mean)
                     push!(test_corrs, test_corr_mean)
+                    push!(test_Lrecs, test_Lrec_mean)
                 end
             end
         end
@@ -176,7 +181,7 @@ function train_AE(args::LuxArgs)
 
     # save model
     timestamp = Dates.format(now(), "udd-HHMM")
-    tag = run_tag(args)
+    tag = run_tag(args; test_Lrec=test_Lrecs[end])
     save_folder = joinpath(args.save_path, "$(timestamp)__$(tag)")
     !ispath(save_folder) && mkpath(save_folder)
     filepath = joinpath(save_folder, "checkpoint.jld2")
@@ -215,6 +220,7 @@ function train_AE(args::LuxArgs)
             "val_corrs", val_corrs,
 
             "test_losses", test_losses,
+            "test_Lrecs", test_Lrecs,
             "test_corrs", test_corrs)
         @info "Model saved: $(filepath)"
     end
@@ -245,7 +251,7 @@ end
 _fmt(x) = replace(string(round(Float64(x), sigdigits=3)), "." => "p")
 _yn(b) = b ? "Y" : "N"
 
-function run_tag(args)
+function run_tag(args; test_Lrec=0.0)
     H, W, Cin = args.input_dim
     _, _, Cout = args.output_dim
 
@@ -262,6 +268,7 @@ function run_tag(args)
         "bs$(args.batch_size)",
         "N$(_yn(args.normalize))",
         "L$(args.loss)",
+        "Tl$(_fmt(test_Lrec))"
     ], "_")
 end
 
