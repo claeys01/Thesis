@@ -128,9 +128,13 @@ function impose_biot_bc_on_snapshot(û::AbstractArray{T,N}; return_sim=false) w
         ω = BiotSavartBCs.MLArray(sim.flow.f)  # same layout as flow.f
         BiotSavartBCs.fill_ω!(ω, sim.flow.u)
 
-        sim.ω = ω
-        sim.tar = Array.(collect_targets(sim.ω,()))
-        sim.ftar = flatten_targets(sim.tar)
+        # Use setfield! to bypass custom setproperty!
+        setfield!(sim, :ω, ω)
+        tar = Array.(collect_targets(sim.ω,()))
+        setfield!(sim, :tar, tar)
+        ftar = flatten_targets(tar)
+        setfield!(sim, :ftar, ftar)
+
 
         BiotSavartBCs.biot_project!(sim.flow, sim.pois, sim.ω, sim.x₀, sim.tar, sim.ftar, U; w=0, fmm=sim.fmm)
         if return_sim
