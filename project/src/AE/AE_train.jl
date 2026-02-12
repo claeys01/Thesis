@@ -44,20 +44,38 @@ function train_AE(args::LuxArgs)
     loss_func = make_loss_function(args, device, normalizer)
 
     # Pre-allocate loss arrays
-    max_iters = args.epochs * length(train_loader)
-    train_losses = Vector{Float32}(undef, max_iters)
-    rec_losses = Vector{Float32}(undef, max_iters)
-    div_losses = Vector{Float32}(undef, max_iters)
-    inside_losses = Vector{Float32}(undef, max_iters)
-    iters = Vector{Int}(undef, max_iters)
-    train_corrs = Vector{Vector{Float32}}(undef, max_iters)
+    # max_iters     = args.epochs * length(train_loader)
+    # train_losses  = Vector{Float32}(undef, max_iters)
+    # rec_losses    = Vector{Float32}(undef, max_iters)
+    # div_losses    = Vector{Float32}(undef, max_iters)
+    # curl_losses   = Vector{Float32}(undef, max_iters)
+    # strain_losses = Vector{Float32}(undef, max_iters)
+    # iters         = Vector{Int}(undef, max_iters)
+    # train_corrs   = Vector{Vector{Float32}}(undef, max_iters)
     
-    val_losses = Vector{Float32}(undef, args.epochs)
-    val_iters = Vector{Int}(undef, args.epochs)
-    val_corrs = Vector{Vector{Float32}}(undef, args.epochs)
+    # val_losses = Vector{Float32}(undef, args.epochs)
+    # val_iters  = Vector{Int}(undef, args.epochs)
+    # val_corrs  = Vector{Vector{Float32}}(undef, args.epochs)
+    
+    # test_losses = Float32[]
+    # test_corrs = Vector{Float32}[]
+
+    max_iters = args.epochs * length(train_loader)
+    
+    train_losses  = Float32[]; sizehint!(train_losses, max_iters)
+    rec_losses    = Float32[]; sizehint!(rec_losses, max_iters)
+    div_losses    = Float32[]; sizehint!(div_losses, max_iters)
+    curl_losses   = Float32[]; sizehint!(curl_losses, max_iters)
+    strain_losses = Float32[]; sizehint!(strain_losses, max_iters)
+    iters         = Int[];     sizehint!(iters, max_iters)
+    train_corrs   = Vector{Float32}[]; sizehint!(train_corrs, max_iters)
+    
+    val_losses = Float32[]; sizehint!(val_losses, args.epochs)
+    val_iters  = Int[];     sizehint!(val_iters, args.epochs)
+    val_corrs  = Vector{Float32}[]; sizehint!(val_corrs, args.epochs)
     
     test_losses = Float32[]
-    test_corrs = Vector{Float32}[]
+    test_corrs  = Vector{Float32}[]
 
     iter = 0
 
@@ -81,15 +99,16 @@ function train_AE(args::LuxArgs)
                     _, loss, stats, train_state = @timeit to "single_train_step!" Training.single_train_step!(
                         args.Autodiff, loss_func, batch, train_state; return_gradients=Val(false)
                     )
-                    Lrec, Linside, L2div, corrs = stats
+                    Lrec, Ldiv, Lcurl, Lstrain, corrs = stats
                     # record
                     iter += 1
-                    iters[iter] = iter
-                    train_losses[iter] = Float32(loss)
-                    rec_losses[iter] = Float32(Lrec)
-                    div_losses[iter] = Float32(L2div)
-                    inside_losses[iter] = Float32(Linside)
-                    train_corrs[iter] = corrs
+                    push!(iters, iter)
+                    push!(train_losses, Float32(loss))
+                    push!(rec_losses, Float32(Lrec))
+                    push!(div_losses, Float32(Ldiv))
+                    push!(curl_losses, Float32(Lcurl))
+                    push!(strain_losses, Float32(Lstrain))
+                    push!(train_corrs, corrs)
                 end
             end
 
@@ -103,16 +122,16 @@ function train_AE(args::LuxArgs)
                     # Forward pass only (no gradients)
                     st_test = LuxCore.testmode(train_state.states)
                     val_loss, _, val_stats = @timeit to "validation loss" loss_func(ae, train_state.parameters, st_test, val_batch)
-                    _, _, _, val_corr = val_stats
+                    _, _, _, _, val_corr = val_stats
                     val_sum += val_loss
                     n_val += 1
                     val_corr_total .+= val_corr
                 end
                 val_mean = Float32(val_sum / max(n_val, 1))
                 val_corr_mean = vec((val_corr_total / max(n_val, 1)))
-                val_losses[epoch] = val_mean
-                val_iters[epoch] = iter
-                val_corrs[epoch] = val_corr_mean
+                push!(val_losses, val_mean)
+                push!(val_iters, iter)
+                push!(val_corrs, val_corr_mean)
             end
 
             # ----- TEST (On whole dataset)
@@ -127,7 +146,7 @@ function train_AE(args::LuxArgs)
                         # Forward pass only
                         st_test = LuxCore.testmode(train_state.states)
                         test_loss, _, test_stats = @timeit to "get test loss" loss_func(ae, train_state.parameters, st_test, test_batch)
-                        _, _, _, test_corr = test_stats
+                        _, _, _, _, test_corr = test_stats
                         test_sum += test_loss
                         n_test += 1
                         test_corr_total .+= test_corr
@@ -146,8 +165,8 @@ function train_AE(args::LuxArgs)
         println(join([
             "Epoch $(epoch)/$(args.epochs)",
             "time=$(round(epoch_time; digits=3))s",
-            "train_loss=$(round(train_losses[iter]; digits=4))",
-            "train_corr=($(round(train_corrs[iter][1]; digits=3)), $(round(train_corrs[iter][2]; digits=3)))",
+            "train_loss=$(round(train_losses[end]; digits=4))",
+            "train_corr=($(round(train_corrs[end][1]; digits=3)), $(round(train_corrs[end][2]; digits=3)))",
             "val_loss=$(round(val_mean; digits=4))",
             "val_corr=($(round(val_corr_mean[1]; digits=3)), $(round(val_corr_mean[2]; digits=3)))",
             "test_loss=$(round(test_mean; digits=4))",
@@ -186,12 +205,15 @@ function train_AE(args::LuxArgs)
             "train_losses", train_losses,
             "rec_losses", rec_losses,
             "div_losses", div_losses,
-            "inside_losses", inside_losses,
+            "curl_losses", curl_losses,
+            "strain_losses", strain_losses,
             "iters", iters,
+            "train_corrs", train_corrs,
+
             "val_losses", val_losses,
             "val_iters", val_iters,
-            "train_corrs", train_corrs,
             "val_corrs", val_corrs,
+
             "test_losses", test_losses,
             "test_corrs", test_corrs)
         @info "Model saved: $(filepath)"
@@ -258,16 +280,17 @@ function make_loss_function(args, device, normalizer)
             uvc = uvmask[:, :, 1:2, :]
             uvc_norm, _ = normalize_batch(uvc; normalizer=normalizer)
             x_in_dev = cat(uvc_norm, uvmask[:, :, 3:4, :]; dims=3)
-            x_target_dev, _ = normalize_batch(x_target_dev; normalizer=normalizer)
+            # x_target_dev, _ = normalize_batch(x_target_dev; normalizer=normalizer)
         end
 
         # Call your existing loss
         return total_loss(
-            m, ps, st,
+            m, ps, st, normalizer, 
             x_in_dev, x_target_dev, μ₀_dev;
             loss=args.loss,
             λdiv=args.λdiv,
-            λmask=args.λmask,
+            λstrain=args.λstrain,
+            λcurl=args.λcurl
         )
     end
     return loss_function

@@ -2,21 +2,21 @@ Base.@kwdef mutable struct LuxArgs
     η::Float64 = 1e-3                    # learning rate
     λ::Float64 = 9e-4                    # regularization parameter
     Autodiff::Any = AutoZygote()
-    λdiv::Float64 = 0.0                 # divergence loss weight
+    λdiv::Float64 = 1.0                  # divergence loss weight
     λmask::Float64 = 0.0                 # weight of body mask loss
     λstrain::Float64 = 0.0
-    λcurl::Float64 = 0.0
+    λcurl::Float64 = 1.0
     loss::Symbol = :L1                   # loss function for reconstruction (:L1, :L2, :charb)
     batch_size::Int = 16                 # batch size
     t_training::Float64 = 16.603
     train_downsample::Int = 200          # amount of data used for training
     test_downsample::Int = 200
     split::Float64 = 0.2
-    epochs::Int = 1000                    # number of epochs
+    epochs::Int = 2                    # number of epochs
     seed::Int = 42                       # random seed
     n_reconstruct::Int = 2               # sampling size for output
     test_loss::Bool = true
-    use_gpu::Bool = true                # use GPU
+    use_gpu::Bool = false                # use GPU
     clip_bc::Bool = true                 # removes the ghost cells from the snapshot
     input_dim::Tuple{Int,Int,Int} = (2^8, 2^8, 4)   # flow field size with μ₀ concatenated
     output_dim::Tuple{Int,Int,Int} = (2^8, 2^8, 2)  # size of reconstructed RHS field
@@ -92,7 +92,7 @@ function get_idxs(simdata::SimData, t_training, n_training, n_test; split=0.2)
     return train_idx, val_idx, test_idx
 end
 
-function get_data(batch_size, path; t_training=10, n_training=500, n_test=500, split=0.2, verbose=true, showplot=true, plotpath=nothing)
+function get_data(batch_size, path; t_training=10, n_training=500, n_test=500, split=0.2, verbose=true, showplot=false, plotpath=nothing)
     simdata = load_simdata(path)
     preprocess_data!(simdata; verbose=verbose)
 
@@ -401,8 +401,13 @@ function (m::AE)(x, ps, st)
 end
 
 # losses
-# recon_loss(x, x̂) = mean(abs2, x̂ .- x)                # MSE
 div_loss_L2(u::AbstractArray) = mean(abs2, div_vectorized(u; buff=1))     # L2 of divergence field
+
+function curl_loss_L2(x::AbstractArray, x̂::AbstractArray)
+    x_curl = curl_vectorized(x)
+    x̂_curl = curl_vectorized(x̂)
+    return mean(abs2, x_curl .- x̂_curl)
+end
 
 function recon_loss(x, x̂; loss=:L2)
     Lrec = 0.0
@@ -412,6 +417,8 @@ function recon_loss(x, x̂; loss=:L2)
         Lrec = mean(abs2, x̂ .- x)
     elseif loss == :charb
         Lrec = Lrec_charbonnier(x, x̂)
+    else
+        @warn "No valid loss function entered(must be :L1, :L2 or :charb), reconstruction loss set to 0"
     end
     return Lrec
 end
@@ -453,43 +460,61 @@ end
 
 Zygote.@nograd batch_corrs
 
-function total_loss(m::AE, ps, st,
+function total_loss(m::AE, ps, st, normalizer::Normalizer,
     x_in::AbstractArray,        # (u,v,mask)
     x_target::AbstractArray,    # (u,v)
     μ₀::AbstractArray;          # (H,W,1,B)  1 outside / 0 inside
     loss=:L1,
     λdiv=0f0,
-    λmask=0f0)
+    λstrain=0f0, 
+    λcurl=0f0)
+
     # 1) Forward pass through AE (Lux-style)
     x̂, st2 = m(x_in, ps, st)
 
-    corrs = batch_corrs(x_target, x̂)
+    # @show mean(x_in[:, :, 1:2, :]), std(x_in[:, :, 1:2, :])
+    # @show mean(x̂), std(x̂)
+    # 2) denormalize reconstruction
+    x̂ = denormalize_batch(x̂, normalizer)
 
     # 3) Mask out body region
     x̂ = x̂ .* μ₀
 
-    # 4) Reconstruction + optional extra losses
-    Linside = 0f0
-    L2div = 0f0
-    Lrec = 0f0
+    # 4) compute correlation function
+    corrs = batch_corrs(x_target, x̂)
 
-    if λmask != 0f0
-        Lrec, Linside = masked_loss(x_target, x̂, μ₀; loss=loss)
-    elseif λdiv != 0f0
-        try
-            # If divergence computation fails on GPU we skip it (avoid CPU/GPU mix)
-            L2div = div_loss_L2(x̂)
-        catch e
-            @warn "div_loss_L2 failed (likely GPU/CPU mismatch). skipping divergence loss: $e"
-        end
-        Lrec = recon_loss(x_target, x̂; loss=loss)
-    else
-        Lrec = recon_loss(x_target, x̂; loss=loss)
-    end
+    # 5) Reconstruction + optional extra losses
+    Lrec = recon_loss(x_target, x̂; loss=loss) # reconstruction loss
 
-    L = Lrec + λdiv * L2div + λmask * Linside
+    # Ldiv = 0f0      # divergence loss
+    # Lstrain = 0f0   # strain loss
+    # Lcurl = 0f0     # curl loss 
 
-    return L, st2, (Lrec, Linside, L2div, corrs)
+    # 5) Reconstruction + optional extra losses
+    Lrec    = recon_loss(x_target, x̂; loss=loss)
+    Ldiv    = λdiv    != 0f0 ? div_loss_L2(x̂)            : 0f0 # divergence loss
+    Lcurl   = λcurl   != 0f0 ? curl_loss_L2(x_target, x̂) : 0f0 # curl loss
+    Lstrain = λstrain != 0f0 ? strain_loss(x_target, x̂)  : 0f0 # strain loss
+
+    L = Lrec + λdiv*Ldiv + λcurl*Lcurl + λstrain*Lstrain
+
+
+    # if λmask != 0f0
+    #     Lrec, Linside = masked_loss(x_target, x̂, μ₀; loss=loss)
+    # elseif λdiv != 0f0
+    #     try
+    #         # If divergence computation fails on GPU we skip it (avoid CPU/GPU mix)
+    #         L2div = div_loss_L2(x̂)
+    #     catch e
+    #         @warn "div_loss_L2 failed (likely GPU/CPU mismatch). skipping divergence loss: $e"
+    #     end
+    #     Lrec = recon_loss(x_target, x̂; loss=loss)
+    # else
+    #     Lrec = recon_loss(x_target, x̂; loss=loss)
+    # end
+
+
+    return L, st2, (Lrec, Ldiv, Lcurl, Lstrain, corrs)
 end
 
 """

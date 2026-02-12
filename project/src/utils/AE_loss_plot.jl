@@ -21,14 +21,17 @@ function plot_losses(loss_trajectory_path::AbstractString, checkpoint_path::Abst
     train_losses   = get(losses, "train_losses", Float32[])
     rec_losses     = get(losses, "rec_losses", Float32[])
     div_losses     = get(losses, "div_losses", Float32[])
-    inside_losses  = get(losses, "inside_losses", Float32[])
+    curl_losses    = get(losses, "curl_losses", Float32[])
+    strain_losses  = get(losses, "strain_losses", Float32[])
     iters          = get(losses, "iters", Int[])
+    train_corrs    = get(losses, "train_corrs", Vector{Float32}[])
+
     val_losses     = get(losses, "val_losses", Float32[])
     val_iters      = get(losses, "val_iters", Int[])
-    train_corrs    = get(losses, "train_corrs", Vector{Float32}[])
     val_corrs      = get(losses, "val_corrs", Vector{Float32}[])
+
     test_losses    = get(losses, "test_losses", Float32[])
-    test_corrs    = get(losses, "test_corrs", Vector{Float32}[])
+    test_corrs     = get(losses, "test_corrs", Vector{Float32}[])
 
 
     checkpoint = JLD2.load(checkpoint_path)
@@ -101,9 +104,9 @@ function plot_losses(loss_trajectory_path::AbstractString, checkpoint_path::Abst
         )
     end
 
-    if args.λmask != 0 && !isempty(inside_losses)
-        plot!(p, iters, inside_losses;
-            label = "inside-mask term",
+    if args.λcurl != 0 && !isempty(curl_losses)
+        plot!(p, iters, curl_losses;
+            label = "curl term",
             lw = 0.8,
             ls = :dashdot,
             color = :orange,
@@ -111,7 +114,17 @@ function plot_losses(loss_trajectory_path::AbstractString, checkpoint_path::Abst
         )
     end
 
-# log scale + nice ticks
+    if args.λstrain != 0 && !isempty(strain_losses)
+        plot!(p, iters, strain_losses;
+            label = "strain term",
+            lw = 0.8,
+            ls = :dashdot,
+            color = :blue,
+            alpha = 0.9,
+        )
+    end
+
+    # log scale + nice ticks
     plot!(p;
         yscale = :log10,
         minorgrid = true,
@@ -190,8 +203,6 @@ function plot_losses(loss_trajectory_path::AbstractString, checkpoint_path::Abst
     # ------------------
     # 1. remove big title from top, just annotate final loss small in plot area
 
-
-
     # shrink legend boxes (border thin)
     plot!(p; legend = (0.9,0.3), legendfontsize=8, foreground_color_legend=:black,
              background_color_legend=RGBA(1,1,1,0.7))
@@ -204,8 +215,8 @@ function plot_losses(loss_trajectory_path::AbstractString, checkpoint_path::Abst
 end
 
 
-checkpoint = "data/Lux_models/2025-12-18_14-27-49/checkpoint.jld2"
-losses = "data/Lux_models/2025-12-18_14-27-49/loss_trajectory.jld2"
+# checkpoint = "data/Lux_models/2025-12-18_14-27-49/checkpoint.jld2"
+# losses = "data/Lux_models/2025-12-18_14-27-49/loss_trajectory.jld2"
 
 # p = plot_losses(losses, checkpoint)
 # display(p)
