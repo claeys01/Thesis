@@ -28,7 +28,8 @@ julia --project=. -e 'using Pkg; Pkg.add(name="CUDA"); using CUDA; CUDA.set_runt
 > [!NOTE]
  Installing CUDA from the software stack not advised in the DelftBlue documentation, but it has to be done this way for cuDNN to work, since it requires a local version of CUDA to be present on the system.  
 
-> [!TIP] when loading the CUDA module, always load a version later than 12.1, since the default cuda version (11.6) is not compatible with the default Julia version on DelftBlue. 
+> [!TIP] 
+when loading the CUDA module, always load a version later than 12.1, since the default cuda version (11.6) is not compatible with the default Julia version on DelftBlue. 
 
 We are now able to test our CUDA installation by requesting an interactive GPU node, which can be done by using the following command: 
 
