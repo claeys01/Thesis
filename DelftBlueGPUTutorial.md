@@ -46,7 +46,7 @@ To test the CUDA installation, request an interactive GPU node using the followi
 srun --mpi=pmix \
      --job-name="int_gpu_job" \
      --partition=gpu-a100-small \
-     --time=03:00:00 \
+     --time=01:00:00 \
      --ntasks=1 \
      --cpus-per-task=2 \
      --gpus-per-task=1 \
@@ -112,6 +112,80 @@ If this does not raise any errors, cuDNN has been configured correctly.
 
 ---
 
+## Example Batch Script for GPU Jobs
+
+Once CUDA and cuDNN are installed, you can submit GPU jobs using a batch script. Below is an extensive template you can adapt for your own projects:
+
+```bash
+#!/bin/bash
+#SBATCH --job-name="my_gpu_job"           # Job name (appears in squeue)
+#SBATCH --partition=gpu-a100              # GPU partition (see note below)
+#SBATCH --output=logs/%x_%j.out           # Standard output log (%x=job name, %j=job ID)
+#SBATCH --error=logs/%x_%j.err            # Standard error log
+#SBATCH --time=01:00:00                   # Maximum runtime (HH:MM:SS)
+#SBATCH --ntasks=1                        # Number of tasks (usually 1 for single-GPU jobs)
+#SBATCH --cpus-per-task=8                 # CPU cores per task
+#SBATCH --gpus-per-task=1                 # GPUs per task
+#SBATCH --mem-per-cpu=4G                  # Memory per CPU core
+#SBATCH --account=<research/education>-<faculty>-<department>
+
+# Set Julia to use all allocated CPU threads
+export JULIA_NUM_THREADS=$SLURM_CPUS_PER_TASK
+
+# Prevent CUDA from trying to download binaries (use local toolkit instead)
+export JULIA_CUDA_USE_BINARYBUILDER=false
+
+echo "============================================"
+echo "Job ID:        $SLURM_JOB_ID"
+echo "Job Name:      $SLURM_JOB_NAME"
+echo "Node:          $(hostname)"
+echo "CPUs:          $SLURM_CPUS_PER_TASK"
+echo "Julia Threads: $JULIA_NUM_THREADS"
+echo "Start Time:    $(date)"
+echo "============================================"
+
+module purge                # Clear any previously loaded modules
+module load 2025            # Load the 2025 software stack
+module load cuda/12.9       # Load CUDA (must match installed version in Julia)
+module load cudnn           # Load cuDNN
+module load julia           # Load Julia
+module load slurm           # Load SLURM utilities
+
+echo "Modules loaded successfully"
+
+# Create logs directory if it doesn't exist
+mkdir -p logs
+
+# Run your Julia script
+# Adjust the --project path and script path to match your setup
+srun julia --project=. path/to/your_script.jl
+
+echo "============================================"
+echo "End Time: $(date)"
+echo "Job finished"
+echo "============================================"
+```
+
+### Usage
+
+1. Save this script as `gpu_job.sh` (or any name you prefer)
+2. Create a `logs` directory: `mkdir -p logs`
+3. Replace `<research/education>-<faculty>-<department>` with your account
+4. Replace `path/to/your_script.jl` with your actual script path
+5. Submit the job: `sbatch gpu_job.sh`
+
+### Available GPU Partitions
+
+| Partition | GPUs | Max Time | Notes |
+|-----------|------|----------|-------|
+| `gpu-a100-small` | 1-2 A100 | 24 hours | Smaller jobs, short queue  |
+| `gpu-a100` | 1-4 A100 | 120 hours | Standard GPU partition |
+| `visual` | 1 | 8 hours | Has internet access (for installation) |
+
+> [!TIP]
+> For shorter jobs or debugging, use `gpu-a100-small` (has limited amount of memory) for faster queue times. Use `gpu-a100` for longer training runs.
+---
+
 ## Summary
 
 | Step | Node Type | Command |
@@ -119,6 +193,7 @@ If this does not raise any errors, cuDNN has been configured correctly.
 | Install CUDA | Visual node | `sbatch install_cuda.sh` |
 | Install cuDNN | Login node | `julia -e 'Pkg.add("cuDNN")'` |
 | Test CUDA/cuDNN | GPU node | `srun ... --pty /bin/bash` |
+| Submit GPU job | Login node | `sbatch gpu_job.sh` |
 
 ---
 
@@ -128,3 +203,6 @@ If this does not raise any errors, cuDNN has been configured correctly.
 - **cuDNN version mismatch:** Make sure the CUDA module version matches what cuDNN expects. Using `cuda/12.9` is recommended.
 - **Internet access errors on GPU nodes:** This is expected. Always install packages on login or visual nodes first.
 - **`local_toolkit=true` not set:** If CUDA tries to download artifacts, re-run `CUDA.set_runtime_version!(local_toolkit=true)` on a visual node.
+- **Job stuck in queue:** Try using `gpu-a100-small` partition or reducing requested resources.
+- **Out of memory errors:** Increase `--mem-per-cpu` or reduce batch size in your script.
+- **Logs directory not found:** Ensure you create the `logs` directory before submitting: `mkdir -p logs`.
