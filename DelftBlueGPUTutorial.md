@@ -122,7 +122,7 @@ Once CUDA and cuDNN are installed, you can submit GPU jobs using a batch script.
 #SBATCH --partition=gpu-a100              # GPU partition (see note below)
 #SBATCH --output=logs/%x_%j.out           # Standard output log (%x=job name, %j=job ID)
 #SBATCH --error=logs/%x_%j.err            # Standard error log
-#SBATCH --time=01:00:00                   # Maximum runtime (HH:MM:SS)
+#SBATCH --time=01:00:00                   # Job runtime (HH:MM:SS)
 #SBATCH --ntasks=1                        # Number of tasks (usually 1 for single-GPU jobs)
 #SBATCH --cpus-per-task=8                 # CPU cores per task
 #SBATCH --gpus-per-task=1                 # GPUs per task
