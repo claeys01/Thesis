@@ -49,7 +49,11 @@ function physical_ass(AE_path::String, NODE_path::String; saveplot=false)
     return plot(div_plot, ε_plot; layout=(2, 1), size=(900, 900), )   
 end
 if abspath(PROGRAM_FILE) == (@__FILE__) || isinteractive()
-    node_path = "data/saved_models/NODE/16/RE2500/E1000_MS_Adam_250/node_params.jld2"
-    AE_path = "data/saved_models/u/Lux/256h_16l/RE2500/2e8/E1000_HW256x256_C4to2_nc6_nd2_z16_C8_lr0p001_wd0p0009_bs16_NY_LL1/checkpoint.jld2"
+    # node_path = "data/saved_models/NODE/16/RE2500/E1000_MS_Adam_250/node_params.jld2"
+    # AE_path = "data/saved_models/u/Lux/256h_16l/RE2500/2e8/E1000_HW256x256_C4to2_nc6_nd2_z16_C8_lr0p001_wd0p0009_bs16_NY_LL1/checkpoint.jld2"
+
+    node_path = "data/saved_models/NODE/16/RE2500/E200_MS_Adam_250/node_params.jld2"
+    AE_path = "data/saved_models/u/Lux/256h_16l/RE2500/2e8/E200_HW256x256_C4to2_nc6_nd2_z16_C8_lr0p001_wd0p0009_bs16_NY_LL1/checkpoint.jld2"
+
     physical_ass(AE_path, node_path)
 end

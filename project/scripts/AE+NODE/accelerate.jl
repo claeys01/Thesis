@@ -42,7 +42,7 @@ t_test = simdata.time[test_idx]
 
 t_end = 50
 n_pred = 10
-n_switch = 200
+n_switch = 20
 with_pred = true
 
 forces_wat  = Vector{Vector{Float32}}()
@@ -87,11 +87,11 @@ end
 show(to)
 
 # with_pred = train_force_plot(forces, time)
-plt = Thesis.train_force_plot(simdata.force, simdata.time; train_idx=train_idx, test_idx=test_idx, show_zeros=false)   
+# plt = Thesis.train_force_plot(simdata.force, simdata.time; train_idx=train_idx, test_idx=test_idx, show_zeros=false)   
 
-# waterlily_drag, waterlily_lift = first.(forces_wat), last.(forces_wat)
-# plt = plot(time_wat, waterlily_drag, label="drag", color=:red, linewidth=1.5, linestyle=:solid)
-# plot!(plt, time_wat, waterlily_lift, label="life", color=:blue, linewidth=1.5, linestyle=:solid)
+waterlily_drag, waterlily_lift = first.(forces_wat), last.(forces_wat)
+plt = plot(time_wat, waterlily_drag, label="drag", color=:red, linewidth=1.5, linestyle=:solid)
+plot!(plt, time_wat, waterlily_lift, label="life", color=:blue, linewidth=1.5, linestyle=:solid)
 
 pred_drag, pred_lift = first.(forces_preds), last.(forces_preds)
 plot!(plt, time_pred, pred_drag, label="pred drag", color=:red, linewidth=3, linestyle=:dash)

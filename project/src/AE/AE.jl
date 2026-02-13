@@ -16,7 +16,7 @@ Base.@kwdef mutable struct LuxArgs
     seed::Int = 42                       # random seed
     n_reconstruct::Int = 2               # sampling size for output
     test_loss::Bool = true
-    use_gpu::Bool = false                # use GPU
+    use_gpu::Bool = true                # use GPU
     clip_bc::Bool = true                 # removes the ghost cells from the snapshot
     input_dim::Tuple{Int,Int,Int} = (2^8, 2^8, 4)   # flow field size with μ₀ concatenated
     output_dim::Tuple{Int,Int,Int} = (2^8, 2^8, 2)  # size of reconstructed RHS field
@@ -403,7 +403,7 @@ end
 # losses
 div_loss(u::AbstractArray) = mean(abs, div_vectorized(u; buff=1))     # L2 of divergence field
 
-function curl_loss_L2(x::AbstractArray, x̂::AbstractArray)
+function curl_loss(x::AbstractArray, x̂::AbstractArray)
     x_curl = curl_vectorized(x)
     x̂_curl = curl_vectorized(x̂)
     return mean(abs, x_curl .- x̂_curl)
@@ -471,9 +471,7 @@ function total_loss(m::AE, ps, st, normalizer::Normalizer,
 
     # 1) Forward pass through AE (Lux-style)
     x̂, st2 = m(x_in, ps, st)
-
-    # @show mean(x_in[:, :, 1:2, :]), std(x_in[:, :, 1:2, :])
-    # @show mean(x̂), std(x̂)
+    
     # 2) denormalize reconstruction
     x̂ = denormalize_batch(x̂, normalizer)
 
@@ -484,35 +482,12 @@ function total_loss(m::AE, ps, st, normalizer::Normalizer,
     corrs = batch_corrs(x_target, x̂)
 
     # 5) Reconstruction + optional extra losses
-    Lrec = recon_loss(x_target, x̂; loss=loss) # reconstruction loss
-
-    # Ldiv = 0f0      # divergence loss
-    # Lstrain = 0f0   # strain loss
-    # Lcurl = 0f0     # curl loss 
-
-    # 5) Reconstruction + optional extra losses
     Lrec    = recon_loss(x_target, x̂; loss=loss)
     Ldiv    = λdiv    != 0f0 ? div_loss(x̂)            : 0f0 # divergence loss
     Lcurl   = λcurl   != 0f0 ? curl_loss(x_target, x̂) : 0f0 # curl loss
     Lstrain = λstrain != 0f0 ? strain_loss(x_target, x̂)  : 0f0 # strain loss
 
     L = Lrec + λdiv*Ldiv + λcurl*Lcurl + λstrain*Lstrain
-
-
-    # if λmask != 0f0
-    #     Lrec, Linside = masked_loss(x_target, x̂, μ₀; loss=loss)
-    # elseif λdiv != 0f0
-    #     try
-    #         # If divergence computation fails on GPU we skip it (avoid CPU/GPU mix)
-    #         L2div = div_loss_L2(x̂)
-    #     catch e
-    #         @warn "div_loss_L2 failed (likely GPU/CPU mismatch). skipping divergence loss: $e"
-    #     end
-    #     Lrec = recon_loss(x_target, x̂; loss=loss)
-    # else
-    #     Lrec = recon_loss(x_target, x̂; loss=loss)
-    # end
-
 
     return L, st2, (Lrec, Ldiv, Lcurl, Lstrain, corrs)
 end
