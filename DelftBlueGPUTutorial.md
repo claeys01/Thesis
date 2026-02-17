@@ -184,6 +184,70 @@ echo "============================================"
 
 > [!TIP]
 > For shorter jobs or debugging, use `gpu-a100-small` (has limited amount of memory) for faster queue times. Use `gpu-a100` for longer training runs.
+
+---
+
+## Running WaterLily on GPU
+
+<!-- [WaterLily.jl](https://github.com/WaterLily-jl/WaterLily.jl) is a Julia package for fluid flow simulations that supports GPU acceleration. This section explains how to test WaterLily with CUDA on DelftBlue. -->
+
+This section shows the steps one needs to take to configure WaterLily simulations on a GPU on DelftBlue. If you have completed CUDA configuration steps correctly, the following steps should not pose any issues. 
+
+### Installing WaterLily
+
+Install WaterLily on a **login node** or **visual node** (requires internet access):
+
+```bash
+module load julia
+julia --project=. -e 'using Pkg; Pkg.add("WaterLily")'
+```
+
+### Testing WaterLily on GPU
+
+Run the following script on a GPU node to verify that WaterLily works correctly with CUDA:
+
+```julia
+using CUDA
+using WaterLily
+
+function sphere(n, m; Re=100, U=1, T=Float64, mem=Array)
+    radius, center = m/8, m/2-1
+    body = AutoBody((x, t) -> √sum(abs2, x .- center) - radius)
+    Simulation(
+        (n, m, m), (U, 0, 0),       # 3D domain size and boundary conditions
+        2radius;                     # Length scale
+        ν = U * 2radius / Re,        # Kinematic viscosity
+        body,
+        T,                           # Floating point type
+        mem                          # Memory backend (Array or CuArray)
+    )
+end
+
+# Create a 3D GPU simulation with Float32 precision
+GPUsim = sphere(3 * 2^5, 2^6; T=Float32, mem=CuArray)
+println("Simulation has $(length(GPUsim.flow.u)) degrees of freedom")
+
+# Compile GPU kernels and run one step
+sim_step!(GPUsim)
+
+# Benchmark: run 50 time steps
+@time sim_step!(GPUsim, 50, remeasure=false)
+
+println("✓ WaterLily GPU simulation test successful!")
+```
+
+### Tips for WaterLily on GPU
+
+| Tip | Description |
+|-----|-------------|
+| Use `Float32` | GPUs are significantly faster with single precision |
+| Use `CuArray` | Pass `mem=CuArray` to run simulations on the GPU |
+| Transfer data carefully | Use `Array(gpu_array)` to copy results back to CPU for saving |
+| Monitor memory | Large 3D simulations can exhaust GPU memory quickly |
+
+> [!TIP]
+> For large 3D simulations, use the `gpu-a100` partition and increase `--mem-per-cpu` in your batch script.
+
 ---
 
 ## Summary
@@ -192,17 +256,28 @@ echo "============================================"
 |------|-----------|---------|
 | Install CUDA | Visual node | `sbatch install_cuda.sh` |
 | Install cuDNN | Login node | `julia -e 'Pkg.add("cuDNN")'` |
+| Install WaterLily | Login node | `julia -e 'Pkg.add("WaterLily")'` |
 | Test CUDA/cuDNN | GPU node | `srun ... --pty /bin/bash` |
+| Test WaterLily | GPU node | Run test script above |
 | Submit GPU job | Login node | `sbatch gpu_job.sh` |
 
 ---
 
 ## Troubleshooting
 
+### General CUDA Issues
 - **CUDA not functional:** Ensure you loaded the CUDA module (`module load cuda/12.9`) before starting Julia.
 - **cuDNN version mismatch:** Make sure the CUDA module version matches what cuDNN expects. Using `cuda/12.9` is recommended.
 - **Internet access errors on GPU nodes:** This is expected. Always install packages on login or visual nodes first.
 - **`local_toolkit=true` not set:** If CUDA tries to download artifacts, re-run `CUDA.set_runtime_version!(local_toolkit=true)` on a visual node.
+
+### Job Submission Issues
 - **Job stuck in queue:** Try using `gpu-a100-small` partition or reducing requested resources.
 - **Out of memory errors:** Increase `--mem-per-cpu` or reduce batch size in your script.
 - **Logs directory not found:** Ensure you create the `logs` directory before submitting: `mkdir -p logs`.
+
+### WaterLily Issues
+- **`WaterLily` not found:** Install the package on a login node first: `julia -e 'using Pkg; Pkg.add("WaterLily")'`.
+- **GPU out of memory:** Reduce grid resolution or use `Float32` instead of `Float64`.
+- **Slow GPU performance:** Ensure you're using `mem=CuArray` and `T=Float32` in your simulation.
+- **CUDA kernel errors:** Make sure CUDA is properly configured by running the basic CUDA test first.
