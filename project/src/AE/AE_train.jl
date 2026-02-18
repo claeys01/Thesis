@@ -43,23 +43,6 @@ function train_AE(args::LuxArgs)
 
     loss_func = make_loss_function(args, device, normalizer)
 
-    # Pre-allocate loss arrays
-    # max_iters     = args.epochs * length(train_loader)
-    # train_losses  = Vector{Float32}(undef, max_iters)
-    # rec_losses    = Vector{Float32}(undef, max_iters)
-    # div_losses    = Vector{Float32}(undef, max_iters)
-    # curl_losses   = Vector{Float32}(undef, max_iters)
-    # strain_losses = Vector{Float32}(undef, max_iters)
-    # iters         = Vector{Int}(undef, max_iters)
-    # train_corrs   = Vector{Vector{Float32}}(undef, max_iters)
-    
-    # val_losses = Vector{Float32}(undef, args.epochs)
-    # val_iters  = Vector{Int}(undef, args.epochs)
-    # val_corrs  = Vector{Vector{Float32}}(undef, args.epochs)
-    
-    # test_losses = Float32[]
-    # test_corrs = Vector{Float32}[]
-
     max_iters = args.epochs * length(train_loader)
     
     train_losses  = Float32[]; sizehint!(train_losses, max_iters)

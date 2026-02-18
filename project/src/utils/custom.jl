@@ -197,14 +197,6 @@ function train_force_plot(forces::Vector{Vector{Float32}}, time::Vector{Float32}
     lift = last.(forces)
     zero_idxs = zero_crossing(lift; direction=:rising)
 
-    # plt = plot(time, [drag, lift],
-    #     labels=["drag" "lift"],
-    #     colors=[:red, :blue],
-    #     xlabel="tU/L",
-    #     ylabel="Pressure force coefficients",
-    #     legend=:topright, 
-    #     linewidth=1.5)
-
     plt = plot(xlabel="tU/L",
         ylabel="Pressure force coefficients",
         legend=:topright) 

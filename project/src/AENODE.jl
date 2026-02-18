@@ -54,9 +54,9 @@ function predict_n(aenode::AENODE, u::AbstractArray, μ₀::AbstractArray, nₜ:
 end
 
 function predict_n(aenode::AENODE, sim::BiotSimulation, nₜ::Int64;
-        Δt::Float32=0.35f0)
+        Δt::Float32=0.35f0, impose_biot=false)
     û = predict_n(aenode, sim.flow.u, sim.flow.μ₀, nₜ, Float32(sim_time(sim));
-        Δt=Δt, return_traj=false)
+        Δt=Δt, return_traj=false, impose_biot=impose_biot)
     sim.flow.u .= û
     append!(sim.flow.Δt, nₜ * Δt)
     return sim
