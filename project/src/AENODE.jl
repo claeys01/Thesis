@@ -9,10 +9,10 @@ mutable struct AENODE{P,S}
     ae_state::S
 end
 
-function AENODE(AE_path::String, NODE_path::String)
+function AENODE(AE_path::String, NODE_path::String; verbose=false)
     enc, dec, _, ps, st, ae_args = load_trained_AE(AE_path; return_params=true)
     normalizer = load_normalizer(AE_path)
-    node, node_args = load_node(NODE_path)
+    node, node_args = load_node(NODE_path; verbose=verbose)
     return AENODE(enc, dec, normalizer, ae_args, node, node_args,
         ps,  # concrete NamedTuple type inferred
         st   # concrete NamedTuple type inferred
@@ -53,13 +53,22 @@ function predict_n(aenode::AENODE, u::AbstractArray, μ₀::AbstractArray, nₜ:
     end
 end
 
-function predict_n(aenode::AENODE, sim::BiotSimulation, nₜ::Int64;
-        Δt::Float32=0.35f0, impose_biot=false)
+function predict_n!(sim::BiotSimulation, aenode::AENODE, nₜ::Int64; 
+    Δt::Float32=0.35f0, impose_biot=false)
     û = predict_n(aenode, sim.flow.u, sim.flow.μ₀, nₜ, Float32(sim_time(sim));
-        Δt=Δt, return_traj=false, impose_biot=impose_biot)
-    sim.flow.u .= û
-    append!(sim.flow.Δt, nₜ * Δt)
-    return sim
+        Δt=Δt, return_traj=false, impose_biot=false)
+    
+    insert_prediction!(sim, û) # insert predicted flow field into sim object
+    # push!(sim.flow.Δt, nₜ * Δt) # update simulation time 
+    Δt_arr = [Δt for _ in 1:nₜ]
+    append!(sim.flow.Δt, [Δt for _ in 1:nₜ])
+    impose_biot_bc!(sim) #  update pressure
+    # push!(sim.flow.Δt,WaterLily.CFL(sim.flow))
+    temp = deepcopy(sim)
+    BiotSavartBCs.sim_step!(temp)
+    sim.flow.u .= temp.flow.u
+    sim.flow.p .= temp.flow.p
+
 end
 
 # node_path = "data/saved_models/NODE/16/RE2500/multiple_shoot_adam_250/node_params.jld2"

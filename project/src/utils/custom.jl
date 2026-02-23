@@ -116,27 +116,66 @@ function insert_prediction!(sim::AbstractSimulation, û::AbstractArray{T,3}) wh
     return sim
 end
 
+function custom_biot_project!(a::Flow{n},ml_b::MultiLevelPoisson,ω,x₀,tar,ftar,U;fmm=true,w=1,tol=1e-4,itmx=32) where n
+    dt = w*a.Δt[end]; a.p .*= dt  # Scale p *= w*Δt
+    BiotSavartBCs.apply_grad_p!(a.u,ω,a.p,a.μ₀) # Apply u-=μ₀∇p & ω=∇×u
+    x₀ .= a.p; fill!(a.p,0)       # x₀ holds p solution
+    BiotSavartBCs.biotBC!(a.u,U,ω,tar,ftar;fmm) # Apply domain BCs
+    # Set residual
+    b = ml_b.levels[1]; b.r .= 0
+    @inside b.r[I] = ifelse(b.iD[I]==0,0,WaterLily.div(I,a.u))
+    BiotSavartBCs.fix_resid!(b.r,a.u,tar[1]) # only fix on the boundaries
+
+    nᵖ,nᵇ,r₂ = 0,0,L₂(b)
+    @log ", $nᵖ, $(WaterLily.L∞(b)), $r₂, $nᵇ\n"
+    while nᵖ<itmx
+        rtol = max(tol,0.1r₂)
+        while nᵖ<itmx
+            WaterLily.Vcycle!(ml_b); WaterLily.smooth!(b)
+            r₂ = L₂(b); nᵖ+=1
+            r₂<rtol && break
+        end
+        BiotSavartBCs.apply_grad_p!(a.u,ω,a.p,a.μ₀)   # Update u,ω
+        x₀ .+= a.p; fill!(a.p,0)        # Update solution
+        BiotSavartBCs.biotBC_r!(b.r,a.u,U,ω,tar,ftar;fmm) # Update BC+residual
+        r₂ = L₂(b); nᵇ+=1
+        @log ", $nᵖ, $(WaterLily.L∞(b)), $r₂, $nᵇ\n"
+        r₂<tol && break
+    end
+    push!(ml_b.n,nᵖ)
+    BiotSavartBCs.pflowBC!(a.u)  # Update ghost BCs (domain is already correct)
+    a.p .= x₀/dt   # copy-scaled pressure solution
+end
+
+
+"""
+Imposing Biot Savart BCs on a simulation, and also filling the pressure field.
+Function assumes that the pressure field is filled, 
+Use for imposing BCs and pressure field on predicted flow field
+"""
+function impose_biot_bc!(a::Flow{N}, b, ω...;λ=quick, fmm=true) where {N}
+    t₁ = sum(a.Δt)
+    U = BiotSavartBCs.BCTuple(a.uBC, t₁, N) 
+    WaterLily.conv_diff!(a.f,a.u,a.σ,λ,ν=a.ν)
+    WaterLily.accelerate!(a.f,t₁,a.g,a.uBC)
+    WaterLily.BDIM!(a); WaterLily.scale_u!(a,0.5)
+
+    mean_div = mean(div_vectorized(a.u[2:end-1, 2:end-1, :]))
+    if mean_div < 1e-4
+        w = 0.5
+    else
+        w = 1
+    end
+    custom_biot_project!(a,b,ω...,U;fmm,w=w) # new
+end
+
+impose_biot_bc!(sim::BiotSimulation) = impose_biot_bc!(sim.flow, sim.pois, sim.ω, sim.x₀,sim.tar,sim.ftar;fmm=sim.fmm)  
+
 function impose_biot_bc_on_snapshot(û::AbstractArray{T,N}; return_sim=false) where {T, N}
     if N == 3
         sim = circle_shedding_biot(;mem=Array, Re=2500, n=2^8, m=2^8, perturb=false)
         insert_prediction!(sim, û)
-
-        # measure!(sim)
-        t = WaterLily.time(sim.flow)
-        U = BiotSavartBCs.BCTuple(sim.flow.uBC, t, N) # hier mss nog een foutje
-
-        ω = BiotSavartBCs.MLArray(sim.flow.f)  # same layout as flow.f
-        BiotSavartBCs.fill_ω!(ω, sim.flow.u)
-
-        # Use setfield! to bypass custom setproperty!
-        setfield!(sim, :ω, ω)
-        tar = Array.(collect_targets(sim.ω,()))
-        setfield!(sim, :tar, tar)
-        ftar = flatten_targets(tar)
-        setfield!(sim, :ftar, ftar)
-
-
-        BiotSavartBCs.biot_project!(sim.flow, sim.pois, sim.ω, sim.x₀, sim.tar, sim.ftar, U; w=0, fmm=sim.fmm)
+        impose_biot_bc!(sim)
         if return_sim
             return sim
         else
@@ -384,3 +423,84 @@ function rotation_rate_vectorized(u::AbstractArray{T,4}; buff=1) where T
     Ω12 = (dudy .- dvdx) ./ 2
     return Ω12
 end
+
+
+function RST(u::AbstractArray{T, 4}, μ₀::AbstractArray{T, 3}) where {T}
+
+    ū = mean(u[:, :, 1, :])
+    v̄ = mean(u[:, :, 2, :])
+    
+    u′ = (u[:, :, 1, :] .- ū) .* μ₀[:, :, 1]                  # broadcast over time
+    v′ = (u[:, :, 2, :] .- v̄) .* μ₀[:, :, 2] 
+
+    # Reynolds stresses (still (Nx,Ny,1); you can drop dim 3 if you want)
+    uu = dropdims(mean(u′ .^ 2;  dims=3); dims=3) # ⟨u'u'⟩
+    vv = dropdims(mean(v′ .^ 2;  dims=3); dims=3) # ⟨v'v'⟩
+    uv = dropdims(mean(u′ .* v′; dims=3); dims=3) # ⟨u'v'⟩
+    return (uu, vv, uv)
+end
+
+function plot_reynolds_stresses(uu, vv, uv)
+    # Compute clims for each component: (min, max) centered around mean
+    # uu_min, uu_max = extrema(uu)
+    # vv_min, vv_max = extrema(vv)
+    # uv_min, uv_max = extrema(uv)
+    uu_min, uu_max = mean(uu) - std(uu), mean(uu) + std(uu)
+    vv_min, vv_max = mean(vv) - std(vv), mean(vv) + std(vv)
+    uv_min, uv_max = mean(uv) - std(uv), mean(uv) + std(uv)
+    
+    
+    # Plot ⟨u'u'⟩
+    plt_uu = flood(uu; 
+        clims=(uu_min, uu_max),
+        levels=20,
+        color=:viridis,
+        title="⟨u'u'⟩",
+        xlabel="x",
+        ylabel="y",
+        aspectratio=:equal, 
+        border=:none, 
+        framestyle=:none,
+        axis=nothing
+    )
+    
+    # Plot ⟨v'v'⟩
+    plt_vv = flood(vv;
+        clims=(vv_min, vv_max),
+        levels=20,
+        color=:viridis,
+        title="⟨v'v'⟩",
+        xlabel="x",
+        ylabel="y",
+        aspectratio=:equal,
+        border=:none, 
+        framestyle=:none,
+        axis=nothing
+    )
+    
+    # Plot ⟨u'v'⟩
+    plt_uv = flood(uv;
+        clims=(uv_min, uv_max),
+        levels=20,
+        color=:viridis,
+        title="⟨u'v'⟩",
+        xlabel="x",
+        ylabel="y",
+        aspectratio=:equal, 
+        border=:none, 
+        framestyle=:none,
+        axis=nothing
+    )
+    
+    # Combine into a single figure
+    plt_combined = plot(plt_uu, plt_vv, plt_uv;
+        layout=(1, 3),
+        size=(1200, 350),
+        dpi=150,
+        # plot_title="Reynolds Stress Components (Re=2500)",
+        # plot_titlefontsize=12
+    )
+    
+    return plt_combined, (plt_uu, plt_vv, plt_uv)
+end
+plot_reynolds_stresses(simdata::SimData) = plot_reynolds_stresses(RST(simdata.u, simdata.μ₀[:, :, :, 1])...)

@@ -159,7 +159,7 @@ export load_simdata
 # ═══════════════════════════════════════════════════════════════════════════════
 export load_node
 export predict_array
-export predict_n
+export predict_n, predict_n!
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Exports - Normalizer Functions
