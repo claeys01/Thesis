@@ -43,7 +43,7 @@ t_train = simdata.time[train_idx]
 t_test = simdata.time[test_idx]
 
 t_end = 50
-n_pred = 16
+n_pred = 32
 n_switch = 200
 with_pred = true
 
@@ -52,6 +52,9 @@ time_wat   = Float32[]
 
 forces_preds = Vector{Vector{Float32}}()
 time_pred = Float32[]
+
+forces_ref = Vector{Vector{Float32}}()
+time_ref = Float32[]
 
 function get_forces(sim::BiotSimulation)
     raw_force = WaterLily.pressure_force(sim)
@@ -79,8 +82,10 @@ predict_sim_times = Float64[]         # Simulated time advanced per prediction
 hybrid_u = AbstractArray[]
 hybrid_μ₀ = AbstractArray[]
 
+# forces_ref = 
+
 pred_idx = Int64[]
-step = 0
+step = 2
 anim = Plots.Animation()
 max_original_force = maximum(maximum(abs.(f)) for f in simdata.force)
 
@@ -124,8 +129,13 @@ while sim_time(sim) < t_end
         push!(forces_wat, forces)
         push!(time_wat, Float32(round(sim_time(sim),digits=4)))
 
-        # reference simulation to compare against
-        sim_ref
+        # while sim_time(ref_sim) < sim_time(sim)
+        #     sim_step(ref_sim)
+        #     push!(forces_ref, forces)
+        #     push!(time_ref, Float32(round(sim_time(ref_sim),digits=4)))
+        #     println( "ref step $step: tU/L=$(round(sim_time(ref_sim),digits=4)), Δt=$(round(ref_sim.flow.Δt[end],digits=3)), wall time: $(round(wall_time*1000, digits=4)) ms, force: $forces")
+        # end
+
 
     end
     push!(hybrid_u, sim.flow.u)
@@ -214,7 +224,7 @@ scatter!(plt_forces, time_pred, pred_lift, label="prediction", color=:blue, mark
 
 Thesis.region_spans!(plt_forces, t_train, t_test)
 
-display(plt_forces)
+# display(plt_forces)
 # Plot 2: Timing comparison bar chart
 plt_timing = bar(
     ["WaterLily\n(per step)", "Prediction\n(per call)"],
@@ -255,12 +265,12 @@ plt_combined = plot(plt_forces, plt_timing, plt_total;
 
 display(plt_combined)
 
-base_plt_rst, _ = Thesis.plot_reynolds_stresses(simdata)
-hybrid_plt_rst, _ = Thesis.plot_reynolds_stresses(Thesis.RST(cat(hybrid_u...; dims=4), sim.flow.μ₀)...)
-rst_comp_plot = plot(base_plt_rst, hybrid_plt_rst; 
-    layout=(2 ,1), 
-    size=(1000, 500),
-    colorbar_width=1,  # Narrower colorbar
-    dpi=150)
-display(rst_comp_plot)
+# base_plt_rst, _ = Thesis.plot_reynolds_stresses(simdata)
+# hybrid_plt_rst, _ = Thesis.plot_reynolds_stresses(Thesis.RST(cat(hybrid_u...; dims=4), sim.flow.μ₀)...)
+# rst_comp_plot = plot(base_plt_rst, hybrid_plt_rst; 
+#     layout=(2 ,1), 
+#     size=(1000, 500),
+#     colorbar_width=1,  # Narrower colorbar
+#     dpi=150)
+# display(rst_comp_plot)
 
