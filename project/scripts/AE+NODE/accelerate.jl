@@ -93,7 +93,6 @@ while sim_time(sim) < t_end
     if (step % n_switch == 0)
         if with_pred
             pred_Δt = 0.35f0
-            # @show get_forces(sim)
             wall_time = @elapsed begin
                 predict_n!(sim, aenode, n_pred; 
                 Δt=pred_Δt, 
@@ -169,8 +168,8 @@ avg_waterlily_sim = mean(waterlily_sim_times)
 avg_predict_sim = mean(predict_sim_times)
 
 # Average conv
-# expected_waterlily_steps = t_end/(avg_waterlily_sim) # ~ 4402
-expected_waterlily_steps = 4402
+expected_waterlily_steps = t_end/(avg_waterlily_sim) # ~ 4402
+# expected_waterlily_steps = 4402
 estimated_pure_waterlily_time = expected_waterlily_steps * avg_waterlily_wall/1000
 
 overall_speedup = estimated_pure_waterlily_time/total_wall
@@ -222,6 +221,13 @@ plot!(plt_forces, time_wat, waterlily_lift, label="Hybrid lift", color=:blue, li
 pred_drag, pred_lift = first.(forces_preds), last.(forces_preds)
 scatter!(plt_forces, time_pred, pred_lift, label="prediction", color=:blue, marker=:x)
 
+# push!(pred_idx, step)
+for i in pred_idx
+    range = i-2:i
+    plot!(plt_forces, time_wat[range], waterlily_lift[range]; color=:black,lw=3, label=nothing)
+end
+# display(plt_forces)
+
 Thesis.region_spans!(plt_forces, t_train, t_test)
 
 # display(plt_forces)
@@ -239,10 +245,6 @@ plt_timing = bar(
     ylim = (0, avg_predict_wall[end] +10)
 
 )
-
-# Add speedup annotation
-# annotate!(plt_timing, [(2, avg_predict_wall + 5, 
-    # text("$(round(speedup_factor, digits=1))x faster\nper sim_time", 8, :center))])
 
 # Plot 3: Throughput comparison
 plt_total = bar(

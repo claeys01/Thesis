@@ -145,6 +145,8 @@ function custom_biot_project!(a::Flow{n},ml_b::MultiLevelPoisson,ω,x₀,tar,fta
     push!(ml_b.n,nᵖ)
     BiotSavartBCs.pflowBC!(a.u)  # Update ghost BCs (domain is already correct)
     a.p .= x₀/dt   # copy-scaled pressure solution
+    # a.p .= x₀   # copy-scaled pressure solution
+
 end
 
 
@@ -153,20 +155,23 @@ Imposing Biot Savart BCs on a simulation, and also filling the pressure field.
 Function assumes that the pressure field is filled, 
 Use for imposing BCs and pressure field on predicted flow field
 """
-function impose_biot_bc!(a::Flow{N}, b, ω...;λ=quick, fmm=true) where {N}
+function impose_biot_bc!(a::Flow{N}, b, ω...;λ=quick, fmm=true, sens=1e-7) where {N}
+    mean_div = abs(mean(div_vectorized(a.u[2:end-1, 2:end-1, :])))
+
     t₁ = sum(a.Δt)
-    U = BiotSavartBCs.BCTuple(a.uBC, t₁, N) 
+    U = BiotSavartBCs.BCTuple(a.uBC, t₁, N)
     WaterLily.conv_diff!(a.f,a.u,a.σ,λ,ν=a.ν)
     WaterLily.accelerate!(a.f,t₁,a.g,a.uBC)
     WaterLily.BDIM!(a); WaterLily.scale_u!(a,0.5)
+    custom_biot_project!(a,b,ω...,U;fmm,w=1) # new
 
-    mean_div = mean(div_vectorized(a.u[2:end-1, 2:end-1, :]))
-    if mean_div < 1e-4
-        w = 0.5
-    else
-        w = 1
-    end
-    custom_biot_project!(a,b,ω...,U;fmm,w=w) # new
+    # if mean_div > sens
+    #     WaterLily.conv_diff!(a.f,a.u,a.σ,λ,ν=a.ν)
+    #     WaterLily.accelerate!(a.f,t₁,a.g,a.uBC)
+    #     WaterLily.BDIM!(a); WaterLily.scale_u!(a,0.5)
+    #     custom_biot_project!(a,b,ω...,U;fmm,w=w) # new
+    # else
+    #     custom_biot_project!(a,b,ω...,U;fmm,w=1) # new
 end
 
 impose_biot_bc!(sim::BiotSimulation) = impose_biot_bc!(sim.flow, sim.pois, sim.ω, sim.x₀,sim.tar,sim.ftar;fmm=sim.fmm)  

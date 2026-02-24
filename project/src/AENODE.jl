@@ -23,7 +23,7 @@ end
 function predict_n(aenode::AENODE, u::AbstractArray, μ₀::AbstractArray, nₜ::Int64, t₀::Float32; 
                 Δt::Float32=0.35f0, 
                 return_traj::Bool=false, 
-                impose_biot::Bool=true)
+                impose_biot::Bool=false)
     @assert size(u) == size(μ₀) "u and μ₀ must be the same size"
     if !ispow2(size(u, 1)) || !ispow2(size(μ₀, 1))
         u, μ₀ = remove_ghosts(u), remove_ghosts(μ₀)
@@ -61,14 +61,14 @@ function predict_n!(sim::BiotSimulation, aenode::AENODE, nₜ::Int64;
     insert_prediction!(sim, û) # insert predicted flow field into sim object
     # push!(sim.flow.Δt, nₜ * Δt) # update simulation time 
     Δt_arr = [Δt for _ in 1:nₜ]
-    append!(sim.flow.Δt, [Δt for _ in 1:nₜ])
+    append!(sim.flow.Δt, Δt_arr)
     impose_biot_bc!(sim) #  update pressure
-    # push!(sim.flow.Δt,WaterLily.CFL(sim.flow))
+    # push!(sim.flow.Δt ,WaterLily.CFL(sim.flow))
     temp = deepcopy(sim)
     BiotSavartBCs.sim_step!(temp)
     sim.flow.u .= temp.flow.u
     sim.flow.p .= temp.flow.p
-
+    # push!(sim.flow.Δt ,WaterLily.CFL(temp.flow))
 end
 
 # node_path = "data/saved_models/NODE/16/RE2500/multiple_shoot_adam_250/node_params.jld2"

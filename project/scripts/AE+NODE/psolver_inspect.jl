@@ -15,70 +15,39 @@ aenode = AENODE(AE_path, node_path)
 
 simdata = load_simdata(aenode.ae_args.full_data_path)
 
+# getting simulation with know initial condition
 random_int = 1
-u, μ₀, t₀ = simdata.u[:, :, :, random_int], simdata.μ₀[:, :, :, random_int], simdata.time[random_int]
-sim.flow.u .= u
+u₀, μ₀, t₀ = simdata.u[:, :, :, random_int], simdata.μ₀[:, :, :, random_int], simdata.time[random_int]
+sim.flow.u .= u₀
 append!(sim.flow.Δt, simdata.Δt[1:random_int-1])
 sim_step!(sim; verbose=true)
+
 u_first = copy(sim.flow.u)
 p_first = copy(sim.flow.p)
 
+sim.flow.p .= 0f0
+# WaterLily.measure!(sim)
 
-@show mean(u_first)
-@show mean(p_first)
-
-step = 0
-sim_ref = deepcopy(sim)
-
-function total_time(sim::BiotSimulation)
-    sum(sim.flow.Δt)*sim.U/sim.L
-end
-
-pred_sim_time = total_time(sim) + (16 * 0.35)*sim.U/sim.L
-while total_time(sim_ref) < pred_sim_time
-    sim_step!(sim_ref)
-    step +=1
-end
-
-predict_n!(sim, aenode, 16; Δt=0.35f0, impose_biot=false)
-@show mean(sim.flow.u)
+# to test pressure method, we set pressure field to zero, and run it. Velocity field should not change
 Thesis.impose_biot_bc!(sim)
+println("mean velocity before: $(mean(u_first)), and after $(mean(sim.flow.u)), rMAE: $(mean(abs, u_first .- sim.flow.u)/mean(u_first))")
+println("mean pressure before: $(mean(p_first)), and after $(mean(sim.flow.p)), rMAE: $(mean(abs, p_first .- sim.flow.p))")
 
-# @show mean(u_first), mean(sim.flow.u)
-# @show mean(p_first), mean(sim.flow.p)
+# predicting the same velocity field as in sim
+# @show t₀, sim_time(sim), sim.flow.Δt
+u_pred = predict_n(aenode, u₀, μ₀, 1, t₀; Δt=sim.flow.Δt[end])
+println("\nMAE between sim and pred: $(mean(abs, u_pred .- sim.flow.u[2:end-1, 2:end-1, :]))\n")
 
-@show mean(sim_ref.flow.u), mean(sim.flow.u)
-@show mean(sim_ref.flow.p), mean(sim.flow.p)
-@show total_time(sim_ref), total_time(sim)
+Thesis.insert_prediction!(sim, u_pred)
+sim.flow.p .= 0f0
+WaterLily.measure!(sim)
 
-# @show size(sim_ref.flow.Δt), size(sim.flow.Δt)
+Thesis.impose_biot_bc!(sim)
+println("original mean velocity: $(mean(u_first)), and predicted $(mean(sim.flow.u)), rMAE: $(mean(abs, u_first .- sim.flow.u)/mean(u_first))")
+println("original mean pressure: $(mean(p_first)), and predicted $(mean(sim.flow.p)), rMAE: $(mean(abs, p_first .- sim.flow.p)/mean(p_first))")
+
+println("\n#################################################################################################\n")
+
 simdata = nothing
 sim = nothing
-
 GC.gc()
-
-
-# @show get_forces(sim)
-
-# predict_n!(sim, aenode, 16; Δt=0.35f0, impose_biot=true)
-
-# @show get_forces(sim)
-
-# WaterLily.logger("data/test_psolver")
-
-# simstep=5
-
-# function get_forces(sim::BiotSimulation)
-#     raw_force = WaterLily.pressure_force(sim)
-#     scaled_force = Float32.(raw_force./(0.5sim.L*sim.U^2)) # scale the forces!
-#     return scaled_force
-# end
-
-# for _ in 1:simstep
-#     sim_step!(sim; verbose=true)
-#     forces = get_forces(sim)
-#     @show forces
-# end
-# plt = WaterLily.plot_logger("data/test_psolver")
-# display(plt)
-# savefig("figs/psolver.png")
