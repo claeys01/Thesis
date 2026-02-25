@@ -24,30 +24,40 @@ sim_step!(sim; verbose=true)
 
 u_first = copy(sim.flow.u)
 p_first = copy(sim.flow.p)
-
-sim.flow.p .= 0f0
+@show mean(p_first)
+# sim.flow.p .= 0f0
 # WaterLily.measure!(sim)
 
 # to test pressure method, we set pressure field to zero, and run it. Velocity field should not change
 Thesis.impose_biot_bc!(sim)
-println("mean velocity before: $(mean(u_first)), and after $(mean(sim.flow.u)), rMAE: $(mean(abs, u_first .- sim.flow.u)/mean(u_first))")
+# temp = deepcopy(sim)
+# WaterLily.sim_step!(temp)
+# p_end = temp.flow.p
+println("mean velocity before: $(mean(u_first)), and after $(mean(sim.flow.u)), rMAE: $(mean(abs, u_first .- sim.flow.u))")
 println("mean pressure before: $(mean(p_first)), and after $(mean(sim.flow.p)), rMAE: $(mean(abs, p_first .- sim.flow.p))")
 
 # predicting the same velocity field as in sim
 # @show t₀, sim_time(sim), sim.flow.Δt
-u_pred = predict_n(aenode, u₀, μ₀, 1, t₀; Δt=sim.flow.Δt[end])
-println("\nMAE between sim and pred: $(mean(abs, u_pred .- sim.flow.u[2:end-1, 2:end-1, :]))\n")
+# u_pred = predict_n(aenode, u₀, μ₀, 1, t₀; Δt=sim.flow.Δt[end])
+# println("\nMAE between sim and pred: $(mean(abs, u_pred .- sim.flow.u[2:end-1, 2:end-1, :]))\n")
 
-Thesis.insert_prediction!(sim, u_pred)
-sim.flow.p .= 0f0
-WaterLily.measure!(sim)
+# Thesis.insert_prediction!(sim, u_pred)
+# sim.flow.p .= 0f0
 
-Thesis.impose_biot_bc!(sim)
-println("original mean velocity: $(mean(u_first)), and predicted $(mean(sim.flow.u)), rMAE: $(mean(abs, u_first .- sim.flow.u)/mean(u_first))")
-println("original mean pressure: $(mean(p_first)), and predicted $(mean(sim.flow.p)), rMAE: $(mean(abs, p_first .- sim.flow.p)/mean(p_first))")
+# # temp2 = deepcopy(sim)
+# # WaterLily.sim_step!(temp2)
+# # temp2.flow.p .= 0f0
 
-println("\n#################################################################################################\n")
+# # WaterLily.sim_step!(temp2)
 
-simdata = nothing
-sim = nothing
-GC.gc()
+# # p_end_pred = temp2.flow.p
+
+# Thesis.impose_biot_bc!(sim)
+# println("original mean velocity: $(mean(u_first)), and predicted $(mean(sim.flow.u)), rMAE: $(mean(abs, u_first .- sim.flow.u))")
+# println("original mean pressure: $(mean(p_first)), and predicted $(mean(p_end_pred)), MAE: $(mean(abs, p_first .- p_end_pred))")
+
+# println("\n#################################################################################################\n")
+
+# simdata = nothing
+# sim = nothing
+# GC.gc()

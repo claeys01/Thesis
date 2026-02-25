@@ -125,7 +125,6 @@ function custom_biot_project!(a::Flow{n},ml_b::MultiLevelPoisson,ω,x₀,tar,fta
     b = ml_b.levels[1]; b.r .= 0
     @inside b.r[I] = ifelse(b.iD[I]==0,0,WaterLily.div(I,a.u))
     BiotSavartBCs.fix_resid!(b.r,a.u,tar[1]) # only fix on the boundaries
-
     nᵖ,nᵇ,r₂ = 0,0,L₂(b)
     @log ", $nᵖ, $(WaterLily.L∞(b)), $r₂, $nᵇ\n"
     while nᵖ<itmx
@@ -145,8 +144,6 @@ function custom_biot_project!(a::Flow{n},ml_b::MultiLevelPoisson,ω,x₀,tar,fta
     push!(ml_b.n,nᵖ)
     BiotSavartBCs.pflowBC!(a.u)  # Update ghost BCs (domain is already correct)
     a.p .= x₀/dt   # copy-scaled pressure solution
-    # a.p .= x₀   # copy-scaled pressure solution
-
 end
 
 
@@ -161,9 +158,10 @@ function impose_biot_bc!(a::Flow{N}, b, ω...;λ=quick, fmm=true, sens=1e-7) whe
     t₁ = sum(a.Δt)
     U = BiotSavartBCs.BCTuple(a.uBC, t₁, N)
     WaterLily.conv_diff!(a.f,a.u,a.σ,λ,ν=a.ν)
-    WaterLily.accelerate!(a.f,t₁,a.g,a.uBC)
+    # WaterLily.accelerate!(a.f,t₁,a.g,a.uBC)
     WaterLily.BDIM!(a); WaterLily.scale_u!(a,0.5)
-    custom_biot_project!(a,b,ω...,U;fmm,w=1) # new
+    # WaterLily.BDIM!(a)
+    custom_biot_project!(a,b,ω...,U;fmm,w=0.5) # new
 
     # if mean_div > sens
     #     WaterLily.conv_diff!(a.f,a.u,a.σ,λ,ν=a.ν)
