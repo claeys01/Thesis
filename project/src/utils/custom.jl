@@ -152,24 +152,26 @@ Imposing Biot Savart BCs on a simulation, and also filling the pressure field.
 Function assumes that the pressure field is filled, 
 Use for imposing BCs and pressure field on predicted flow field
 """
-function impose_biot_bc!(a::Flow{N}, b, ω...;λ=quick, fmm=true, sens=1e-7) where {N}
-    mean_div = abs(mean(div_vectorized(a.u[2:end-1, 2:end-1, :])))
+function impose_biot_bc!(a::Flow{N}, b, ω...;λ=quick, fmm=true) where {N}
 
     t₁ = sum(a.Δt)
-    U = BiotSavartBCs.BCTuple(a.uBC, t₁, N)
+    U = BiotSavartBCs.BCTuple(a.uBC, t₁, N) 
     WaterLily.conv_diff!(a.f,a.u,a.σ,λ,ν=a.ν)
-    # WaterLily.accelerate!(a.f,t₁,a.g,a.uBC)
     WaterLily.BDIM!(a); WaterLily.scale_u!(a,0.5)
-    # WaterLily.BDIM!(a)
     custom_biot_project!(a,b,ω...,U;fmm,w=0.5) # new
 
-    # if mean_div > sens
-    #     WaterLily.conv_diff!(a.f,a.u,a.σ,λ,ν=a.ν)
-    #     WaterLily.accelerate!(a.f,t₁,a.g,a.uBC)
-    #     WaterLily.BDIM!(a); WaterLily.scale_u!(a,0.5)
-    #     custom_biot_project!(a,b,ω...,U;fmm,w=w) # new
-    # else
-    #     custom_biot_project!(a,b,ω...,U;fmm,w=1) # new
+    # WaterLily.measure!(a,body;t₁,ϵ=1)
+    WaterLily.update!(b)
+
+    a.u⁰ .= a.u; WaterLily.scale_u!(a,0)
+    conv_diff!(a.f,a.u⁰,a.σ,λ,ν=a.ν)
+    WaterLily.BDIM!(a);
+    custom_biot_project!(a,b,ω...,U;fmm) # new
+
+    WaterLily.conv_diff!(a.f,a.u,a.σ,λ,ν=a.ν)
+    WaterLily.BDIM!(a); WaterLily.scale_u!(a,0.5)
+    custom_biot_project!(a,b,ω...,U;fmm,w=0.5) # new
+    a.u .= a.u⁰
 end
 
 impose_biot_bc!(sim::BiotSimulation) = impose_biot_bc!(sim.flow, sim.pois, sim.ω, sim.x₀,sim.tar,sim.ftar;fmm=sim.fmm)  
@@ -445,12 +447,14 @@ end
 
 function plot_reynolds_stresses(uu, vv, uv)
     # Compute clims for each component: (min, max) centered around mean
-    # uu_min, uu_max = extrema(uu)
-    # vv_min, vv_max = extrema(vv)
-    # uv_min, uv_max = extrema(uv)
-    uu_min, uu_max = mean(uu) - std(uu), mean(uu) + std(uu)
-    vv_min, vv_max = mean(vv) - std(vv), mean(vv) + std(vv)
-    uv_min, uv_max = mean(uv) - std(uv), mean(uv) + std(uv)
+    # uu_min, uu_max = (0.0, maximum(uu))
+    # vv_min, vv_max = (0.0, maximum(vv))
+    uu_min, uu_max = extrema(uu)
+    vv_min, vv_max = extrema(vv)
+    uv_min, uv_max = extrema(uv)
+    # uu_min, uu_max = 0.0, mean(uu) + std(uu)
+    # vv_min, vv_max = 0.0, mean(vv) + std(vv)
+    # uv_min, uv_max = mean(uv) - std(uv), mean(uv) + std(uv)
     
     
     # Plot ⟨u'u'⟩

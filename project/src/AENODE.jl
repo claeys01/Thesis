@@ -59,16 +59,9 @@ function predict_n!(sim::BiotSimulation, aenode::AENODE, nₜ::Int64;
         Δt=Δt, return_traj=false, impose_biot=false)
     
     insert_prediction!(sim, û) # insert predicted flow field into sim object
-    # push!(sim.flow.Δt, nₜ * Δt) # update simulation time 
     Δt_arr = [Δt for _ in 1:nₜ]
     append!(sim.flow.Δt, Δt_arr)
     impose_biot_bc!(sim) #  update pressure
-    # push!(sim.flow.Δt ,WaterLily.CFL(sim.flow))
-    temp = deepcopy(sim)
-    BiotSavartBCs.sim_step!(temp)
-    sim.flow.u .= temp.flow.u
-    sim.flow.p .= temp.flow.p
-    # push!(sim.flow.Δt ,WaterLily.CFL(temp.flow))
 end
 
 # node_path = "data/saved_models/NODE/16/RE2500/multiple_shoot_adam_250/node_params.jld2"

@@ -15,6 +15,14 @@ aenode = AENODE(AE_path, node_path)
 
 simdata = load_simdata(aenode.ae_args.full_data_path)
 
+function plot_pressure(sim::BiotSimulation)
+    p = sim.flow.p
+    px = WaterLily.flood(p[:, :], border=:none, colorbar=false, framestyle=:none, axis=nothing, ticks=false)
+    # py = WaterLily.flood(p[:, :, 2], border=:none, colorbar=false, framestyle=:none, axis=nothing, ticks=false)
+    # plt = plot(px, py, layout=(1, 2))
+    px
+end
+
 # getting simulation with know initial condition
 random_int = 1
 u₀, μ₀, t₀ = simdata.u[:, :, :, random_int], simdata.μ₀[:, :, :, random_int], simdata.time[random_int]
@@ -24,12 +32,16 @@ sim_step!(sim; verbose=true)
 
 u_first = copy(sim.flow.u)
 p_first = copy(sim.flow.p)
-@show mean(p_first)
+# @show mean(p_first)
 # sim.flow.p .= 0f0
 # WaterLily.measure!(sim)
 
 # to test pressure method, we set pressure field to zero, and run it. Velocity field should not change
+p_pre = plot_pressure(sim)
+
 Thesis.impose_biot_bc!(sim)
+
+# WaterLily.sim_step!(sim)
 # temp = deepcopy(sim)
 # WaterLily.sim_step!(temp)
 # p_end = temp.flow.p
@@ -38,11 +50,12 @@ println("mean pressure before: $(mean(p_first)), and after $(mean(sim.flow.p)), 
 
 # predicting the same velocity field as in sim
 # @show t₀, sim_time(sim), sim.flow.Δt
-# u_pred = predict_n(aenode, u₀, μ₀, 1, t₀; Δt=sim.flow.Δt[end])
+u_pred = predict_n(aenode, u₀, μ₀, 1, t₀; Δt=sim.flow.Δt[end])
 # println("\nMAE between sim and pred: $(mean(abs, u_pred .- sim.flow.u[2:end-1, 2:end-1, :]))\n")
 
-# Thesis.insert_prediction!(sim, u_pred)
-# sim.flow.p .= 0f0
+Thesis.insert_prediction!(sim, u_pred)
+WaterLily.measure!(sim)
+sim.flow.p .= 0f0
 
 # # temp2 = deepcopy(sim)
 # # WaterLily.sim_step!(temp2)
@@ -51,12 +64,25 @@ println("mean pressure before: $(mean(p_first)), and after $(mean(sim.flow.p)), 
 # # WaterLily.sim_step!(temp2)
 
 # # p_end_pred = temp2.flow.p
+# p_pre = plot_pressure(sim)
 
 # Thesis.impose_biot_bc!(sim)
-# println("original mean velocity: $(mean(u_first)), and predicted $(mean(sim.flow.u)), rMAE: $(mean(abs, u_first .- sim.flow.u))")
-# println("original mean pressure: $(mean(p_first)), and predicted $(mean(p_end_pred)), MAE: $(mean(abs, p_first .- p_end_pred))")
+WaterLily.sim_step!(sim)
+WaterLily.sim_step!(sim)
 
-# println("\n#################################################################################################\n")
+# Thesis.impose_biot_bc!(sim)
+# Thesis.impose_biot_bc!(sim)
+
+
+p_aft = plot_pressure(sim)
+plt = plot(p_pre, p_aft, layout=(1,2), colorbar=true, levels=20)
+display(plt)
+
+
+println("\noriginal mean velocity: $(mean(u_first)), and predicted $(mean(sim.flow.u)), rMAE: $(mean(abs, u_first .- sim.flow.u))")
+println("original mean pressure: $(mean(p_first)), and predicted $(mean(sim.flow.p)), MAE: $(mean(abs, p_first .- sim.flow.p))")
+
+println("\n#################################################################################################\n")
 
 # simdata = nothing
 # sim = nothing

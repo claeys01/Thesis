@@ -1,5 +1,6 @@
 using Thesis
 using WaterLily
+using WaterLily: MeanFlow
 using Statistics
 using Plots
 using TimerOutputs
@@ -26,25 +27,22 @@ aenode = AENODE(AE_path, node_path)
 # create simulation object with flow field from training data#   load AE data
 simdata = load_simdata(aenode.ae_args.full_data_path)
 
-# @show typeof(simdata.force), typeof(simdata.time)
-
-# random_int = findfirst(t -> t > aenode.ae_args.t_training, simdata.time)
 random_int = 1
 u, μ₀, t₀ = simdata.u[:, :, :, random_int], simdata.μ₀[:, :, :, random_int], simdata.time[random_int]
 
 sim.flow.u .= u
 append!(sim.flow.Δt, simdata.Δt[1:random_int])
 sim_step!(sim)
+sim_meanflow = MeanFlow(sim.flow; uu_stats=true)
 
-sim_ref = deepcopy(sim)
 
 train_idx, val_idx, test_idx = Thesis.get_idxs(simdata, aenode.ae_args)
 t_train = simdata.time[train_idx]
 t_test = simdata.time[test_idx]
 
 t_end = 50
-n_pred = 32
-n_switch = 200
+n_pred = 16
+n_switch = 100
 with_pred = true
 
 forces_wat  = Vector{Vector{Float32}}()
@@ -64,11 +62,9 @@ end
 
 function force_stats(forces::Vector{Vector{Float32}})
     drag = first.(forces)
-    lift = last.(forces)
-    
+    lift = last.(forces)    
     drag_mean = mean(drag)
     lift_rms = sqrt(mean(lift .^ 2))
-    
     return (drag_mean = drag_mean, lift_rms = lift_rms)
 end
 
@@ -82,12 +78,16 @@ predict_sim_times = Float64[]         # Simulated time advanced per prediction
 hybrid_u = AbstractArray[]
 hybrid_μ₀ = AbstractArray[]
 
-# forces_ref = 
-
 pred_idx = Int64[]
-step = 2
-anim = Plots.Animation()
-max_original_force = maximum(maximum(abs.(f)) for f in simdata.force)
+step = 1
+ref_step = 1
+
+ref_sim = deepcopy(sim)
+
+save_interval = 0.25 # in CTU
+next_save = save_interval
+ref_meanflow = MeanFlow(ref_sim.flow; uu_stats=true)
+
 
 while sim_time(sim) < t_end
     if (step % n_switch == 0)
@@ -98,55 +98,58 @@ while sim_time(sim) < t_end
                 Δt=pred_Δt, 
                 impose_biot=true)
             end
-            WaterLily.logger("data/test_psolver")
 
             sim_dt = n_pred * pred_Δt*sim.U/sim.L
 
             push!(predict_wall_times, wall_time)
             push!(predict_sim_times, sim_dt)
-            
             forces = get_forces(sim)
-
-            println(" Inserted prediction for $n_pred steps: tU/L=$(round(sim_time(sim),digits=4)), Δt=$(round(sim.flow.Δt[end],digits=3)), wall time: $(round(wall_time*1000, digits=4)) ms, force: $forces")
-
             push!(forces_wat, forces)
             push!(time_wat, Float32(round(sim_time(sim),digits=4)))
+            println(" Inserted prediction for $n_pred steps: tU/L=$(round(sim_time(sim),digits=4)), Δt=$(round(sim.flow.Δt[end],digits=3)), wall time: $(round(wall_time*1000, digits=4)) ms, force: $forces")
 
             push!(forces_preds, forces)
             push!(time_pred, Float32(round(sim_time(sim),digits=4)))
             push!(pred_idx, step)
         end
     else
-        wall_time = @elapsed sim_step!(sim)
+        wat_wall_time = @elapsed sim_step!(sim)
+        
         forces = get_forces(sim)
-
-        println( "WaterLily step $step: tU/L=$(round(sim_time(sim),digits=4)), Δt=$(round(sim.flow.Δt[end],digits=3)), wall time: $(round(wall_time*1000, digits=4)) ms, force: $forces")
-        sim_dt = sim.flow.Δt[end]*sim.U/sim.L
-
-        push!(waterlily_wall_times, wall_time)
-        push!(waterlily_sim_times, sim_dt)
         push!(forces_wat, forces)
         push!(time_wat, Float32(round(sim_time(sim),digits=4)))
-
-        # while sim_time(ref_sim) < sim_time(sim)
-        #     sim_step(ref_sim)
-        #     push!(forces_ref, forces)
-        #     push!(time_ref, Float32(round(sim_time(ref_sim),digits=4)))
-        #     println( "ref step $step: tU/L=$(round(sim_time(ref_sim),digits=4)), Δt=$(round(ref_sim.flow.Δt[end],digits=3)), wall time: $(round(wall_time*1000, digits=4)) ms, force: $forces")
-        # end
-
+        println( "WaterLily step $step: tU/L=$(round(sim_time(sim),digits=4)), Δt=$(round(sim.flow.Δt[end],digits=3)), wall time: $(round(wat_wall_time*1000, digits=4)) ms, force: $forces")
 
     end
-    push!(hybrid_u, sim.flow.u)
-    push!(hybrid_μ₀, sim.flow.μ₀)
 
+    while sim_time(sim) > sim_time(ref_sim)
+        wall_time = @elapsed sim_step!(ref_sim)
+        sim_dt = ref_sim.flow.Δt[end]*sim.U/sim.L
+        push!(waterlily_wall_times, wall_time)
+        push!(waterlily_sim_times, sim_dt)
+        force_ref = get_forces(ref_sim)
+        push!(forces_ref, force_ref)
+        push!(time_ref, Float32(round(sim_time(ref_sim),digits=4)))
+        println( "* Reference step $ref_step: tU/L=$(round(sim_time(ref_sim),digits=4)), Δt=$(round(ref_sim.flow.Δt[end],digits=3)), wall time: $(round(wall_time*1000, digits=4)) ms, force: $forces")
+        ref_step +=1
+
+    end
+
+    # now sim_ref is one timestep ahead of sim
+
+    if WaterLily.sim_time(sim) > next_save
+        WaterLily.update!(sim_meanflow, sim.flow)
+        WaterLily.update!(ref_meanflow, ref_sim.flow)
+        next_save = sim_time(sim) + save_interval
+        println("Saved mean flow statistics.")
+        println("sim time:$(round(sim_time(sim),digits=4)), ref_sim time: $(round(sim_time(ref_sim),digits=4)), next save: $next_save")
+    end
 
     step +=1
 end
 
-WaterLily.plot_logger("data/test_psolver")
-savefig("figs/psolver.png")
-# show(to)
+step = 0
+ref_step = 0
 
 # ============================================================================
 # Compute Acceleration Metrics
@@ -168,15 +171,15 @@ avg_waterlily_sim = mean(waterlily_sim_times)
 avg_predict_sim = mean(predict_sim_times)
 
 # Average conv
-expected_waterlily_steps = t_end/(avg_waterlily_sim) # ~ 4402
-# expected_waterlily_steps = 4402
+# expected_waterlily_steps = t_end/(avg_waterlily_sim) # ~ 4402
+expected_waterlily_steps = length(waterlily_wall_times)
 estimated_pure_waterlily_time = expected_waterlily_steps * avg_waterlily_wall/1000
 
 overall_speedup = estimated_pure_waterlily_time/total_wall
 
 println("\n--- WaterLily Steps ---")
 println("  Number of steps:     $(length(waterlily_wall_times))")
-println("  Total wall time:     $(round(total_waterlily_wall, digits=3)) s")
+# println("  Total wall time:     $(round(total_waterlily_wall, digits=3)) s")
 println("  Avg wall time/step:  $(round(avg_waterlily_wall, digits=2)) ms")
 println("  Avg sim time/step:   $(round(avg_waterlily_sim, digits=4)) tU/L")
 
@@ -207,10 +210,12 @@ plt_forces = plot(framestyle = :box, size = (600, 400), dpi = 150,
     xlims = (0, t_end),
     title = "Force Comparison")
 
-plot!(plt_forces, simdata.time, first.(simdata.force), color=:red, ls=:dashdotdot, label="Original drag", alpha=0.5)
-plot!(plt_forces, simdata.time, last.(simdata.force), color=:blue, ls=:dashdotdot, label="Original lift", alpha=0.5)
+ref_dag, ref_lift = first.(forces_ref), last.(forces_ref)
+plot!(plt_forces, time_ref, ref_dag, color=:red, ls=:dashdotdot, label="Reference drag", alpha=0.5)
+plot!(plt_forces, time_ref, ref_lift, color=:blue, ls=:dashdotdot, label="Refence lift", alpha=0.5)
 
-# hline!(plt_forces, [stats_original.drag_mean], color=:red, ls=:dash, lw=2, label="Original C̄_D", alpha=0.7)
+# plot!(plt_forces, simdata.time, first.(simdata.force), color=:red, ls=:dash, label="Database drag", alpha=0.5)
+# plot!(plt_forces, simdata.time, last.(simdata.force), color=:blue, ls=:dash, label="Database lift", alpha=0.5)# hline!(plt_forces, [stats_original.drag_mean], color=:red, ls=:dash, lw=2, label="Original C̄_D", alpha=0.7)
 
 waterlily_drag, waterlily_lift = first.(forces_wat), last.(forces_wat)
 plot!(plt_forces, time_wat, waterlily_drag, label="Hybrid drag", color=:red, linewidth=1)
@@ -220,13 +225,6 @@ plot!(plt_forces, time_wat, waterlily_lift, label="Hybrid lift", color=:blue, li
 
 pred_drag, pred_lift = first.(forces_preds), last.(forces_preds)
 scatter!(plt_forces, time_pred, pred_lift, label="prediction", color=:blue, marker=:x)
-
-# push!(pred_idx, step)
-for i in pred_idx
-    range = i-2:i
-    plot!(plt_forces, time_wat[range], waterlily_lift[range]; color=:black,lw=3, label=nothing)
-end
-# display(plt_forces)
 
 Thesis.region_spans!(plt_forces, t_train, t_test)
 
@@ -267,12 +265,47 @@ plt_combined = plot(plt_forces, plt_timing, plt_total;
 
 display(plt_combined)
 
-# base_plt_rst, _ = Thesis.plot_reynolds_stresses(simdata)
-# hybrid_plt_rst, _ = Thesis.plot_reynolds_stresses(Thesis.RST(cat(hybrid_u...; dims=4), sim.flow.μ₀)...)
-# rst_comp_plot = plot(base_plt_rst, hybrid_plt_rst; 
-#     layout=(2 ,1), 
-#     size=(1000, 500),
-#     colorbar_width=1,  # Narrower colorbar
-#     dpi=150)
-# display(rst_comp_plot)
+τ = uu(sim_meanflow)
+τ_ref = uu(ref_meanflow)
+plt_rst1, _= Thesis.plot_reynolds_stresses(τ[:, :, 1, 1], τ[:, :, 2, 2], τ[:, :, 2, 1])
+plt_rst2, _= Thesis.plot_reynolds_stresses(τ_ref[:, :, 1, 1], τ_ref[:, :, 2, 2], τ_ref[:, :, 2, 1])
 
+rst_comp_plot = plot(plt_rst1, plt_rst2; 
+    layout=(2 ,1), 
+    size=(1000, 500),
+    colorbar_width=1,  # Narrower colorbar
+    dpi=150)
+display(rst_comp_plot)
+
+plt_UU = flood(sim_meanflow.U[:, :, 2];
+        # clims=(vv_min, vv_max),
+        levels=20,
+        color=:viridis,
+        # title="⟨v'v'⟩",
+        xlabel="x",
+        ylabel="y",
+        aspectratio=:equal,
+        border=:none, 
+        framestyle=:none,
+        axis=nothing
+    )
+
+plt_UU_ref = flood(ref_meanflow.U[:, :, 2];
+    # clims=(vv_min, vv_max),
+    levels=20,
+    color=:viridis,
+    # title="⟨v'v'⟩",
+    xlabel="x",
+    ylabel="y",
+    aspectratio=:equal,
+    border=:none, 
+    framestyle=:none,
+    axis=nothing
+)
+
+UU_comp_plot = plot(plt_UU, plt_UU_ref; 
+    layout=(2 ,1), 
+    size=(1000, 500),
+    colorbar_width=1,  # Narrower colorbar
+    dpi=150)
+display(UU_comp_plot)
