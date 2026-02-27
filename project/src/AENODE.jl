@@ -22,8 +22,7 @@ end
 # a function that predicts the new flow field of a simulation for a selected amount of timesteps, 
 function predict_n(aenode::AENODE, u::AbstractArray, μ₀::AbstractArray, nₜ::Int64, t₀::Float32; 
                 Δt::Float32=0.35f0, 
-                return_traj::Bool=false, 
-                impose_biot::Bool=false)
+                return_traj::Bool=false)
     @assert size(u) == size(μ₀) "u and μ₀ must be the same size"
     if !ispow2(size(u, 1)) || !ispow2(size(μ₀, 1))
         u, μ₀ = remove_ghosts(u), remove_ghosts(μ₀)
@@ -40,23 +39,18 @@ function predict_n(aenode::AENODE, u::AbstractArray, μ₀::AbstractArray, nₜ:
     t = return_traj ? range(t₀, step=Δt/32.0f0, length=nₜ+1) : range(t₀, step=nₜ * Δt/32.0f0, length=2)
     # 32 is the characteristic length of the simulation, need to take out hard coding later and pass it to ae or node args
     ẑ = predict_array(aenode.NODE, z; t=t)
-
     # decompress latent prediction
     û, _ = aenode.decoder(ẑ, aenode.ae_params.decoder, aenode.ae_state.decoder)
     û = denormalize_batch(û, aenode.normalizer) .* repeat(μ₀, 1, 1, 1, length(t))
     û = û[:,:,:,2:end]
     # if desired, return trajectory of flow fields, or return end of trajectory as a simulation object
-    if impose_biot
-        return_traj ? (return impose_biot_bc_on_snapshot(û)) : (return impose_biot_bc_on_snapshot(û[:, :, :, end]))
-    else
-        return_traj ? (return û) : (return û[:, :, :, end])
-    end
+    return_traj ? (return û) : (return û[:, :, :, end])
 end
 
 function predict_n!(sim::BiotSimulation, aenode::AENODE, nₜ::Int64; 
     Δt::Float32=0.35f0, impose_biot=false)
     û = predict_n(aenode, sim.flow.u, sim.flow.μ₀, nₜ, Float32(sim_time(sim));
-        Δt=Δt, return_traj=false, impose_biot=false)
+        Δt=Δt, return_traj=false)
     
     insert_prediction!(sim, û) # insert predicted flow field into sim object
     Δt_arr = [Δt for _ in 1:nₜ]
@@ -72,3 +66,4 @@ end
 # sim = circle_shedding_biot(;mem=Array, Re=2500, n=2^8, m=2^8, perturb=false)
 # predict_n(aenode, sim, 4)
 # nothing
+

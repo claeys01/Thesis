@@ -13,44 +13,48 @@ aenode = AENODE(AE_path, node_path)
 
 simdata = load_simdata(aenode.ae_args.full_data_path)
 
-u₀, μ₀ = simdata.u[:, :, :, 1], simdata.μ₀[:, :, :, 1]
+u₀, μ₀, t₀ = simdata.u[:, :, :, 1], simdata.μ₀[:, :, :, 1], simdata.time[1]
 u = simdata.u
-simdata = nothing
+# simdata = nothing
+û = Thesis.predict_n(aenode, u₀, μ₀, 16, t₀)
 
-sim = circle_shedding_biot(;mem=Array, Re=2500, n=2^8, m=2^8, perturb=false)
-t_end = 50
+@show simdata.time[16]
 
-sim.flow.u .= u₀
-meanflow = MeanFlow(sim.flow; uu_stats=true)
-while sim_time(sim) < t_end
-        sim_step!(sim; remeasure=false, verbose=false)
-        sim_info(sim)
-        WaterLily.update!(meanflow, sim.flow)
-end
-
-# viz!(sim, ω_mean; clims=(-0.2,0.2), levels=60)
-τ = uu(meanflow)
-τ_uu = Array(τ[:, :, 1, 1])
-@show size(τ_uu), typeof(τ_uu)
-@show extrema(τ_uu)
-# viz!(sim, τ_uu; clims=(-0.2,0.2), levels=60)
-plt_rst1, _= Thesis.plot_reynolds_stresses(τ[:, :, 1, 1], τ[:, :, 2, 2], τ[:, :, 2, 1])
-# display(plt_rst)
-
-# Compute Reynolds stress terms
-cuu, cvv, cuv = Thesis.RST(u, μ₀)
-# @show size(uu), size(vv), size(uv)
-
-# Generate the plots
-plt_rst2, _ = Thesis.plot_reynolds_stresses(cuu, cvv, cuv)
-# display(plt_rst)
-
-plt = plot(plt_rst1, plt_rst2, layout=(2, 1))
-display(plt)
 nothing
-# GC.gc()
-# # Optionally save
-# # savefig(plt_rst, "figs/reynolds_stresses.png")
+# sim = circle_shedding_biot(;mem=Array, Re=2500, n=2^8, m=2^8, perturb=false)
+# t_end = 50
+
+# sim.flow.u .= u₀
+# meanflow = MeanFlow(sim.flow; uu_stats=true)
+# while sim_time(sim) < t_end
+#         sim_step!(sim; remeasure=false, verbose=false)
+#         sim_info(sim)
+#         WaterLily.update!(meanflow, sim.flow)
+# end
+
+# # viz!(sim, ω_mean; clims=(-0.2,0.2), levels=60)
+# τ = uu(meanflow)
+# τ_uu = Array(τ[:, :, 1, 1])
+# @show size(τ_uu), typeof(τ_uu)
+# @show extrema(τ_uu)
+# # viz!(sim, τ_uu; clims=(-0.2,0.2), levels=60)
+# plt_rst1, _= Thesis.plot_reynolds_stresses(τ[:, :, 1, 1], τ[:, :, 2, 2], τ[:, :, 2, 1])
+# # display(plt_rst)
+
+# # Compute Reynolds stress terms
+# cuu, cvv, cuv = Thesis.RST(u, μ₀)
+# # @show size(uu), size(vv), size(uv)
+
+# # Generate the plots
+# plt_rst2, _ = Thesis.plot_reynolds_stresses(cuu, cvv, cuv)
+# # display(plt_rst)
+
+# plt = plot(plt_rst1, plt_rst2, layout=(2, 1))
+# display(plt)
+# nothing
+# # GC.gc()
+# # # Optionally save
+# # # savefig(plt_rst, "figs/reynolds_stresses.png")
 
 
 
