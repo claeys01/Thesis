@@ -157,10 +157,10 @@ export load_simdata
 # ═══════════════════════════════════════════════════════════════════════════════
 # Exports - NODE Functions
 # ═══════════════════════════════════════════════════════════════════════════════
-export load_node
+export load_node, get_node_data
 export predict_array
 export predict_n, predict_n!
-
+export train_NODE
 # ═══════════════════════════════════════════════════════════════════════════════
 # Exports - Normalizer Functions
 # ═══════════════════════════════════════════════════════════════════════════════
