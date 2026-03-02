@@ -43,8 +43,8 @@ t_test = simdata.time[test_idx]
 t_end = 50
 n_pred = 32
 n_switch = 100
+pred_Δt = 0.35f0
 with_pred = true
-
 
 function get_forces(sim::BiotSimulation)
     raw_force = WaterLily.pressure_force(sim)
@@ -88,11 +88,15 @@ save_interval = 0.25 # in CTU
 next_save = save_interval
 ref_meanflow = MeanFlow(ref_sim.flow; uu_stats=true)
 
+# warmup
+warmup_sim = deepcopy(sim)
+predict_wall_time = predict_n!(warmup_sim, aenode, n_pred; 
+    Δt=pred_Δt, 
+    impose_biot=true)
 
 while sim_time(sim) < t_end
     if (step % n_switch == 0)
         if with_pred
-            pred_Δt = 0.35f0
             predict_wall_time = @elapsed begin
                 predict_n!(sim, aenode, n_pred; 
                 Δt=pred_Δt, 
@@ -205,7 +209,7 @@ println("  Avg sim time/step:   $(round(avg_hybrid_sim, digits=4)) tU/L")
 
 
 println("\n--- Predictions ---")
-println("  Number of predictions: $(length(predict_wall_times))")
+println("  Number of predictions: $(length(hybrid_predict_wall_times))")
 println("  Steps per prediction:  $(n_pred)")
 println("  Total wall time:       $(round(total_hybrid_predict_wall, digits=3)) s")
 println("  Avg wall time/pred:    $(round(avg_hybrid_predict_wall, digits=2)) ms")
@@ -235,7 +239,7 @@ println("Rel Err   - Drag mean:  $(round(rel_err.drag_mean, digits=5)) %, Lift R
 println("\n" * "="^60)
 
 # Plot 1: Forces (existing)
-plt_forces = plot(framestyle = :box, size = (600, 400), dpi = 150,
+plt_forces = plot(framestyle = :box, size = (600, 400), dpi = 500,
     xlabel = "tU/L", ylabel = "Force coefficient",
     xlims = (0, t_end),
     title = "Force Comparison")
@@ -245,7 +249,8 @@ plot!(plt_forces, time_ref, ref_dag, color=:red, ls=:dashdotdot, label="Referenc
 plot!(plt_forces, time_ref, ref_lift, color=:blue, ls=:dashdotdot, label="Refence lift", alpha=0.5)
 
 # plot!(plt_forces, simdata.time, first.(simdata.force), color=:red, ls=:dash, label="Database drag", alpha=0.5)
-# plot!(plt_forces, simdata.time, last.(simdata.force), color=:blue, ls=:dash, label="Database lift", alpha=0.5)# hline!(plt_forces, [stats_original.drag_mean], color=:red, ls=:dash, lw=2, label="Original C̄_D", alpha=0.7)
+# plot!(plt_forces, simdata.time, last.(simdata.force), color=:blue, ls=:dash, label="Database lift", alpha=0.5)
+# hline!(plt_forces, [stats_original.drag_mean], color=:red, ls=:dash, lw=2, label="Original C̄_D", alpha=0.7)
 
 waterlily_drag, waterlily_lift = first.(hybrid_forces_wat), last.(hybrid_forces_wat)
 plot!(plt_forces, hybrid_time_wat, waterlily_drag, label="Hybrid drag", color=:red, linewidth=1)
@@ -254,11 +259,22 @@ plot!(plt_forces, hybrid_time_wat, waterlily_lift, label="Hybrid lift", color=:b
 # hline!(plt_forces, [stats_hybrid.drag_mean], color=:darkred, ls=:solid, lw=2, label="Hybrid C̄_D")
 
 pred_drag, pred_lift = first.(hybrid_forces_preds), last.(hybrid_forces_preds)
-scatter!(plt_forces, hybrid_time_pred, pred_lift, label="prediction", color=:blue, marker=:x)
+# scatter!(plt_forces, hybrid_time_pred, pred_lift, label="prediction", color=:blue, marker=:x, markersize=4, markeralpha=1)
+labeled = false
+for i in pred_idx
+    range = i-1:i
+    plot!(plt_forces, hybrid_time_wat[range], waterlily_lift[range], 
+        label = labeled ? "" : "Prediction",
+        color=:black, 
+        lw=2, 
+        marker=:circle, 
+        markersize=2, 
+        markerstrokewidth=1)
+    labeled = true
+end
 
 Thesis.region_spans!(plt_forces, t_train, t_test)
 
-# display(plt_forces)
 # Plot 2: Timing comparison bar chart
 plt_timing = bar(
     ["WaterLily\n(per step)", "Prediction\n(per call)"],
@@ -269,7 +285,7 @@ plt_timing = bar(
     color = [:royalblue, :orange],
     framestyle = :box,
     size = (400, 350),
-    dpi = 150,
+    dpi = 500,
     ylim = (0, avg_hybrid_predict_wall[end] +10)
 
 )
@@ -284,7 +300,7 @@ plt_total = bar(
     color = [:royalblue, :orange],
     framestyle = :box,
     size = (400, 350),
-    dpi = 150, 
+    dpi = 500, 
     ylim = (0, maximum((total_reference_wall[end], total_hybrid_wall[end])) + 10)
 )
 
@@ -293,49 +309,81 @@ plt_combined = plot(plt_forces, plt_timing, plt_total;
     layout = @layout([a; b c]),
     size = (800, 700))
 
-display(plt_combined)
+
+function rst_plot(rst_term, clims)
+    WaterLily.flood(rst_term; 
+        levels=20,
+        color=:viridis,
+        aspectratio=:equal, 
+        # border=:none, 
+        # framestyle=:none,
+        clims=clims,
+        axis=nothing, 
+        colorbar=true,
+        xlims=(0, size(rst_term)[1]),
+        ylims=(0, size(rst_term)[1]),
+        size=(300,300),
+    )
+end
 
 τ = uu(sim_meanflow)
 τ_ref = uu(ref_meanflow)
-plt_rst1, _= Thesis.plot_reynolds_stresses(τ[:, :, 1, 1], τ[:, :, 2, 2], τ[:, :, 2, 1])
-plt_rst2, _= Thesis.plot_reynolds_stresses(τ_ref[:, :, 1, 1], τ_ref[:, :, 2, 2], τ_ref[:, :, 2, 1])
 
-rst_comp_plot = plot(plt_rst1, plt_rst2; 
-    layout=(2 ,1), 
-    size=(1000, 500),
-    colorbar_width=1,  # Narrower colorbar
-    dpi=150)
+rst_comp_plots = []
+ranges = [(1, 1), (2, 2), (2, 1)]
+titles = ["⟨u'u'⟩", "⟨v'v'⟩", "⟨u'v'⟩"]
+for (i, (i3, i4)) in enumerate(ranges)
+    τ_comp, τ_ref_comp = τ[:, :, i3, i4], τ_ref[:, :, i3, i4]
+
+    clims = (minimum((minimum(τ_comp), minimum(τ_ref_comp))),
+             maximum((maximum(τ_comp), maximum(τ_ref_comp))))
+
+    p_ref, p_hybrid = rst_plot(τ_ref_comp, clims), plot!(rst_plot(τ_comp, clims))
+    plt = plot(p_ref, p_hybrid, layout=(1, 2), 
+        plot_title="$(titles[i]) (Reference vs Hybrid)", 
+        top_margin=(-10, :mm),
+        size=(600, 300))
+
+    push!(rst_comp_plots, plt)
+end
+rst_comp_plot = plot(rst_comp_plots...,
+                layout=(3, 1), 
+                size=(900, 1100))
+
+function plot_meanflow_comparison(sim_meanflow, ref_meanflow)
+    # Extract mean u and v
+    sim_u = sim_meanflow.U[:, :, 1]
+    sim_v = sim_meanflow.U[:, :, 2]
+    ref_u = ref_meanflow.U[:, :, 1]
+    ref_v = ref_meanflow.U[:, :, 2]
+
+    # Shared color limits for fair comparison
+    u_clims = (min(minimum(sim_u), minimum(ref_u)), max(maximum(sim_u), maximum(ref_u)))
+    v_clims = (min(minimum(sim_v), minimum(ref_v)), max(maximum(sim_v), maximum(ref_v)))
+
+    # Plots
+    plt_sim_u = flood(sim_u; clims=u_clims, color=:viridis,xlims=(0, 258), ylims=(0, 258), title="Hybrid ⟨u⟩",    colorbar=true, framestyle=:none, border=:none, xlabel="x", ylabel="y", aspectratio=:equal)
+    plt_ref_u = flood(ref_u; clims=u_clims, color=:viridis,xlims=(0, 258), ylims=(0, 258), title="Reference ⟨u⟩", colorbar=true, framestyle=:none, border=:none, xlabel="x", ylabel="y", aspectratio=:equal)
+    plt_sim_v = flood(sim_v; clims=v_clims, color=:viridis,xlims=(0, 258), ylims=(0, 258), title="Hybrid ⟨v⟩",    colorbar=true, framestyle=:none, border=:none, xlabel="x", ylabel="y", aspectratio=:equal)
+    plt_ref_v = flood(ref_v; clims=v_clims, color=:viridis,xlims=(0, 258), ylims=(0, 258), title="Reference ⟨v⟩", colorbar=true, framestyle=:none, border=:none, xlabel="x", ylabel="y", aspectratio=:equal)
+
+    # Combine in a 2x2 grid
+    plt = plot(plt_ref_u, plt_sim_u, plt_ref_v, plt_sim_v;
+        layout=(2,2), size=(900,700), dpi=150)
+    # display(plt)
+    return plt
+end
+
+# Call the function after your meanflow objects are updated:
+plt_meanflow = plot_meanflow_comparison(sim_meanflow, ref_meanflow)
+
 display(rst_comp_plot)
+display(plt_combined)
+display(plt_meanflow)
 
-plt_UU = flood(sim_meanflow.U[:, :, 2];
-        # clims=(vv_min, vv_max),
-        levels=20,
-        color=:viridis,
-        # title="⟨v'v'⟩",
-        xlabel="x",
-        ylabel="y",
-        aspectratio=:equal,
-        border=:none, 
-        framestyle=:none,
-        axis=nothing
-    )
+savefig(rst_comp_plot, "figs/acceleration/rst_comp_plot.png")
+savefig(plt_combined, "figs/acceleration/plt_combined.png")
+savefig(plt_meanflow, "figs/acceleration/plt_meanflow.png")
 
-plt_UU_ref = flood(ref_meanflow.U[:, :, 2];
-    # clims=(vv_min, vv_max),
-    levels=20,
-    color=:viridis,
-    # title="⟨v'v'⟩",
-    xlabel="x",
-    ylabel="y",
-    aspectratio=:equal,
-    border=:none, 
-    framestyle=:none,
-    axis=nothing
-)
 
-UU_comp_plot = plot(plt_UU, plt_UU_ref; 
-    layout=(2 ,1), 
-    size=(1000, 500),
-    colorbar_width=1,  # Narrower colorbar
-    dpi=150)
-display(UU_comp_plot)
+# nothing

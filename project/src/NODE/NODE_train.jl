@@ -127,6 +127,6 @@ function train_NODE(args; kws...)
     # @info "  Saved predictions to $preds_path"
 end
 
-# if abspath(PROGRAM_FILE) == (@__FILE__) || isinteractive()
-#     train_NODE(NodeArgs())
-# end
+if abspath(PROGRAM_FILE) == @__FILE__
+    train_NODE(NodeArgs())
+end
