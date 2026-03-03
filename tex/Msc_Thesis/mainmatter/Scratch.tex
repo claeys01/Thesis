@@ -1,0 +1,26 @@
+\pagebreak
+\begin{subequations} 
+
+    % Continuity
+    \begin{equation}
+    \begin{aligned}
+    \frac{\partial u_i}{\partial x_i} &= 0
+    \end{aligned}
+    \end{equation}
+
+    % Momentum
+    \begin{equation}
+    \begin{aligned}
+   \underbrace{ \frac{\partial u_i}{\partial t} }_{\text{Local acceleration}}
+= 
+- 
+\underbrace{ u_j \frac{\partial u_i}{\partial x_j} }_{\text{Convective term}} 
++
+\underbrace{ -\frac{1}{\rho} \frac{\partial p}{\partial x_i} }_{\text{Pressure gradient}}
++ 
+\underbrace{ \nu \frac{\partial^2 u_i}{\partial x_j \partial x_j} }_{\text{Viscous diffusion}}
++ 
+\underbrace{ g_i }_{\text{Body forces}}
+    \end{aligned}
+    \end{equation}
+\end{subequations}
