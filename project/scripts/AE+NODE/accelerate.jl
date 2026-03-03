@@ -46,6 +46,7 @@ n_switch = 100
 pred_Δt = 0.35f0
 with_pred = true
 
+
 function get_forces(sim::BiotSimulation)
     raw_force = WaterLily.pressure_force(sim)
     scaled_force = Float32.(raw_force./(0.5sim.L*sim.U^2)) # scale the forces!
@@ -95,7 +96,8 @@ predict_wall_time = predict_n!(warmup_sim, aenode, n_pred;
     impose_biot=true)
 
 while sim_time(sim) < t_end
-    if (step % n_switch == 0)
+    if (step % n_switch == 0 && sim_time(sim) > t_train[end])
+    # if step % n_switch == 0
         if with_pred
             predict_wall_time = @elapsed begin
                 predict_n!(sim, aenode, n_pred; 
@@ -141,7 +143,7 @@ while sim_time(sim) < t_end
         force_ref = get_forces(ref_sim)
         push!(forces_ref, force_ref)
         push!(time_ref, Float32(round(sim_time(ref_sim),digits=4)))
-        println( "* Reference step $ref_step: tU/L=$(round(sim_time(ref_sim),digits=4)), Δt=$(round(ref_sim.flow.Δt[end],digits=3)), wall time: $(round(reference_wall_time*1000, digits=4)) ms, force: $forces")
+        println( "* Reference step $ref_step: tU/L=$(round(sim_time(ref_sim),digits=4)), Δt=$(round(ref_sim.flow.Δt[end],digits=3)), wall time: $(round(reference_wall_time*1000, digits=4)) ms, force: $force_ref")
         ref_step +=1
 
     end
@@ -242,6 +244,7 @@ println("\n" * "="^60)
 plt_forces = plot(framestyle = :box, size = (600, 400), dpi = 500,
     xlabel = "tU/L", ylabel = "Force coefficient",
     xlims = (0, t_end),
+    ylims = (-3,2),
     title = "Force Comparison")
 
 ref_dag, ref_lift = first.(forces_ref), last.(forces_ref)
@@ -270,11 +273,31 @@ for i in pred_idx
         marker=:circle, 
         markersize=2, 
         markerstrokewidth=1)
+    plot!(plt_forces, hybrid_time_wat[range], waterlily_drag[range], 
+        label ="",
+        color=:black, 
+        lw=2, 
+        marker=:circle, 
+        markersize=2, 
+        markerstrokewidth=1)
     labeled = true
 end
 
-Thesis.region_spans!(plt_forces, t_train, t_test)
+# Prepare annotation text
+rel_drag = round(rel_err.drag_mean, digits=2)
+rel_lift = round(rel_err.lift_rms, digits=2)
+annotation_text = "Rel. error:\nMean Drag: $rel_drag %\nRMS Lift: $rel_lift %"
 
+# Place annotation in the upper right corner of the plot
+annotate!(
+    plt_forces,
+    0,  # x position (near the right edge)
+    -2.5,           # y position (adjust as needed for your ylims)
+    text(annotation_text, :black, 10, :left)
+)
+
+Thesis.region_spans!(plt_forces, t_train, t_test)
+display(plt_forces)
 # Plot 2: Timing comparison bar chart
 plt_timing = bar(
     ["WaterLily\n(per step)", "Prediction\n(per call)"],
@@ -377,13 +400,19 @@ end
 # Call the function after your meanflow objects are updated:
 plt_meanflow = plot_meanflow_comparison(sim_meanflow, ref_meanflow)
 
-display(rst_comp_plot)
 display(plt_combined)
+display(rst_comp_plot)
 display(plt_meanflow)
 
-savefig(rst_comp_plot, "figs/acceleration/rst_comp_plot.png")
-savefig(plt_combined, "figs/acceleration/plt_combined.png")
-savefig(plt_meanflow, "figs/acceleration/plt_meanflow.png")
+savedir = "figs/acceleration/t$(t_end)_np$(n_pred)_ns$(n_switch)/"
+if !isdir(savedir)
+    mkdir(savedir)
+end
+
+
+savefig(plt_combined, joinpath(savedir, "plt_combined_test.png"))
+savefig(rst_comp_plot, joinpath(savedir,"rst_comp_plot_test.png"))
+savefig(plt_meanflow, joinpath(savedir, "plt_meanflow_test.png"))
 
 
 # nothing

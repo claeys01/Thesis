@@ -37,7 +37,7 @@ p_first = copy(sim.flow.p)
 # WaterLily.measure!(sim)
 
 # to test pressure method, we set pressure field to zero, and run it. Velocity field should not change
-p_pre = plot_pressure(sim)
+p_pre = plot_pressurze(sim)
 
 Thesis.impose_biot_bc!(sim)
 

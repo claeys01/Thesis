@@ -156,9 +156,17 @@ function impose_biot_bc!(a::Flow{N}, b, ω...;λ=quick, fmm=true) where {N}
 
     t₁ = sum(a.Δt)
     U = BiotSavartBCs.BCTuple(a.uBC, t₁, N) 
+
+    a.u⁰ .= a.u; WaterLily.scale_u!(a,0)
+    conv_diff!(a.f,a.u⁰,a.σ,λ,ν=a.ν)
+    WaterLily.BDIM!(a);
+    custom_biot_project!(a,b,ω...,U;fmm) # new
+
     WaterLily.conv_diff!(a.f,a.u,a.σ,λ,ν=a.ν)
     WaterLily.BDIM!(a); WaterLily.scale_u!(a,0.5)
     custom_biot_project!(a,b,ω...,U;fmm,w=0.5) # new
+    push!(a.Δt,WaterLily.CFL(a))
+
 
     # WaterLily.measure!(a,body;t₁,ϵ=1)
     WaterLily.update!(b)
@@ -171,7 +179,8 @@ function impose_biot_bc!(a::Flow{N}, b, ω...;λ=quick, fmm=true) where {N}
     WaterLily.conv_diff!(a.f,a.u,a.σ,λ,ν=a.ν)
     WaterLily.BDIM!(a); WaterLily.scale_u!(a,0.5)
     custom_biot_project!(a,b,ω...,U;fmm,w=0.5) # new
-    a.u .= a.u⁰
+    push!(a.Δt,WaterLily.CFL(a))
+    # a.u .= a.u⁰
 end
 
 impose_biot_bc!(sim::BiotSimulation) = impose_biot_bc!(sim.flow, sim.pois, sim.ω, sim.x₀,sim.tar,sim.ftar;fmm=sim.fmm)  

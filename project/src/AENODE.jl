@@ -54,6 +54,7 @@ function predict_n!(sim::BiotSimulation, aenode::AENODE, nₜ::Int64;
     
     insert_prediction!(sim, û) # insert predicted flow field into sim object
     Δt_arr = [Δt for _ in 1:nₜ]
+    # Δt_arr = Δt * nₜ
     append!(sim.flow.Δt, Δt_arr)
     impose_biot_bc!(sim) #  update pressure
 end
