@@ -96,8 +96,8 @@ predict_wall_time = predict_n!(warmup_sim, aenode, n_pred;
     impose_biot=true)
 
 while sim_time(sim) < t_end
-    if (step % n_switch == 0 && sim_time(sim) > t_train[end])
-    # if step % n_switch == 0
+    # if (step % n_switch == 0 && sim_time(sim) > t_train[end])
+    if step % n_switch == 0
         if with_pred
             predict_wall_time = @elapsed begin
                 predict_n!(sim, aenode, n_pred; 
@@ -297,10 +297,11 @@ annotate!(
 )
 
 Thesis.region_spans!(plt_forces, t_train, t_test)
-display(plt_forces)
+# display(plt_forces)
 # Plot 2: Timing comparison bar chart
 plt_timing = bar(
     ["WaterLily\n(per step)", "Prediction\n(per call)"],
+    
     [average_reference_wall, avg_hybrid_predict_wall],
     ylabel = "Wall time (ms)",
     title = "Average Computation Time",
@@ -410,9 +411,9 @@ if !isdir(savedir)
 end
 
 
-savefig(plt_combined, joinpath(savedir, "plt_combined_test.png"))
-savefig(rst_comp_plot, joinpath(savedir,"rst_comp_plot_test.png"))
-savefig(plt_meanflow, joinpath(savedir, "plt_meanflow_test.png"))
+savefig(plt_combined, joinpath(savedir, "plt_combined.png"))
+savefig(rst_comp_plot, joinpath(savedir,"rst_comp_plot.png"))
+savefig(plt_meanflow, joinpath(savedir, "plt_meanflow.png"))
 
 
 # nothing
