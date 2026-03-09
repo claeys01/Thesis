@@ -12,8 +12,6 @@ latent_data = Thesis.load_datasets(aenode.node_args)
 
 simdata = load_simdata(aenode.ae_args.full_data_path)
 
-
-
 t₀ = simdata.time[1]
 
 rollout_range = collect(1:3000)
@@ -22,51 +20,60 @@ z0 = latent_data.z_total[:, rollout_range[1]]
 sol = Thesis.predict_array(aenode.NODE,  z0; t=time, onlysol=false)
 
 ẑ = Array(sol[1])
-
+@show size(ẑ)
 ẑ_norms = norm.(eachcol(ẑ))
 
 plt = plot()
 for i in 1:16
     plot!(plt, time, ẑ[i, :])
 end
-plot!(plt, time, mean(ẑ, dims=1)[1, :], lw=2, color=:black)
-display(plt)
 
-# Compute KDE of training latent trajectories
-kde_model = kde(latent_data.z_total)  # KDE in latent space
+struct MahalanobisOOD
+    μ::Vector{Float64}
+    Σinv::Matrix{Float64}
+    threshold::Float64
+end
 
-# Evaluate log-likelihood of rollout trajectory under the KDE
-logpdf_rollout = logpdf(kde_model, ẑ)  # shape: (16, 3000) or similar
+function fit_mahalanobis_ood(Ztrain::AbstractMatrix; q=0.99, reg=1e-6)
+    # columns = samples
+    μ = vec(mean(Ztrain, dims=2))
+    
+    X = Ztrain .- μ
+    # Σ = (X * X') / (size(Ztrain, 2) - 1)
+    Σ = cov(Ztrain, dims=2)
+    
+    # regularization for numerical stability
+    Σreg = Σ + reg * I(size(Σ, 1))
+    Σinv = inv(Matrix(Σreg))
+    
+    # distances of training points to define threshold
+    dists = [sqrt(dot(Ztrain[:, i] - μ, Σinv * (Ztrain[:, i] - μ))) for i in axes(Ztrain, 2)]
+    threshold = quantile(dists, q)
+    
+    return MahalanobisOOD(μ, Σinv, threshold)
+end
 
-# Compute statistics
-mean_logpdf = mean(logpdf_rollout)
-min_logpdf = minimum(logpdf_rollout)
-std_logpdf = std(logpdf_rollout)
+train_OOD = fit_mahalanobis_ood(latent_data.z_train)
+@show typeof(train_OOD.threshold)
 
-println("KDE Log-Likelihood Statistics:")
-println("  Mean: $(round(mean_logpdf, digits=4))")
-println("  Min:  $(round(min_logpdf, digits=4))")
-println("  Std:  $(round(std_logpdf, digits=4))")
+function score(model::MahalanobisOOD, z::AbstractVector)
+    δ = z - model.μ
+    return sqrt(dot(δ, model.Σinv * δ))
+end
 
-# Plot log-likelihood over time
-plt_kde = plot(
-    time, vec(mean(logpdf_rollout, dims=1));
-    label="Mean log-likelihood",
+scores = []
+for i in 2:length(simdata.time[2:end])
+    z_pred = Thesis.predict_array(aenode.NODE,  z0; t=[t₀, simdata.time[i]], onlysol=true)[:, end]
+
+    temp = score(train_OOD, z_pred)
+    push!(scores, temp)
+end
+
+@show size(scores)
+time_axis = simdata.time[2:end-1]
+plt = plot(time_axis, scores, label="Score over rollout time",
     xlabel="tU/L",
-    ylabel="log p(z)",
-    title="KDE Log-Likelihood of Rollout Trajectory",
-    framestyle=:box,
-    linewidth=2,
-    size=(700, 400)
-)
-hline!(plt_kde, [mean_logpdf]; label="Overall mean", linestyle=:dash, color=:red)
-display(plt_kde)
-
-# Count how many points fall below a threshold (e.g., mean - 2*std)
-threshold = mean_logpdf - 2*std_logpdf
-out_of_dist = count(<(threshold), logpdf_rollout)
-pct_ood = 100 * out_of_dist / length(logpdf_rollout)
-
-println("\nOut-of-Distribution Analysis:")
-println("  Threshold (mean - 2σ): $(round(threshold, digits=4))")
-println("  Points below threshold: $out_of_dist / $(length(logpdf_rollout)) ($(round(pct_ood, digits=2))%)")
+    ylabel="Mahalanobis score",
+    ylims=(0, 2*train_OOD.threshold), 
+    xlims=(0, maximum(time_axis)))
+hline!(plt, [train_OOD.threshold], label="Threshold")
