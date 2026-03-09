@@ -20,9 +20,9 @@ Base.@kwdef mutable struct NodeArgs
     group_size = 20
     continuity_term = 200
     save_path = "data/models/NODE_models"   # results dir
-    train_latent_path = "data/latent_data/16/RE2500/2e8/U_128_latent_E1000_train.jld2"
-    test_latent_path =  "data/latent_data/16/RE2500/2e8/U_128_latent_E1000_test.jld2"
-    total_latent_path = "data/latent_data/16/RE2500/2e8/U_128_latent_E1000.jld2"
+    train_latent_path = "data/latent_data/16/RE2500/2e8/U_128_latent_curldiv_E1000_train.jld2"
+    test_latent_path =  "data/latent_data/16/RE2500/2e8/U_128_latent_curldiv_E1000_test.jld2"
+    total_latent_path = "data/latent_data/16/RE2500/2e8/U_128_latent_curldiv_E1000.jld2"
 end
 
 function get_NODE_data(latent_path; downsample=-1, verbose=true)
@@ -77,17 +77,18 @@ function predict(node::NODE, z0; p=nothing, t=nothing)
     nnode = NeuralODE(node.dudt, tspan, node.solver; saveat=t, abstol=node.abstol, reltol=node.reltol)
     sol = nnode(z0, p_used, node.st)
 
-    if isa(sol, Tuple)
-        sol = sol[1]
-    end
-
+    # if isa(sol, Tuple)
+    #     sol = sol[1]
+    # end
+    # @show sol.stats.nf
     return sol
 end
 
 # Convenience: produce a (latent_dim, n_timepoints) Array prediction 
-function predict_array(node::NODE, z0; p=nothing, t=nothing)
+function predict_array(node::NODE, z0; p=nothing, t=nothing, onlysol=true)
     sol = predict(node, z0; p=p, t=t)
-    return Array(sol)
+    onlysol ? Array(sol[1]) : sol
+    # return Array(sol)
 end
 
 # Mean-squared error loss between data `z` and NODE prediction (z shaped like (latent_dim, n_t))

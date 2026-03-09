@@ -27,21 +27,21 @@ function predict_n(aenode::AENODE, u::AbstractArray, μ₀::AbstractArray, nₜ:
     if !ispow2(size(u, 1)) || !ispow2(size(μ₀, 1))
         u, μ₀ = remove_ghosts(u), remove_ghosts(μ₀)
     end
-    u, _ = normalize_batch(u; normalizer=aenode.normalizer)
+    u, _ = @timeit to "normalize batch" normalize_batch(u; normalizer=aenode.normalizer)
     tmp = cat(u, μ₀; dims=3)                      # (H, W, C)
     u_in = reshape(tmp, size(tmp,1), size(tmp,2), size(tmp,3), 1)  # (H, W, C, 1)
     
     # compress simulation flow field to latent space
-    z, _ = aenode.encoder(u_in, aenode.ae_params.encoder, aenode.ae_state.encoder)
+    z, _ = @timeit to "encode" aenode.encoder(u_in, aenode.ae_params.encoder, aenode.ae_state.encoder)
     z = vec(z)
 
     # predict in latent space using node
     t = return_traj ? range(t₀, step=Δt/32.0f0, length=nₜ+1) : range(t₀, step=nₜ * Δt/32.0f0, length=2)
     # 32 is the characteristic length of the simulation, need to take out hard coding later and pass it to ae or node args
-    ẑ = predict_array(aenode.NODE, z; t=t)
+    ẑ = @timeit to "NODE integrate" predict_array(aenode.NODE, z; t=t)
     # decompress latent prediction
-    û, _ = aenode.decoder(ẑ, aenode.ae_params.decoder, aenode.ae_state.decoder)
-    û = denormalize_batch(û, aenode.normalizer) .* repeat(μ₀, 1, 1, 1, length(t))
+    û, _ = @timeit to "decode" aenode.decoder(ẑ, aenode.ae_params.decoder, aenode.ae_state.decoder)
+    û = @timeit to "denormalize" denormalize_batch(û, aenode.normalizer) .* repeat(μ₀, 1, 1, 1, length(t))
     û = û[:,:,:,2:end]
     # if desired, return trajectory of flow fields, or return end of trajectory as a simulation object
     return_traj ? (return û) : (return û[:, :, :, end])
@@ -52,11 +52,11 @@ function predict_n!(sim::BiotSimulation, aenode::AENODE, nₜ::Int64;
     û = predict_n(aenode, sim.flow.u, sim.flow.μ₀, nₜ, Float32(sim_time(sim));
         Δt=Δt, return_traj=false)
     
-    insert_prediction!(sim, û) # insert predicted flow field into sim object
+    @timeit to "insert pred" insert_prediction!(sim, û) # insert predicted flow field into sim object
     Δt_arr = [Δt for _ in 1:nₜ]
     # Δt_arr = Δt * nₜ
     append!(sim.flow.Δt, Δt_arr)
-    impose_biot_bc!(sim) #  update pressure
+    @timeit to "impose biot" impose_biot_bc!(sim) #  update pressure
 end
 
 # node_path = "data/saved_models/NODE/16/RE2500/multiple_shoot_adam_250/node_params.jld2"

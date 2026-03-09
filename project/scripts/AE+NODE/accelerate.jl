@@ -9,8 +9,8 @@ sim = circle_shedding_biot(;mem=Array, Re=2500, n=2^8, m=2^8, perturb=false)
 
 reset_timer!(to::TimerOutput)
 
-# load aenode struct with trained neural ai models
-node_path = "data/NODE_models/Feb12-1551/node_params.jld2"
+# 1000 with physics in loss func
+node_path = "data/saved_models/NODE/16/RE2500/E1000_curldiv_MS_Adam_250/node_params.jld2"
 AE_path = "data/saved_models/u/Lux/256h_16l/RE2500/2e8/Feb12-1530__E1000_HW256x256_C4to2_nc6_nd2_z16_C8_lr0p001_wd0p0009_bs16_NY_LL1_Tl0p0471/checkpoint.jld2"
 aenode = AENODE(AE_path, node_path)
 

@@ -116,8 +116,16 @@ function insert_prediction!(sim::AbstractSimulation, û::AbstractArray{T,3}) wh
     return sim
 end
 
+function custom_BDIM!(a::Flow, dt)
+    # dt = a.Δt[end]
+
+    @loop a.f[Ii] = a.u⁰[Ii]+dt*a.f[Ii]-a.V[Ii] over Ii in CartesianIndices(a.f)
+    @loop a.u[Ii] += WaterLily.μddn(Ii,a.μ₁,a.f)+a.V[Ii]+a.μ₀[Ii]*a.f[Ii] over Ii ∈ inside_u(size(a.p))
+end
+
 function custom_biot_project!(a::Flow{n},ml_b::MultiLevelPoisson,ω,x₀,tar,ftar,U;fmm=true,w=1,tol=1e-4,itmx=32) where n
     dt = w*a.Δt[end]; a.p .*= dt  # Scale p *= w*Δt
+    # dt *= w; a.p .*= dt  # Scale p *= w*Δt
     BiotSavartBCs.apply_grad_p!(a.u,ω,a.p,a.μ₀) # Apply u-=μ₀∇p & ω=∇×u
     x₀ .= a.p; fill!(a.p,0)       # x₀ holds p solution
     BiotSavartBCs.biotBC!(a.u,U,ω,tar,ftar;fmm) # Apply domain BCs

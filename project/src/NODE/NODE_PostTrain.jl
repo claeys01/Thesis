@@ -85,7 +85,6 @@ function extrapolate_node(params_path; test_downsample::Int = -1, total_downsamp
     region_spans!(plt, data.t_train, data.t_test)
 
     return plot(p, plt; layout=(2, 1), size=(900, 900)), (ẑ_train, ẑ_test)
-    # return plot(p, plt; layout=(2, 1), size=(900, 900))
 
 end
 

@@ -157,7 +157,7 @@ export load_simdata
 # ═══════════════════════════════════════════════════════════════════════════════
 # Exports - NODE Functions
 # ═══════════════════════════════════════════════════════════════════════════════
-export load_node
+export load_node, train_NODE
 export predict_array
 export predict_n, predict_n!
 
