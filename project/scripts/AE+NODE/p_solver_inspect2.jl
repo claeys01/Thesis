@@ -22,11 +22,11 @@ random_int = 1
 u, μ₀, t₀ = simdata.u[:, :, :, random_int], simdata.μ₀[:, :, :, random_int], simdata.time[random_int]
 
 
-# function get_forces(sim::BiotSimulation)
-#     raw_force = WaterLily.pressure_force(sim)
-#     scaled_force = Float32.(raw_force ./ (0.5 * sim.L * sim.U^2))
-#     return scaled_force
-# end
+function get_forces(sim::BiotSimulation)
+    raw_force = WaterLily.pressure_force(sim)
+    scaled_force = Float32.(raw_force ./ (0.5 * sim.L * sim.U^2))
+    return scaled_force
+end
 
 # # Set initial condition
 clims = (-3, 3)
@@ -134,7 +134,30 @@ while sim_time(slow_sim) < t_extr
     end
 end
 
-@show sim_time(sim)
+slower_sim = deepcopy(sim)
+slower_pressure = []
+slower_times = []
+slower_forces = []
+next_save_slower = deepcopy(next_save)
+while sim_time(slower_sim) < t_extr
+    push!(slower_sim.flow.Δt, 0.05)
+    sim_step!(slower_sim)
+
+    if sim_time(slower_sim) > next_save_slower
+        sim_info(slower_sim)
+
+        p = mean(slower_sim.flow.p .* slower_sim.flow.μ₀[:, :, 1])
+        @show p
+        # Record force
+        force = get_forces(slower_sim)
+        push!(slower_forces, force)
+        push!(slower_pressure, p)
+        push!(slower_times, sim_time(slower_sim))
+        next_save_slower = sim_time(slower_sim) + save_interval
+    end
+end
+
+# @show sim_time(sim)
 
 while sim_time(sim) < t_extr
     push!(sim.flow.Δt, WaterLily.CFL(sim.flow))
@@ -163,7 +186,7 @@ plt_forces = plot(
     times, drag;
     label="Drag (CFL controlled)",
     color=:red,
-    linewidth=1.5,
+    linewidth=1,
     xlabel="tU/L",
     ylabel="Force coefficient",
     title="Drag and Lift Coefficients",
@@ -172,13 +195,16 @@ plt_forces = plot(
     dpi=150,
     size=(700, 400)
 )
-plot!(plt_forces, times, lift; label="Lift (CFL controlled)", color=:blue, linewidth=1.5)
+plot!(plt_forces, times, lift; label="Lift (CFL controlled)", color=:blue, linewidth=1)
 slow_drag = first.(slow_forces)
 slow_lift = last.(slow_forces)
 plot!(plt_forces, slow_times, slow_lift; label="Lift (Δt=0.01)",lw=2, color=:blue, ls=:dashdot, linewidth=2)
 plot!(plt_forces, slow_times, slow_drag; label="Drag (Δt=0.01)",lw=2, color=:red, ls=:dashdot, linewidth=2)
 
-
+slower_drag = first.(slower_forces)
+slower_lift = last.(slower_forces)
+plot!(plt_forces, slower_times, slower_lift; label="Lift (Δt=0.05)",lw=2, color=:blue, ls=:dot, linewidth=2)
+plot!(plt_forces, slower_times, slower_drag; label="Drag (Δt=0.05)",lw=2, color=:red, ls=:dot, linewidth=2)
 
 # hline!(plt_forces, [stats.drag_mean]; label="⟨Drag⟩", color=:darkred, linestyle=:dash, linewidth=2)
 
@@ -187,7 +213,7 @@ plt_pressure = plot(
     times, pressure;
     label="Mean pressure (CFL controlled)",
     color=:green,
-    linewidth=1.5,
+    linewidth=1,
     xlabel="tU/L",
     ylabel="Mean pressure",
     title="Mean Pressure Over Time",
@@ -199,6 +225,13 @@ plot!(
     slow_times, slow_pressure;
     ls=:dashdot,
     label="Mean pressure (Δt=0.01)",
+    color=:green,
+    linewidth=2,
+)
+plot!(
+    slower_times, slower_pressure;
+    ls=:dot,
+    label="Mean pressure (Δt=0.05)",
     color=:green,
     linewidth=2,
 )

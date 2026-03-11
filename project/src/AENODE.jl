@@ -5,15 +5,17 @@ mutable struct AENODE{P,S}
     ae_args::LuxArgs
     NODE::NODE
     node_args::NodeArgs
+    knn_ood::KNNOOD
     ae_params::P
     ae_state::S
 end
 
-function AENODE(AE_path::String, NODE_path::String; verbose=false)
+function AENODE(AE_path::String, NODE_path::String; verbose=false, k=5, q=0.99)
     enc, dec, _, ps, st, ae_args = load_trained_AE(AE_path; return_params=true)
     normalizer = load_normalizer(AE_path)
     node, node_args = load_node(NODE_path; verbose=verbose)
-    return AENODE(enc, dec, normalizer, ae_args, node, node_args,
+    knnood = fit_knn_ood(get_NODE_data(node_args.train_latent_path; downsample=node_args.downsample, verbose=verbose)[1], k=k, q=q)
+    return AENODE(enc, dec, normalizer, ae_args, node, node_args, knnood,
         ps,  # concrete NamedTuple type inferred
         st   # concrete NamedTuple type inferred
     )
@@ -57,6 +59,41 @@ function predict_n!(sim::BiotSimulation, aenode::AENODE, nₜ::Int64;
     # Δt_arr = Δt * nₜ
     append!(sim.flow.Δt, Δt_arr)
     @timeit to "impose biot" impose_biot_bc!(sim) #  update pressure
+end
+
+function predict_flexible(aenode::AENODE, u::AbstractArray, μ₀::AbstractArray, t₀::Float32; Δt::Float32=0.35f0 )
+    @assert size(u) == size(μ₀) "u and μ₀ must be the same size"
+    if !ispow2(size(u, 1)) || !ispow2(size(μ₀, 1))
+        u, μ₀ = remove_ghosts(u), remove_ghosts(μ₀)
+    end
+    u, _ = @timeit to "normalize batch" normalize_batch(u; normalizer=aenode.normalizer)
+    tmp = cat(u, μ₀; dims=3)                      # (H, W, C)
+    u_in = reshape(tmp, size(tmp,1), size(tmp,2), size(tmp,3), 1)  # (H, W, C, 1)
+    
+    # compress simulation flow field to latent space
+    z, _ = @timeit to "encode" aenode.encoder(u_in, aenode.ae_params.encoder, aenode.ae_state.encoder)
+    z = vec(z)
+    KNN_score(aenode.knn_ood, z) > aenode.knn_ood.threshold && @warn "Encodeded flow not similar to training data, NODE integration can be wrong"
+    
+    # NODE integration untill cutoff criteria is met.
+    tₙ = t₀ + Δt/32.0f0
+    n_integr = 0
+    ẑ = Thesis.predict_array(aenode.NODE,  z; t=[t₀, tₙ], onlysol=true)[:, end]
+    while true 
+        n_integr += 1
+        knn_score = KNN_score(aenode.knn_ood, ẑ)
+        if knn_score > aenode.knn_ood.threshold
+            @warn "NODE integration too far outside of training distances, cutting of integration after $n_integr steps"
+            break
+        else
+            tₙ += Δt/32.0f0
+            ẑ = Thesis.predict_array(aenode.NODE,  z; t=[t₀, tₙ], onlysol=true)[:, end]
+        end
+    end
+    # decode latent prediction
+    û, _ = @timeit to "decode" aenode.decoder(ẑ, aenode.ae_params.decoder, aenode.ae_state.decoder)
+    û = @timeit to "denormalize" denormalize_batch(û, aenode.normalizer) .* μ₀
+    return û[:, :, :, end], n_integr
 end
 
 # node_path = "data/saved_models/NODE/16/RE2500/multiple_shoot_adam_250/node_params.jld2"

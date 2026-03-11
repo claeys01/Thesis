@@ -35,6 +35,8 @@ using NNlib
 using MLUtils
 using MLUtils: DataLoader
 using Optimisers
+using NearestNeighbors
+
 
 # Automatic differentiation
 using Zygote
@@ -118,12 +120,13 @@ include("simulations/vortex_shedding.jl")
 include("AE/AE.jl")
 include("AE/AE_train.jl")
 
+# OOD detection
+include("OOD/KNN.jl")
+
 # NODE components
 include("NODE/NODE_core.jl")
 include("NODE/NODE_train.jl")
 include("NODE/NODE_PostTrain.jl")
-
-
 
 # Combined AE+NODE
 include("AENODE.jl")
@@ -145,6 +148,9 @@ export NODE, AENODE
 export Normalizer
 export BiotSimulation
 
+# OOD Detection Types
+export KNNOOD
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # Exports - AE Functions
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -158,8 +164,23 @@ export load_simdata
 # Exports - NODE Functions
 # ═══════════════════════════════════════════════════════════════════════════════
 export load_node, train_NODE
-export predict_array
+export predict_array, predict
 export predict_n, predict_n!
+export NODE, setup_lux!
+export L2_loss, loss_multiple_shoot
+export plot_node_trajectory, plot_multiple_shoot
+export save_node, load_node
+export node_loss
+export extrapolate_node, load_datasets, make_nodes
+export predictions_and_losses, plot_trajectories, plot_losses
+export region_spans!
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Exports - OOD Detection Functions
+# ═══════════════════════════════════════════════════════════════════════════════
+export fit_knn_ood
+export KNN_score
+# export KNNOOD
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Exports - Normalizer Functions
@@ -174,7 +195,9 @@ export compute_normalizer
 export circle_shedding_biot
 export sim_time
 export impose_biot_bc_on_snapshot
-export flood 
+export flood
+export sim_step!
+export sim_info
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Exports - Custom/Physics Functions
@@ -195,14 +218,17 @@ export preprocess_data!
 # ═══════════════════════════════════════════════════════════════════════════════
 export build_batch
 export get_latent_data
+export get_NODE_data
+export get_idxs
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Exports - Utilities
 # ═══════════════════════════════════════════════════════════════════════════════
-export to  # Just export the TimerOutput instance, not @timeit (already re-exported)
+export to
 export @with_plots, load_plots
 export is_hpc, get_device
 export cpu_device, gpu_device
+export set_seed!
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Environment & Device Utilities
@@ -246,14 +272,12 @@ function set_seed!(seed::Int)
     end
 end
 
-export set_seed!
-
 # ═══════════════════════════════════════════════════════════════════════════════
 # Convenience Re-exports
 # ═══════════════════════════════════════════════════════════════════════════════
 export DataLoader
 export Chain, Dense, Conv, BatchNorm, MaxPool, Upsample
-export relu, tanh, sigmoid
+export relu, tanh, sigmoid, tanhshrink
 export WrappedFunction, SamePad
 export struct2dict
 
