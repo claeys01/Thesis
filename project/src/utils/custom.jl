@@ -173,7 +173,7 @@ function impose_biot_bc!(a::Flow{N}, b, ω...;λ=quick, fmm=true) where {N}
     WaterLily.conv_diff!(a.f,a.u,a.σ,λ,ν=a.ν)
     WaterLily.BDIM!(a); WaterLily.scale_u!(a,0.5)
     custom_biot_project!(a,b,ω...,U;fmm,w=0.5) # new
-    push!(a.Δt,WaterLily.CFL(a))
+    # push!(a.Δt,WaterLily.CFL(a))
 
 
     # WaterLily.measure!(a,body;t₁,ϵ=1)
@@ -187,7 +187,7 @@ function impose_biot_bc!(a::Flow{N}, b, ω...;λ=quick, fmm=true) where {N}
     WaterLily.conv_diff!(a.f,a.u,a.σ,λ,ν=a.ν)
     WaterLily.BDIM!(a); WaterLily.scale_u!(a,0.5)
     custom_biot_project!(a,b,ω...,U;fmm,w=0.5) # new
-    push!(a.Δt,WaterLily.CFL(a))
+    # push!(a.Δt,WaterLily.CFL(a))
     # a.u .= a.u⁰
 end
 

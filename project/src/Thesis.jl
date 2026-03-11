@@ -166,6 +166,7 @@ export load_simdata
 export load_node, train_NODE
 export predict_array, predict
 export predict_n, predict_n!
+export predict_flex, predict_flex!
 export NODE, setup_lux!
 export L2_loss, loss_multiple_shoot
 export plot_node_trajectory, plot_multiple_shoot

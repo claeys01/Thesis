@@ -41,11 +41,9 @@ t_train = simdata.time[train_idx]
 t_test = simdata.time[test_idx]
 
 t_end = 50
-n_pred = 32
-n_switch = 137
+n_switch = 237
 pred_Δt = 0.35f0
 with_pred = true
-
 
 function get_forces(sim::BiotSimulation)
     raw_force = WaterLily.pressure_force(sim)
@@ -79,6 +77,8 @@ time_ref = Float32[]
 reference_wall_times = Float64[]
 reference_sim_times = Float64[]
 
+n_integrs = Int[]
+
 pred_idx = Int64[]
 step = 1
 ref_step = 1
@@ -91,38 +91,43 @@ ref_meanflow = MeanFlow(ref_sim.flow; uu_stats=true)
 
 # warmup
 warmup_sim = deepcopy(sim)
-predict_wall_time = predict_n!(warmup_sim, aenode, n_pred; 
+predict_wall_time = predict_flex(aenode, warmup_sim; 
     Δt=pred_Δt, 
     impose_biot=true)
 
 while sim_time(sim) < t_end
-    # if (step % n_switch == 0 && sim_time(sim) > t_train[end])
-    if step % n_switch == 0
+    if (step % n_switch == 0 && sim_time(sim) > t_train[end])
+    # if step % n_switch == 0
         if with_pred
+            sim_time_before = sim_time(sim)
             predict_wall_time = @elapsed begin
-                predict_n!(sim, aenode, n_pred; 
+                sim, n_integr = predict_flex(aenode, sim; 
                 Δt=pred_Δt, 
                 impose_biot=true)
             end
+            sim_time_after = sim_time(sim)
 
-            sim_dt = n_pred * pred_Δt*sim.U/sim.L
+            # sim_dt = n_pred * pred_Δt*sim.U/sim.L
+            sim_dt = sim_time_after - sim_time_before
+            if n_integr != 0 # if simulation time didnt change, no prediction was inserted
+                push!(n_integrs, n_integr)
+                push!(hybrid_predict_wall_times, predict_wall_time)
+                push!(hybrid_predict_sim_times, sim_dt)
+                
+                forces = get_forces(sim)
+                push!(hybrid_forces_preds, forces)
+                push!(hybrid_time_pred, Float32(round(sim_time(sim),digits=4)))
+                push!(pred_idx, step)
+                println(" Inserted prediction for $n_integr steps: tU/L=$(round(sim_time(sim),digits=4)), wall time: $(round(predict_wall_time*1000, digits=4)) ms, force: $forces")
 
-            push!(hybrid_predict_wall_times, predict_wall_time)
-            push!(hybrid_predict_sim_times, sim_dt)
-            forces = get_forces(sim)
-            push!(hybrid_forces_wat, forces)
-            push!(hybrid_time_wat, Float32(round(sim_time(sim),digits=4)))
-            println(" Inserted prediction for $n_pred steps: tU/L=$(round(sim_time(sim),digits=4)), Δt=$(round(sim.flow.Δt[end],digits=3)), wall time: $(round(predict_wall_time*1000, digits=4)) ms, force: $forces")
-
-            push!(hybrid_forces_preds, forces)
-            push!(hybrid_time_pred, Float32(round(sim_time(sim),digits=4)))
-            push!(pred_idx, step)
+                push!(hybrid_forces_wat, forces)
+                push!(hybrid_time_wat, Float32(round(sim_time(sim),digits=4)))
+            end
         end
     else
         hybrid_waterlily_wall_time = @elapsed sim_step!(sim)
         sim_dt = sim.flow.Δt[end]*sim.U/sim.L
 
-        
         forces = get_forces(sim)
         push!(hybrid_forces_wat, forces)
         push!(hybrid_time_wat, Float32(round(sim_time(sim),digits=4)))
@@ -212,8 +217,9 @@ println("  Avg sim time/step:   $(round(avg_hybrid_sim, digits=4)) tU/L")
 
 println("\n--- Predictions ---")
 println("  Number of predictions: $(length(hybrid_predict_wall_times))")
-println("  Steps per prediction:  $(n_pred)")
+# println("  Steps per prediction:  $(n_pred)")
 println("  Total wall time:       $(round(total_hybrid_predict_wall, digits=3)) s")
+println("  Avg steps/pred:        $(round(mean(n_integrs)))")
 println("  Avg wall time/pred:    $(round(avg_hybrid_predict_wall, digits=2)) ms")
 println("  Avg sim time/pred:     $(round(avg_hybrid_predict_sim, digits=4)) tU/L")
 
@@ -405,15 +411,15 @@ display(plt_combined)
 display(rst_comp_plot)
 display(plt_meanflow)
 
-savedir = "figs/acceleration/t$(t_end)_np$(n_pred)_ns$(n_switch)/"
+# savedir = "figs/acceleration/t$(t_end)_np$(n_pred)_ns$(n_switch)/"
 if !isdir(savedir)
     mkdir(savedir)
 end
 
 
-savefig(plt_combined, joinpath(savedir, "plt_combined.png"))
-savefig(rst_comp_plot, joinpath(savedir,"rst_comp_plot.png"))
-savefig(plt_meanflow, joinpath(savedir, "plt_meanflow.png"))
+# savefig(plt_combined, joinpath(savedir, "plt_combined.png"))
+# savefig(rst_comp_plot, joinpath(savedir,"rst_comp_plot.png"))
+# savefig(plt_meanflow, joinpath(savedir, "plt_meanflow.png"))
 
 
 # nothing

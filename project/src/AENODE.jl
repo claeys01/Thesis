@@ -56,12 +56,25 @@ function predict_n!(sim::BiotSimulation, aenode::AENODE, nₜ::Int64;
     
     @timeit to "insert pred" insert_prediction!(sim, û) # insert predicted flow field into sim object
     Δt_arr = [Δt for _ in 1:nₜ]
-    # Δt_arr = Δt * nₜ
     append!(sim.flow.Δt, Δt_arr)
+    push!(sim.flow.Δt, WaterLily.CFL(sim.flow))
     @timeit to "impose biot" impose_biot_bc!(sim) #  update pressure
 end
 
-function predict_flexible(aenode::AENODE, u::AbstractArray, μ₀::AbstractArray, t₀::Float32; Δt::Float32=0.35f0 )
+function predict_flex(aenode::AENODE, sim::BiotSimulation; Δt::Float32=0.35f0, impose_biot=false)
+    û, n_integr = predict_flex(aenode, sim.flow.u, sim.flow.μ₀, Float32(sim_time(sim)); Δt=Δt)
+    if isnothing(û)
+        return sim, n_integr
+    end
+    insert_prediction!(sim, û)
+    Δt_arr = [Δt for _ in 1:n_integr]
+    append!(sim.flow.Δt, Δt_arr)
+    push!(sim.flow.Δt, WaterLily.CFL(sim.flow))
+    impose_biot && @timeit to "impose biot" impose_biot_bc!(sim)
+    return sim, n_integr
+end
+
+function predict_flex(aenode::AENODE, u::AbstractArray, μ₀::AbstractArray, t₀::Float32; Δt::Float32=0.35f0 )
     @assert size(u) == size(μ₀) "u and μ₀ must be the same size"
     if !ispow2(size(u, 1)) || !ispow2(size(μ₀, 1))
         u, μ₀ = remove_ghosts(u), remove_ghosts(μ₀)
@@ -73,8 +86,11 @@ function predict_flexible(aenode::AENODE, u::AbstractArray, μ₀::AbstractArray
     # compress simulation flow field to latent space
     z, _ = @timeit to "encode" aenode.encoder(u_in, aenode.ae_params.encoder, aenode.ae_state.encoder)
     z = vec(z)
-    KNN_score(aenode.knn_ood, z) > aenode.knn_ood.threshold && @warn "Encodeded flow not similar to training data, NODE integration can be wrong"
-    
+    if KNN_score(aenode.knn_ood, z) > aenode.knn_ood.threshold
+        @warn "Encodeded flow not similar to training data, NODE integration can be wrong"
+        return nothing, 0
+    end
+
     # NODE integration untill cutoff criteria is met.
     tₙ = t₀ + Δt/32.0f0
     n_integr = 0
