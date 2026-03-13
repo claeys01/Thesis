@@ -67,7 +67,7 @@ function predict_flex(aenode::AENODE, sim::BiotSimulation; Δt::Float32=0.35f0, 
         return sim, n_integr
     end
     insert_prediction!(sim, û)
-    Δt_arr = [Δt for _ in 1:n_integr]
+    Δt_arr = [Δt for _ in 1:n_integr-1]
     append!(sim.flow.Δt, Δt_arr)
     push!(sim.flow.Δt, WaterLily.CFL(sim.flow))
     impose_biot && @timeit to "impose biot" impose_biot_bc!(sim)

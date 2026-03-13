@@ -5,10 +5,87 @@ using Statistics
 using Plots
 using TimerOutputs
 
+
 sim = circle_shedding_biot(;mem=Array, Re=2500, n=2^8, m=2^8, perturb=false)
 
 reset_timer!(to::TimerOutput)
+function save_velocity_frame!(gif_frames::Vector, sim::BiotSimulation, time_step::Float64)
+    """
+    Save velocity field plots (u and v components) as a frame for GIF animation.
+    """
+    # Extract velocity components (remove ghost cells)
+    u_field = sim.flow.u[2:end-1, 2:end-1, 1]
+    v_field = sim.flow.u[2:end-1, 2:end-1, 2]
+    
+    # Determine color limits for consistent scaling across frames
+    u_clims = (0.1, 2)
+    v_clims = (-1, 1)
+    
+    # Create two subplots: u and v components
+    plt_u = flood(u_field;
+        clims=u_clims,
+        # levels=20,
+        title="u-velocity",
+        xlabel="x",
+        ylabel="y",
+        aspectratio=:equal,
+        framestyle=:none,
+        border=:none,
+        colorbar=false,
+        titlefontsize=8,
+        size=(400, 350))
+    
+    plt_v = flood(v_field;
+        clims=v_clims,
+        # levels=20,
+        title="v-velocity",
+       xlabel="x",
+        ylabel="y",
+        aspectratio=:equal,
+        framestyle=:none,
+        border=:none,
+        colorbar=false,
+        titlefontsize=8,
+        size=(400, 350))
+    
+    # Combine both velocity fields in one frame
+    plt_frame = plot(plt_u, plt_v;
+        layout=(1, 2),
+        size=(850, 350),
+        plot_title="Velocity Field at tU/L = $(round(time_step, digits=3))",
+        plot_titlefontsize=14)
+    
+    push!(gif_frames, plt_frame)
+end
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# Function to create and save GIF after simulation
+# ═══════════════════════════════════════════════════════════════════════════════
+function create_velocity_gif(gif_frames::Vector, t_end::Int64, savedir::String="")
+    """
+    Create and save velocity GIF after simulation completes.
+    """
+    println("\n" * "="^60)
+    println("Creating velocity GIF...")
+    println("="^60 * "\n")
+
+    if !isdir(savedir)
+        mkdir(savedir)
+    end
+
+    # gif_path = "figs/velocity_gifs/velocity_evolution_t$(t_end)_hybrid$(suffix).gif"
+    gif_path = joinpath(savedir, "velocity_evolution.gif")
+    anim = Plots.Animation()
+    for gif_frame in gif_frames
+        # plt = gif_frame
+        frame(anim, gif_frame)
+
+    end
+
+    gif(anim, gif_path; fps = 5)
+    println("GIF saved to: $gif_path")
+    return gif_path
+end
 # 1000 with physics in loss func
 node_path = "data/saved_models/NODE/16/RE2500/E1000_curldiv_MS_Adam_250/node_params.jld2"
 AE_path = "data/saved_models/u/Lux/256h_16l/RE2500/2e8/Feb12-1530__E1000_HW256x256_C4to2_nc6_nd2_z16_C8_lr0p001_wd0p0009_bs16_NY_LL1_Tl0p0471/checkpoint.jld2"
@@ -40,8 +117,8 @@ train_idx, val_idx, test_idx = Thesis.get_idxs(simdata, aenode.ae_args)
 t_train = simdata.time[train_idx]
 t_test = simdata.time[test_idx]
 
-t_end = 50
-n_switch = 237
+t_end = 20
+n_switch = 200
 pred_Δt = 0.35f0
 with_pred = true
 
@@ -86,6 +163,7 @@ ref_step = 1
 ref_sim = deepcopy(sim)
 
 save_interval = 0.25 # in CTU
+gif_frames = []  # Store plots for GIF
 next_save = save_interval
 ref_meanflow = MeanFlow(ref_sim.flow; uu_stats=true)
 
@@ -94,22 +172,26 @@ warmup_sim = deepcopy(sim)
 predict_wall_time = predict_flex(aenode, warmup_sim; 
     Δt=pred_Δt, 
     impose_biot=true)
-
+temp_times = []
 while sim_time(sim) < t_end
-    if (step % n_switch == 0 && sim_time(sim) > t_train[end])
-    # if step % n_switch == 0
+    # if (step % n_switch == 0 && sim_time(sim) > t_train[end])
+    if step % n_switch == 0
         if with_pred
             sim_time_before = sim_time(sim)
             predict_wall_time = @elapsed begin
                 sim, n_integr = predict_flex(aenode, sim; 
                 Δt=pred_Δt, 
-                impose_biot=true)
+                impose_biot=false)
             end
             sim_time_after = sim_time(sim)
-
+            push!(temp_times, sim_time_after)
+            @show n_integr
             # sim_dt = n_pred * pred_Δt*sim.U/sim.L
             sim_dt = sim_time_after - sim_time_before
             if n_integr != 0 # if simulation time didnt change, no prediction was inserted
+                # sim_step!(sim)
+                # display(WaterLily.flood(sim.flow.p .* sim.flow.μ₀[:, :, 2]))
+                # display(WaterLily.flood(sim.flow.σ ))
                 push!(n_integrs, n_integr)
                 push!(hybrid_predict_wall_times, predict_wall_time)
                 push!(hybrid_predict_sim_times, sim_dt)
@@ -122,6 +204,8 @@ while sim_time(sim) < t_end
 
                 push!(hybrid_forces_wat, forces)
                 push!(hybrid_time_wat, Float32(round(sim_time(sim),digits=4)))
+            else
+                @info "nothing inserted: $sim_time_after"
             end
         end
     else
@@ -134,7 +218,7 @@ while sim_time(sim) < t_end
         push!(hybrid_waterlily_wall_times, hybrid_waterlily_wall_time)
         push!(hybrid_waterlily_sim_times, sim_dt)
 
-        println( "WaterLily step $step: tU/L=$(round(sim_time(sim),digits=4)), Δt=$(round(sim.flow.Δt[end],digits=3)), wall time: $(round(hybrid_waterlily_wall_time*1000, digits=4)) ms, force: $forces")
+        # println( "WaterLily step $step: tU/L=$(round(sim_time(sim),digits=4)), Δt=$(round(sim.flow.Δt[end],digits=3)), wall time: $(round(hybrid_waterlily_wall_time*1000, digits=4)) ms, force: $forces")
 
     end
 
@@ -148,7 +232,7 @@ while sim_time(sim) < t_end
         force_ref = get_forces(ref_sim)
         push!(forces_ref, force_ref)
         push!(time_ref, Float32(round(sim_time(ref_sim),digits=4)))
-        println( "* Reference step $ref_step: tU/L=$(round(sim_time(ref_sim),digits=4)), Δt=$(round(ref_sim.flow.Δt[end],digits=3)), wall time: $(round(reference_wall_time*1000, digits=4)) ms, force: $force_ref")
+        # println( "* Reference step $ref_step: tU/L=$(round(sim_time(ref_sim),digits=4)), Δt=$(round(ref_sim.flow.Δt[end],digits=3)), wall time: $(round(reference_wall_time*1000, digits=4)) ms, force: $force_ref")
         ref_step +=1
 
     end
@@ -159,16 +243,19 @@ while sim_time(sim) < t_end
         WaterLily.update!(sim_meanflow, sim.flow)
         WaterLily.update!(ref_meanflow, ref_sim.flow)
         next_save = sim_time(sim) + save_interval
-        println("Saved mean flow statistics.")
-        println("sim time:$(round(sim_time(sim),digits=4)), ref_sim time: $(round(sim_time(ref_sim),digits=4)), next save: $next_save")
+        save_velocity_frame!(gif_frames, sim, sim_time(sim))
+
+        # println("Saved mean flow statistics.")
+        # println("sim time:$(round(sim_time(sim),digits=4)), ref_sim time: $(round(sim_time(ref_sim),digits=4)), next save: $next_save")
     end
 
     step +=1
 end
 
+
 step = 0
 ref_step = 0
-
+@show temp_times
 # ============================================================================
 # Compute Acceleration Metrics
 # ============================================================================
@@ -307,7 +394,6 @@ Thesis.region_spans!(plt_forces, t_train, t_test)
 # Plot 2: Timing comparison bar chart
 plt_timing = bar(
     ["WaterLily\n(per step)", "Prediction\n(per call)"],
-    
     [average_reference_wall, avg_hybrid_predict_wall],
     ylabel = "Wall time (ms)",
     title = "Average Computation Time",
@@ -411,15 +497,17 @@ display(plt_combined)
 display(rst_comp_plot)
 display(plt_meanflow)
 
-# savedir = "figs/acceleration/t$(t_end)_np$(n_pred)_ns$(n_switch)/"
+savedir = "figs/acceleration/t$(t_end)_nflex_ns$(n_switch)/"
 if !isdir(savedir)
     mkdir(savedir)
 end
 
 
-# savefig(plt_combined, joinpath(savedir, "plt_combined.png"))
-# savefig(rst_comp_plot, joinpath(savedir,"rst_comp_plot.png"))
-# savefig(plt_meanflow, joinpath(savedir, "plt_meanflow.png"))
+savefig(plt_combined, joinpath(savedir, "plt_combined.png"))
+savefig(rst_comp_plot, joinpath(savedir,"rst_comp_plot.png"))
+savefig(plt_meanflow, joinpath(savedir, "plt_meanflow.png"))
+
+gif_path = create_velocity_gif(gif_frames, t_end, savedir)
 
 
 # nothing

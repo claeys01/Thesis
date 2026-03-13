@@ -107,7 +107,8 @@ function div_field(u::AbstractArray{T,N}; avg=false, buff=1) where {T,N}
 end
 
 
-
+import WaterLily: Vcycle!,smooth!, scale_u!, conv_diff!, udf!, accelerate!, BDIM!, CFL
+import BiotSavartBCs: apply_grad_p!, biotBC!, fix_resid!, biotBC_r!, pflowBC!, BCTuple
 # replacing flow field with simulations
 function insert_prediction!(sim::AbstractSimulation, û::AbstractArray{T,3}) where {T}
     sim_size = size(sim.flow.u); pred_size = size(û)
@@ -118,39 +119,63 @@ end
 
 function custom_BDIM!(a::Flow, dt)
     # dt = a.Δt[end]
-
     @loop a.f[Ii] = a.u⁰[Ii]+dt*a.f[Ii]-a.V[Ii] over Ii in CartesianIndices(a.f)
     @loop a.u[Ii] += WaterLily.μddn(Ii,a.μ₁,a.f)+a.V[Ii]+a.μ₀[Ii]*a.f[Ii] over Ii ∈ inside_u(size(a.p))
 end
 
+function custom_sim_step!(sim::BiotSimulation;remeasure=true,meanflow=nothing,kwargs...)
+    remeasure && WaterLily.measure!(sim)
+    custom_biot_mom_step!(sim.flow,sim.pois,sim.ω,sim.x₀,sim.tar,sim.ftar;fmm=sim.fmm,kwargs...)
+end
+
+function custom_biot_mom_step!(a::Flow{N},b,ω...;λ=quick,udf=nothing,fmm=true,kwargs...) where N
+    a.u⁰ .= a.u; scale_u!(a,0); t₁ = sum(a.Δt); t₀ = t₁-a.Δt[end]
+    U = BCTuple(a.uBC,t₁,N); # BCs at t₁
+    # predictor u → u'
+    @log "p"
+    conv_diff!(a.f,a.u⁰,a.σ,λ,ν=a.ν)
+    udf!(a,udf,t₀; kwargs...)
+    accelerate!(a.f,t₀,a.g,a.uBC)
+    BDIM!(a);
+    custom_biot_project!(a,b,ω...,U;fmm) # new
+    # corrector u → u¹
+    @log "c"
+    conv_diff!(a.f,a.u,a.σ,λ,ν=a.ν)
+    udf!(a,udf,t₁; kwargs...)
+    accelerate!(a.f,t₁,a.g,a.uBC)
+    BDIM!(a); scale_u!(a,0.5)
+    custom_biot_project!(a,b,ω...,U;fmm,w=0.5) # new
+    # push!(a.Δt,CFL(a))
+end
+
 function custom_biot_project!(a::Flow{n},ml_b::MultiLevelPoisson,ω,x₀,tar,ftar,U;fmm=true,w=1,tol=1e-4,itmx=32) where n
     dt = w*a.Δt[end]; a.p .*= dt  # Scale p *= w*Δt
-    # dt *= w; a.p .*= dt  # Scale p *= w*Δt
-    BiotSavartBCs.apply_grad_p!(a.u,ω,a.p,a.μ₀) # Apply u-=μ₀∇p & ω=∇×u
+    apply_grad_p!(a.u,ω,a.p,a.μ₀) # Apply u-=μ₀∇p & ω=∇×u
     x₀ .= a.p; fill!(a.p,0)       # x₀ holds p solution
-    BiotSavartBCs.biotBC!(a.u,U,ω,tar,ftar;fmm) # Apply domain BCs
+    biotBC!(a.u,U,ω,tar,ftar;fmm) # Apply domain BCs
     # Set residual
     b = ml_b.levels[1]; b.r .= 0
     @inside b.r[I] = ifelse(b.iD[I]==0,0,WaterLily.div(I,a.u))
-    BiotSavartBCs.fix_resid!(b.r,a.u,tar[1]) # only fix on the boundaries
+    fix_resid!(b.r,a.u,tar[1]) # only fix on the boundaries
+
     nᵖ,nᵇ,r₂ = 0,0,L₂(b)
     @log ", $nᵖ, $(WaterLily.L∞(b)), $r₂, $nᵇ\n"
     while nᵖ<itmx
         rtol = max(tol,0.1r₂)
         while nᵖ<itmx
-            WaterLily.Vcycle!(ml_b); WaterLily.smooth!(b)
+            Vcycle!(ml_b); smooth!(b)
             r₂ = L₂(b); nᵖ+=1
             r₂<rtol && break
         end
-        BiotSavartBCs.apply_grad_p!(a.u,ω,a.p,a.μ₀)   # Update u,ω
+        apply_grad_p!(a.u,ω,a.p,a.μ₀)   # Update u,ω
         x₀ .+= a.p; fill!(a.p,0)        # Update solution
-        BiotSavartBCs.biotBC_r!(b.r,a.u,U,ω,tar,ftar;fmm) # Update BC+residual
+        biotBC_r!(b.r,a.u,U,ω,tar,ftar;fmm) # Update BC+residual
         r₂ = L₂(b); nᵇ+=1
         @log ", $nᵖ, $(WaterLily.L∞(b)), $r₂, $nᵇ\n"
         r₂<tol && break
     end
     push!(ml_b.n,nᵖ)
-    BiotSavartBCs.pflowBC!(a.u)  # Update ghost BCs (domain is already correct)
+    pflowBC!(a.u)  # Update ghost BCs (domain is already correct)
     a.p .= x₀/dt   # copy-scaled pressure solution
 end
 
@@ -175,7 +200,6 @@ function impose_biot_bc!(a::Flow{N}, b, ω...;λ=quick, fmm=true) where {N}
     custom_biot_project!(a,b,ω...,U;fmm,w=0.5) # new
     # push!(a.Δt,WaterLily.CFL(a))
 
-
     # WaterLily.measure!(a,body;t₁,ϵ=1)
     WaterLily.update!(b)
 
@@ -187,8 +211,6 @@ function impose_biot_bc!(a::Flow{N}, b, ω...;λ=quick, fmm=true) where {N}
     WaterLily.conv_diff!(a.f,a.u,a.σ,λ,ν=a.ν)
     WaterLily.BDIM!(a); WaterLily.scale_u!(a,0.5)
     custom_biot_project!(a,b,ω...,U;fmm,w=0.5) # new
-    # push!(a.Δt,WaterLily.CFL(a))
-    # a.u .= a.u⁰
 end
 
 impose_biot_bc!(sim::BiotSimulation) = impose_biot_bc!(sim.flow, sim.pois, sim.ω, sim.x₀,sim.tar,sim.ftar;fmm=sim.fmm)  
