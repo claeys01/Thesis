@@ -40,7 +40,7 @@ train_idx, val_idx, test_idx = Thesis.get_idxs(simdata, aenode.ae_args)
 t_train = simdata.time[train_idx]
 t_test = simdata.time[test_idx]
 
-t_end = 50
+t_end = 20
 n_pred = 32
 n_switch = 137
 pred_Δt = 0.35f0
