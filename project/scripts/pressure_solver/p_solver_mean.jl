@@ -30,4 +30,7 @@ end
 
 # # Set initial condition
 sim.flow.u .= u
+sim_step!(sim)
 
+plt = Thesis.velocity_flood(sim)
+display(plt)

@@ -112,6 +112,9 @@ include("utils/AE_normalizer.jl")
 # Custom functions (depends on WaterLily)
 include("utils/custom.jl")
 
+# Plotting utilities
+include("utils/plotting_funcs.jl")
+
 # Simulations
 include("simulations/vortex_shedding_biot_savart.jl")
 include("simulations/vortex_shedding.jl")
@@ -134,6 +137,8 @@ include("AENODE.jl")
 # Reconstruction utilities
 include("utils/AE_reconstructer.jl")
 include("utils/AE_loss_plot.jl")
+
+
 
 # Data getters
 # include("data_getters/Lux_get_latent_data.jl")

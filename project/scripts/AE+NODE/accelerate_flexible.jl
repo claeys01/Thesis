@@ -1,4 +1,5 @@
 using Thesis
+using Thesis: get_forces
 using WaterLily
 using WaterLily: MeanFlow
 using Statistics
@@ -9,49 +10,13 @@ using TimerOutputs
 sim = circle_shedding_biot(;mem=Array, Re=2500, n=2^8, m=2^8, perturb=false)
 
 reset_timer!(to::TimerOutput)
-function save_velocity_frame!(gif_frames::Vector, sim::BiotSimulation, time_step::Float64)
+function save_velocity_frame!(gif_frames::Vector, sim::AbstractSimulation, time_step::Float64)
     """
     Save velocity field plots (u and v components) as a frame for GIF animation.
     """
-    # Extract velocity components (remove ghost cells)
-    u_field = sim.flow.u[2:end-1, 2:end-1, 1]
-    v_field = sim.flow.u[2:end-1, 2:end-1, 2]
-    
-    # Determine color limits for consistent scaling across frames
-    u_clims = (0.1, 2)
-    v_clims = (-1, 1)
-    
-    # Create two subplots: u and v components
-    plt_u = flood(u_field;
-        clims=u_clims,
-        # levels=20,
-        title="u-velocity",
-        xlabel="x",
-        ylabel="y",
-        aspectratio=:equal,
-        framestyle=:none,
-        border=:none,
-        colorbar=false,
-        titlefontsize=8,
-        size=(400, 350))
-    
-    plt_v = flood(v_field;
-        clims=v_clims,
-        # levels=20,
-        title="v-velocity",
-       xlabel="x",
-        ylabel="y",
-        aspectratio=:equal,
-        framestyle=:none,
-        border=:none,
-        colorbar=false,
-        titlefontsize=8,
-        size=(400, 350))
-    
+    plt_combined, _, _  = Thesis.velocity_flood(sim)
     # Combine both velocity fields in one frame
-    plt_frame = plot(plt_u, plt_v;
-        layout=(1, 2),
-        size=(850, 350),
+    plt_frame = plot(plt_combined,
         plot_title="Velocity Field at tU/L = $(round(time_step, digits=3))",
         plot_titlefontsize=14)
     
@@ -73,7 +38,6 @@ function create_velocity_gif(gif_frames::Vector, t_end::Int64, savedir::String="
         mkdir(savedir)
     end
 
-    # gif_path = "figs/velocity_gifs/velocity_evolution_t$(t_end)_hybrid$(suffix).gif"
     gif_path = joinpath(savedir, "velocity_evolution.gif")
     anim = Plots.Animation()
     for gif_frame in gif_frames
@@ -112,7 +76,6 @@ append!(sim.flow.Δt, simdata.Δt[1:random_int])
 sim_step!(sim)
 sim_meanflow = MeanFlow(sim.flow; uu_stats=true)
 
-
 train_idx, val_idx, test_idx = Thesis.get_idxs(simdata, aenode.ae_args)
 t_train = simdata.time[train_idx]
 t_test = simdata.time[test_idx]
@@ -122,11 +85,6 @@ n_switch = 200
 pred_Δt = 0.35f0
 with_pred = true
 
-function get_forces(sim::BiotSimulation)
-    raw_force = WaterLily.pressure_force(sim)
-    scaled_force = Float32.(raw_force./(0.5sim.L*sim.U^2)) # scale the forces!
-    return scaled_force
-end
 
 function force_stats(forces::Vector{Vector{Float32}})
     drag = first.(forces)
@@ -173,6 +131,7 @@ predict_wall_time = predict_flex(aenode, warmup_sim;
     Δt=pred_Δt, 
     impose_biot=true)
 temp_times = []
+
 while sim_time(sim) < t_end
     # if (step % n_switch == 0 && sim_time(sim) > t_train[end])
     if step % n_switch == 0
@@ -185,13 +144,8 @@ while sim_time(sim) < t_end
             end
             sim_time_after = sim_time(sim)
             push!(temp_times, sim_time_after)
-            @show n_integr
-            # sim_dt = n_pred * pred_Δt*sim.U/sim.L
             sim_dt = sim_time_after - sim_time_before
             if n_integr != 0 # if simulation time didnt change, no prediction was inserted
-                # sim_step!(sim)
-                # display(WaterLily.flood(sim.flow.p .* sim.flow.μ₀[:, :, 2]))
-                # display(WaterLily.flood(sim.flow.σ ))
                 push!(n_integrs, n_integr)
                 push!(hybrid_predict_wall_times, predict_wall_time)
                 push!(hybrid_predict_sim_times, sim_dt)
@@ -255,7 +209,7 @@ end
 
 step = 0
 ref_step = 0
-@show temp_times
+
 # ============================================================================
 # Compute Acceleration Metrics
 # ============================================================================

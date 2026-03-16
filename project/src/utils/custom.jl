@@ -16,8 +16,26 @@ function RHS(flow::Flow{N};λ=WaterLily.quick,kwargs...) where N
     return RHS
 end
 
-function remove_ghosts(snapshot::AbstractArray)
-    return snapshot[2:end-1, 2:end-1, :, :]
+ispow2(n::Integer) = n > 0 && (n & (n - 1)) == 0
+
+
+function remove_ghosts(snapshot::AbstractArray{T, N}) where {T, N}
+    H, W, _ = size(snapshot)
+    if ispow2(H) && ispow2(W)
+        throw(ArgumentError("snapshot(s) does not contain ghost cells"))
+    elseif N == 2
+        return snapshot[2:end-1, 2:end-1]
+    elseif N == 3
+        return snapshot[2:end-1, 2:end-1, :]
+    elseif N == 4
+        return snapshot[2:end-1, 2:end-1, :, :]
+    end
+end
+
+function get_forces(sim::AbstractSimulation)
+    raw_force = WaterLily.pressure_force(sim)
+    scaled_force = Float32.(raw_force./(0.5sim.L*sim.U^2)) # scale the forces!
+    return scaled_force
 end
 
 function preprocess_data!(data::SimData;
@@ -45,7 +63,6 @@ function preprocess_data!(data::SimData;
 end
 
 
-ispow2(n::Integer) = n > 0 && (n & (n - 1)) == 0
 
 
 function strain_field(u::AbstractArray{T,N}; buff::Int64=1) where {T,N}
@@ -275,59 +292,6 @@ function zero_crossing(y; direction=:both, eps=0.0)
     return idx
 end
 
-function train_force_plot(forces::Vector{Vector{Float32}}, time::Vector{Float32}; train_idx=nothing, val_idx=nothing, test_idx=nothing, show_zeros=true)
-    drag = first.(forces)
-    lift = last.(forces)
-    zero_idxs = zero_crossing(lift; direction=:rising)
-
-    plt = plot(xlabel="tU/L",
-        ylabel="Pressure force coefficients",
-        legend=:topright) 
-    plot!(plt, time, drag, label="drag", color=:red, linewidth=1.5)
-    plot!(plt, time, lift, label="lift", color=:blue, linewidth=1.5)
-
-
-    if !isnothing(val_idx) && !isempty(val_idx)
-        scatter!(plt, time[val_idx], lift[val_idx], 
-        markersize = 2, color=:darkgreen, markerstrokewidth = 0, markershape =:dtriangle, 
-        label="validation points")
-    end
-    # Highlight train/val region (before test starts)
-    if !isnothing(train_idx) && !isempty(train_idx)
-        train_range = first(train_idx) : last(train_idx)
-        
-        # Add vertical shaded region for train/val
-        vspan!(plt, [time[first(train_range)], time[last(train_range)]];
-            fillcolor=:green, alpha=0.1, label="train/val region")
-    end
- 
-    # Highlight test region
-    if !isnothing(test_idx) && !isempty(test_idx)
-        test_range = first(test_idx) : last(test_idx)
-        
-        # Add vertical shaded region for test
-        vspan!(plt, [time[first(test_range)], time[last(test_range)]];
-            fillcolor=:purple, alpha=0.1, label="test region")
-        
-    end
-    # Annotate zero crossings
-    if show_zeros
-        for (i, idx) in enumerate(zero_idxs)
-            shift = i % 2
-            scatter!(plt, [time[idx]], [lift[idx]]; label=false, color=:black, markersize=3)
-            annotate!(plt, time[idx], lift[idx] + 0.1 -(shift*0.2) , text(string(round(time[idx],digits = 3)), 8, :right))
-        end
-    end
-
-    # display(plt)
-    return plt
-end
-
-function train_force_plot(simdata::SimData; 
-        train_idx=nothing, val_idx=nothing, test_idx=nothing, show_zeros=true)
-   train_force_plot(simdata.force, simdata.time; 
-        train_idx=train_idx, val_idx=val_idx, test_idx=test_idx, show_zeros=show_zeros)
-end
 
 function velocity_gradient_vectorized(u::AbstractArray{T,3}; buff=1) where T
     # Using central differences for cross-terms (like WaterLily's ∂(i,j,I,u) for i≠j)
@@ -484,69 +448,3 @@ function RST(u::AbstractArray{T, 4}, μ₀::AbstractArray{T, 3}) where {T}
     return (uu, vv, uv)
 end
 
-function plot_reynolds_stresses(uu, vv, uv)
-    # Compute clims for each component: (min, max) centered around mean
-    # uu_min, uu_max = (0.0, maximum(uu))
-    # vv_min, vv_max = (0.0, maximum(vv))
-    uu_min, uu_max = extrema(uu)
-    vv_min, vv_max = extrema(vv)
-    uv_min, uv_max = extrema(uv)
-    # uu_min, uu_max = 0.0, mean(uu) + std(uu)
-    # vv_min, vv_max = 0.0, mean(vv) + std(vv)
-    # uv_min, uv_max = mean(uv) - std(uv), mean(uv) + std(uv)
-    
-    
-    # Plot ⟨u'u'⟩
-    plt_uu = flood(uu; 
-        clims=(uu_min, uu_max),
-        levels=20,
-        color=:viridis,
-        title="⟨u'u'⟩",
-        xlabel="x",
-        ylabel="y",
-        aspectratio=:equal, 
-        border=:none, 
-        framestyle=:none,
-        axis=nothing
-    )
-    
-    # Plot ⟨v'v'⟩
-    plt_vv = flood(vv;
-        clims=(vv_min, vv_max),
-        levels=20,
-        color=:viridis,
-        title="⟨v'v'⟩",
-        xlabel="x",
-        ylabel="y",
-        aspectratio=:equal,
-        border=:none, 
-        framestyle=:none,
-        axis=nothing
-    )
-    
-    # Plot ⟨u'v'⟩
-    plt_uv = flood(uv;
-        clims=(uv_min, uv_max),
-        levels=20,
-        color=:viridis,
-        title="⟨u'v'⟩",
-        xlabel="x",
-        ylabel="y",
-        aspectratio=:equal, 
-        border=:none, 
-        framestyle=:none,
-        axis=nothing
-    )
-    
-    # Combine into a single figure
-    plt_combined = plot(plt_uu, plt_vv, plt_uv;
-        layout=(1, 3),
-        size=(1200, 350),
-        dpi=150,
-        # plot_title="Reynolds Stress Components (Re=2500)",
-        # plot_titlefontsize=12
-    )
-    
-    return plt_combined, (plt_uu, plt_vv, plt_uv)
-end
-plot_reynolds_stresses(simdata::SimData) = plot_reynolds_stresses(RST(simdata.u, simdata.μ₀[:, :, :, 1])...)

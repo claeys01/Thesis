@@ -20,6 +20,7 @@ z0 = latent_data.z_total[:, rollout_range[1]]
 sol = Thesis.predict_array(aenode.NODE,  z0; t=simdata.time, onlysol=false)
 
 ẑ = Array(sol[1])
+
 @show size(ẑ)
 ẑ_norms = norm.(eachcol(ẑ))
 
@@ -128,10 +129,10 @@ for i in 2:length(simdata.time[2:end])
     push!(timings, elapsed)
     elapsed > 0.03 && println(i, " ", elapsed)
     KNN = KNN_score(knood, z_pred)
-    if KNN > knood.threshold
-        z0 = latent_data.z_total[:, i]
-        t₀ = simdata.time[i]
-    end
+    # if KNN > knood.threshold
+    #     z0 = latent_data.z_total[:, i]
+    #     t₀ = simdata.time[i]
+    # end
     push!(knn_scores, KNN)
 end
 
