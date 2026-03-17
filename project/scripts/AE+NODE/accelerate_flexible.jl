@@ -83,7 +83,7 @@ t_test = simdata.time[test_idx]
 t_end = 20
 n_switch = 200
 pred_Δt = 0.35f0
-with_pred = true
+with_pred = false
 
 
 function force_stats(forces::Vector{Vector{Float32}})

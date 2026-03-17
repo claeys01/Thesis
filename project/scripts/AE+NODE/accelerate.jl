@@ -31,7 +31,7 @@ random_int = 1
 u, μ₀, t₀ = simdata.u[:, :, :, random_int], simdata.μ₀[:, :, :, random_int], simdata.time[random_int]
 
 sim.flow.u .= u
-append!(sim.flow.Δt, simdata.Δt[1:random_int])
+# append!(sim.flow.Δt, simdata.Δt[1:random_int])
 sim_step!(sim)
 sim_meanflow = MeanFlow(sim.flow; uu_stats=true)
 
@@ -42,7 +42,7 @@ t_test = simdata.time[test_idx]
 
 t_end = 20
 n_pred = 32
-n_switch = 137
+n_switch = 100
 pred_Δt = 0.35f0
 with_pred = true
 
@@ -52,6 +52,8 @@ function get_forces(sim::BiotSimulation)
     scaled_force = Float32.(raw_force./(0.5sim.L*sim.U^2)) # scale the forces!
     return scaled_force
 end
+forces1 = get_forces(sim)
+@show forces1
 
 function force_stats(forces::Vector{Vector{Float32}})
     drag = first.(forces)
@@ -102,11 +104,19 @@ while sim_time(sim) < t_end
             predict_wall_time = @elapsed begin
                 predict_n!(sim, aenode, n_pred; 
                 Δt=pred_Δt, 
-                impose_biot=true)
+                impose_biot=false)
             end
+            closest_idx = argmin(abs.(simdata.time .- sim_time(sim)))
+            @show closest_idx
+            # sim.flow.p .= simdata.p[:, :, closest_idx]
+            # sim.flow.f .= simdata.f[:, :, :, closest_idx]
+            # measure!(sim)
+            # @assert sim.flow.p == simdata.p[:, :, closest_idx]
+            # @show mean(simdata.p[:, :, closest_idx])
+            # display(WaterLily.flood(simdata.p[:, :, closest_idx]))
+            @show simdata.force[closest_idx]
 
             sim_dt = n_pred * pred_Δt*sim.U/sim.L
-
             push!(hybrid_predict_wall_times, predict_wall_time)
             push!(hybrid_predict_sim_times, sim_dt)
             forces = get_forces(sim)
@@ -119,18 +129,19 @@ while sim_time(sim) < t_end
             push!(pred_idx, step)
         end
     else
-        hybrid_waterlily_wall_time = @elapsed sim_step!(sim)
+        hybrid_waterlily_wall_time = @elapsed sim_step!(sim; remeasure=true)
         sim_dt = sim.flow.Δt[end]*sim.U/sim.L
 
-        
         forces = get_forces(sim)
+        if forces[1] < -2
+            display(plot(WaterLily.flood(sim.flow.u[:, :, 1]), WaterLily.flood(sim.flow.p)))
+        end
         push!(hybrid_forces_wat, forces)
         push!(hybrid_time_wat, Float32(round(sim_time(sim),digits=4)))
         push!(hybrid_waterlily_wall_times, hybrid_waterlily_wall_time)
         push!(hybrid_waterlily_sim_times, sim_dt)
 
-        println( "WaterLily step $step: tU/L=$(round(sim_time(sim),digits=4)), Δt=$(round(sim.flow.Δt[end],digits=3)), wall time: $(round(hybrid_waterlily_wall_time*1000, digits=4)) ms, force: $forces")
-
+        # println( "WaterLily step $step: tU/L=$(round(sim_time(sim),digits=4)), Δt=$(round(sim.flow.Δt[end],digits=3)), wall time: $(round(hybrid_waterlily_wall_time*1000, digits=4)) ms, force: $forces")
     end
 
     while sim_time(sim) > sim_time(ref_sim)
@@ -143,7 +154,7 @@ while sim_time(sim) < t_end
         force_ref = get_forces(ref_sim)
         push!(forces_ref, force_ref)
         push!(time_ref, Float32(round(sim_time(ref_sim),digits=4)))
-        println( "* Reference step $ref_step: tU/L=$(round(sim_time(ref_sim),digits=4)), Δt=$(round(ref_sim.flow.Δt[end],digits=3)), wall time: $(round(reference_wall_time*1000, digits=4)) ms, force: $force_ref")
+        # println( "* Reference step $ref_step: tU/L=$(round(sim_time(ref_sim),digits=4)), Δt=$(round(ref_sim.flow.Δt[end],digits=3)), wall time: $(round(reference_wall_time*1000, digits=4)) ms, force: $force_ref")
         ref_step +=1
 
     end
@@ -155,7 +166,7 @@ while sim_time(sim) < t_end
         WaterLily.update!(ref_meanflow, ref_sim.flow)
         next_save = sim_time(sim) + save_interval
         println("Saved mean flow statistics.")
-        println("sim time:$(round(sim_time(sim),digits=4)), ref_sim time: $(round(sim_time(ref_sim),digits=4)), next save: $next_save")
+        # println("sim time:$(round(sim_time(sim),digits=4)), ref_sim time: $(round(sim_time(ref_sim),digits=4)), next save: $next_save")
     end
 
     step +=1

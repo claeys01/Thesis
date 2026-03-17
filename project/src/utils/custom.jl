@@ -203,7 +203,6 @@ Function assumes that the pressure field is filled,
 Use for imposing BCs and pressure field on predicted flow field
 """
 function impose_biot_bc!(a::Flow{N}, b, ω...;λ=quick, fmm=true) where {N}
-
     t₁ = sum(a.Δt)
     U = BiotSavartBCs.BCTuple(a.uBC, t₁, N) 
 
