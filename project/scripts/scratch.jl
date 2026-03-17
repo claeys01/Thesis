@@ -1,66 +1,95 @@
 using Thesis
+using WaterLily
+using WaterLily: MeanFlow
 using Statistics
 using Plots
-using Revise
-using LinearAlgebra
-# include("/home/matth/Thesis/project/scripts/data_getters/get_latent_data.jl")
+using TimerOutputs
 
-# checkpoint = "data/saved_models/u/Lux/256h_16l/RE2500/2e8/Feb12-1530__E1000_HW256x256_C4to2_nc6_nd2_z16_C8_lr0p001_wd0p0009_bs16_NY_LL1_Tl0p0471/checkpoint.jld2"
-# save_path = "data/latent_data/16/RE2500/2e8/U_128_latent_curldiv_E1000.jld2"
-# train_latent, test_latent = get_latent_data(checkpoint; save_path=save_path)
+sim = circle_shedding_biot(;mem=Array, Re=2500, n=2^8, m=2^8, perturb=false, Δt=0.0)
+reset_timer!(to::TimerOutput)
 
-# Thesis.train_NODE(NodeArgs(
-#     train_latent_path = "data/latent_data/16/RE2500/2e8/U_128_latent_curldiv_E1000_train.jld2",
-#     test_latent_path =  "data/latent_data/16/RE2500/2e8/U_128_latent_curldiv_E1000_test.jld2",
-#     total_latent_path = "data/latent_data/16/RE2500/2e8/U_128_latent_curldiv_E1000.jld2"
-# ))
-# x = randn(256, 256, 2, 50)
-
+# 1000 with physics in loss func
 node_path = "data/saved_models/NODE/16/RE2500/E1000_curldiv_MS_Adam_250/node_params.jld2"
+AE_path = "data/saved_models/u/Lux/256h_16l/RE2500/2e8/Feb12-1530__E1000_HW256x256_C4to2_nc6_nd2_z16_C8_lr0p001_wd0p0009_bs16_NY_LL1_Tl0p0471/checkpoint.jld2"
+aenode = AENODE(AE_path, node_path)
 
-node, node_args = load_node(node_path; verbose=true)
-plt = plot_node_trajectory
+simdata = load_simdata(aenode.ae_args.full_data_path)
 
-data = Thesis.load_datasets(node_args; total_downsample=-1, verbose=true)
-@show data.t_total
-plt, _ = Thesis.extrapolate_node(node_path)
-display(plt)
-@show size(z_train)
+random_int = 1
+u, μ₀, t₀ = simdata.u[:, :, :, random_int], simdata.μ₀[:, :, :, random_int], simdata.time[random_int]
 
-mean_z_train = mean(z_train, dims=2)
-max_z_train = maximum(z_train, dims=2)
-min_z_train = minimum(z_train, dims=2)
+sim.flow.u .= u
+# append!(sim.flow.Δt, simdata.Δt[1:random_int])
+# sim_step!(sim)
+# sim_step!(sim)
+# f = deepcopy(sim.flow.f)
+# @show size(f)
+# H, B, C = size(f)
 
-function energy_timeseries(X)
-    return 0.5 .* sum(abs2, X; dims=1)[1,:]
+# for c in 1:C
+#     for j in 1:B
+#         for i in 1:H
+#             elem = f[i, j, c]
+#             # @show typeof(elem), elem
+
+#             if isnan(elem)
+#                 @show "jemoder"
+#                 f[i, j, c] = -100
+#             end
+#         end
+#     end
+# end
+
+# # f_clean = replace(f, Int64(NaN) => 0.0)
+# display(WaterLily.flood(f[:, :, 1]))
+
+sim_meanflow = MeanFlow(sim.flow; uu_stats=true)
+t_end = 50
+step = 1
+
+p_list = Vector{Array{Float32,2}}()
+f_list = Vector{Array{Float32,3}}()
+for i in eachindex(simdata.time)
+    push!(sim.flow.Δt, simdata.Δt[i])
+    sim_step!(sim)
+    # display(WaterLily.flood(sim.flow.f[:, :, 1]))
+
+
+    println("-"^10, step, "-"^10)
+    current_time, current_Δt = sim_time(sim), sim.flow.Δt[end]
+    saved_time, saved_Δt   = simdata.time[i], simdata.Δt[i]
+    
+    println("sim:   tU/L=$(current_time), Δt=$(current_Δt)")
+    println("saved: tU/L=$(saved_time), Δt=$(saved_Δt)")
+
+    # @show mean(sim.flow.p)
+    # display(WaterLily.flood(sim.flow.p))
+    push!(p_list, copy(sim.flow.p))
+    push!(f_list, copy(sim.flow.f))
+    # @assert current_Δt == saved_Δt
+    # @assert current_time == saved_time
+
+
+    step += 1
 end
+p = cat(p_list...; dims = 3) 
+f = cat(p_list...; dims = 4) 
+H, W, T = size(p)
 
-function energy_drift(E)
-    dE = diff(E)
-    return mean(abs2, dE)
-end
-
-# energy_z_train = energy_timeseries(z_train)
-# energy_z_test = energy_timeseries(z_test)
-# energy_z_total = energy_timeseries(z_total)
-
-
-# @show size(energy_z_train)
-# DE_train = energy_drift(energy_z_train)
-# DE_test = energy_drift(energy_z_test)
-# DE_total = energy_drift(energy_z_total)
-
-
-# @show DE_train, DE_test, DE_total
-# Δz = diff(z_train, dims=2)
-# step_sizes = norm.(eachcol(Δz))               # should be roughly constant
-
-# # 2. Acceleration (second derivative) — detects kinks/explosions
-# Δ²z = diff(Δz, dims=2)
-# acceleration = norm.(eachcol(Δ²z))
-
-# # 3. Trajectory curvature — very sensitive to drift
-# curvature = acceleration ./ (step_sizes[1:end-1] .+ 1e-8)
-
-# # 4. Norm of the latent state — should stay within training range
-# z_norms = norm.(eachcol(z_train))
+simdata = SimData(
+    simdata.time,
+    simdata.Δt,
+    simdata.u,
+    p,
+    f,
+    simdata.μ₀,
+    simdata.force,
+    simdata.ε,
+    simdata.period_ranges,
+    simdata.reordered_ranges,
+    simdata.single_period_idx,
+)
+# @save "data/datasets/RE2500/2e8/U_128_full.jld2" simdata
+@show T, size(simdata.time)
+@assert T == size(simdata.time)[1]
+@show simdata.time[1], simdata.time[end]
