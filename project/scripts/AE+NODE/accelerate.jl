@@ -133,8 +133,9 @@ while sim_time(sim) < t_end
         sim_dt = sim.flow.Δt[end]*sim.U/sim.L
 
         forces = get_forces(sim)
-        if forces[1] < -2
-            display(plot(WaterLily.flood(sim.flow.u[:, :, 1]), WaterLily.flood(sim.flow.p)))
+        if forces[1] < -2.1
+            # display(plot(WaterLily.flood(sim.flow.u[:, :, 1]), WaterLily.flood(sim.flow.p)))
+            display(WaterLily.flood(sim.flow.p))
         end
         push!(hybrid_forces_wat, forces)
         push!(hybrid_time_wat, Float32(round(sim_time(sim),digits=4)))

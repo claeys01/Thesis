@@ -80,11 +80,13 @@ train_idx, val_idx, test_idx = Thesis.get_idxs(simdata, aenode.ae_args)
 t_train = simdata.time[train_idx]
 t_test = simdata.time[test_idx]
 
-t_end = 20
+t_end = 50
 n_switch = 200
 pred_Δt = 0.35f0
-with_pred = false
-
+save_interval = 0.25 # in CTU
+step = 1
+ref_step = 1
+with_pred = true
 
 function force_stats(forces::Vector{Vector{Float32}})
     drag = first.(forces)
@@ -115,12 +117,10 @@ reference_sim_times = Float64[]
 n_integrs = Int[]
 
 pred_idx = Int64[]
-step = 1
-ref_step = 1
+
 
 ref_sim = deepcopy(sim)
 
-save_interval = 0.25 # in CTU
 gif_frames = []  # Store plots for GIF
 next_save = save_interval
 ref_meanflow = MeanFlow(ref_sim.flow; uu_stats=true)
@@ -133,14 +133,14 @@ predict_wall_time = predict_flex(aenode, warmup_sim;
 temp_times = []
 
 while sim_time(sim) < t_end
-    # if (step % n_switch == 0 && sim_time(sim) > t_train[end])
-    if step % n_switch == 0
+    if (step % n_switch == 0 && sim_time(sim) > t_train[end])
+    # if step % n_switch == 0
         if with_pred
             sim_time_before = sim_time(sim)
             predict_wall_time = @elapsed begin
                 sim, n_integr = predict_flex(aenode, sim; 
                 Δt=pred_Δt, 
-                impose_biot=false)
+                impose_biot=true)
             end
             sim_time_after = sim_time(sim)
             push!(temp_times, sim_time_after)
@@ -150,7 +150,7 @@ while sim_time(sim) < t_end
                 push!(hybrid_predict_wall_times, predict_wall_time)
                 push!(hybrid_predict_sim_times, sim_dt)
                 
-                forces = get_forces(sim)
+                forces = Thesis.get_forces(sim)
                 push!(hybrid_forces_preds, forces)
                 push!(hybrid_time_pred, Float32(round(sim_time(sim),digits=4)))
                 push!(pred_idx, step)
@@ -166,7 +166,7 @@ while sim_time(sim) < t_end
         hybrid_waterlily_wall_time = @elapsed sim_step!(sim)
         sim_dt = sim.flow.Δt[end]*sim.U/sim.L
 
-        forces = get_forces(sim)
+        forces = Thesis.get_forces(sim)
         push!(hybrid_forces_wat, forces)
         push!(hybrid_time_wat, Float32(round(sim_time(sim),digits=4)))
         push!(hybrid_waterlily_wall_times, hybrid_waterlily_wall_time)
