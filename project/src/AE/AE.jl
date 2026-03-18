@@ -54,8 +54,8 @@ end
 function downsample_equal(v::AbstractVector, M::Integer)
     N = length(v)
     M ≤ N || @warn "Cannot downsample to $M entries from $N points, returning $N points"
-    if M < 0
-        return v
+    if M ≤ 0
+        return nothing
     end
     M = clamp(M, 1, N)
     # idx = round.(Int, range(1, N, length = M))
@@ -89,7 +89,7 @@ function get_idxs(simdata::SimData, t_training, n_training, n_test; split=0.2)
         train_idx = setdiff(trainval_idx, val_idx)
     end
     test_idx = downsample_equal(collect(last(trainval_idx)+1:N), n_test)
-    return train_idx, val_idx, test_idx
+    return (train_idx=train_idx, val_idx=val_idx, test_idx=test_idx)
 end
 
 function get_data(batch_size, path; t_training=10, n_training=500, n_test=500, split=0.2, verbose=true, showplot=false, plotpath=nothing)
@@ -99,9 +99,10 @@ function get_data(batch_size, path; t_training=10, n_training=500, n_test=500, s
     N = size(simdata.u, 4)
     N < 2 && error("get_data: need at least 2 samples to create train/validation split (got $N)")
 
-    train_idx, val_idx, test_idx = get_idxs(simdata, t_training, n_training, n_test; split=split)
+    # train_idx, val_idx, test_idx = get_idxs(simdata, t_training, n_training, n_test; split=split)
+    idxs = get_idxs(simdata, t_training, n_training, n_test; split=split)
 
-    plt = train_force_plot(simdata; train_idx=train_idx, val_idx=val_idx, test_idx=test_idx)
+    plt = train_force_plot(simdata; train_idx=idxs.train_idx, val_idx=idxs.val_idx, test_idx=idxs.test_idx)
     showplot && display(plt)
     if !isnothing(plotpath)
         savefig(plt, plotpath)
@@ -109,20 +110,20 @@ function get_data(batch_size, path; t_training=10, n_training=500, n_test=500, s
     end
 
     # compute normaliser on training data only and then normalise each batch
-    _, normalizer = normalize_batch(simdata.u[:, :, :, train_idx]; normalizer=nothing)
+    _, normalizer = normalize_batch(simdata.u[:, :, :, idxs.train_idx]; normalizer=nothing)
 
     data = (
-        TrainData=EpochData(get_data_in(simdata.u, simdata.μ₀; idx=train_idx)...),
-        ValData=EpochData(get_data_in(simdata.u, simdata.μ₀; idx=val_idx)...),
-        TestData=EpochData(get_data_in(simdata.u, simdata.μ₀; idx=test_idx)...)
+        TrainData = EpochData(get_data_in(simdata.u, simdata.μ₀; idx=idxs.train_idx)...),
+        ValData   = EpochData(get_data_in(simdata.u, simdata.μ₀; idx=idxs.val_idx)...),
+        TestData  = EpochData(get_data_in(simdata.u, simdata.μ₀; idx=idxs.test_idx)...)
     )
 
     simdata = nothing
     # DataLoaders over indices only (lightweight)
     loaders = (
-        train_loader=DataLoader(collect(1:length(train_idx)); batchsize=batch_size, shuffle=true),
-        val_loader=DataLoader(collect(1:length(val_idx)); batchsize=batch_size, shuffle=false),
-        test_loader=DataLoader(collect(1:length(test_idx)); batchsize=batch_size, shuffle=false)
+        train_loader = DataLoader(collect(1:length(idxs.train_idx)); batchsize=batch_size, shuffle=true),
+        val_loader   = DataLoader(collect(1:length(idxs.val_idx));   batchsize=batch_size, shuffle=false),
+        test_loader  = DataLoader(collect(1:length(idxs.test_idx));  batchsize=batch_size, shuffle=false)
     )
     return data, loaders, normalizer
 end

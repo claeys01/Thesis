@@ -69,7 +69,8 @@ function train_AE(args::LuxArgs)
     # training
     @info "Start Training, total $(args.epochs) epochs"
     val_mean = 1
-    
+    test_corr_mean = (0.0, 0.0)
+    test_mean = 0.0
     for epoch = 1:args.epochs
         epoch_start = time()
         @timeit to "epoch" begin
@@ -148,6 +149,7 @@ function train_AE(args::LuxArgs)
         end
         # ---- epoch end: print concise summary ----
         epoch_time = time() - epoch_start
+
         test_corr_str = "($(round(test_corr_mean[1]; digits=3)), $(round(test_corr_mean[2]; digits=3)))"
 
         println(join([
@@ -164,7 +166,8 @@ function train_AE(args::LuxArgs)
 
     # save model
     timestamp = Dates.format(now(), "udd-HHMM")
-    tag = run_tag(args; test_Lrec=test_Lrecs[end])
+    tag = args.test_loss ? run_tag(args; test_Lrec=test_Lrecs[end]) : tag = run_tag(args)
+
     save_folder = joinpath(args.save_path, "$(timestamp)__$(tag)")
     !ispath(save_folder) && mkpath(save_folder)
     filepath = joinpath(save_folder, "checkpoint.jld2")
@@ -284,7 +287,6 @@ function make_loss_function(args, device, normalizer)
         )
     end
     return loss_function
-
 end
 
 
