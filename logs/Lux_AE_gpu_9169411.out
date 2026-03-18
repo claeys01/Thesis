@@ -1,0 +1,9 @@
+Running on host gpu018
+Using 8 Julia threads
+Starting at Fri Feb 13 09:56:15 CET 2026
+Loading Modules
+Finished Loading Modules
+Running Lux_AE_train.jl
+
+Training AE for 200 epochs with λdiv=1, λcurl=1)
+Finished at Fri Feb 13 10:01:49 CET 2026
