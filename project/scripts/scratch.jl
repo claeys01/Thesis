@@ -28,8 +28,8 @@ end
 AE_path = joinpath(root_path, "data/saved_models/u/Lux/256h_16l/RE2500/2e8/Feb12-1530__E1000_HW256x256_C4to2_nc6_nd2_z16_C8_lr0p001_wd0p0009_bs16_NY_LL1_Tl0p0471/checkpoint.jld2")
 tl_path = joinpath(root_path, "data/datasets/RE2500/2e8/U_128_transfer.jld2")
 
-retraindata = simdata = load_simdata(tl_path)
-@show simdata.time[end] simdata.time[1]
+# retraindata = simdata = load_simdata(tl_path)
+# @show simdata.time[end] simdata.time[1]
 
 # idx_train = argmin(abs.(simdata.time .- aenode.ae_args.t_training))
 # idx_30 = argmin(abs.(simdata.time .- 30))
