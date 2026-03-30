@@ -20,15 +20,16 @@ function main()
     @info "  Hostname: $(gethostname())"
     
     # Run training with HPC-appropriate settings
+    
+    println("\nTraining AE for 200 epochs with λdiv=$(div), λcurl=$(curl))")
+    train_AE(LuxArgs(epochs=200, λdiv=Float64(div), λcurl=Float64(curl)))
 
-
-    for div in 1:1000:10000
-        for curl in 1:100:1000
-            println("\nTraining AE for 200 epochs with λdiv=$(div), λcurl=$(curl))")
-            train_AE(LuxArgs(epochs=200, λdiv=Float64(div), λcurl=Float64(curl)))
-            println("\n")
-        end
-    end
+    # for div in 1:1000:10000
+    #     for curl in 1:100:1000
+    #         train_AE(LuxArgs(epochs=200, λdiv=Float64(div), λcurl=Float64(curl)))
+    #         println("\n")
+    #     end
+    # end
 end
 
 main()

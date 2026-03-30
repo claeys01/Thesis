@@ -9,17 +9,20 @@ ENV["THESIS_USE_CUDA"] = "true"  # Uncomment if using GPU nodes
 # Pkg.activate(joinpath(@__DIR__, ".."))
 
 # Load the module
-
-
 using Thesis
 using JLD2
-function main()
 
-    # sim = circle_shedding_biot(;mem=Array, Re=2500, n=2^8, m=2^8, perturb=false)
+function main()
+    
 
     if is_hpc()
         root_path = "scratch/mfbclaeys"
-        println("is hpc")
+        # Log job info
+        @info "Starting HPC AE training job"
+        @info "  SLURM_JOB_ID: $(get(ENV, "SLURM_JOB_ID", "N/A"))"
+        @info "  SLURM_NTASKS: $(get(ENV, "SLURM_NTASKS", "N/A"))"
+        @info "  SLURM_CPUS_PER_TASK: $(get(ENV, "SLURM_CPUS_PER_TASK", "N/A"))"
+        @info "  Hostname: $(gethostname())"   
     else
         root_path = ""
     end
@@ -30,8 +33,6 @@ function main()
     checkpoint = JLD2.load(AE_path)
     args_dict = checkpoint["args"]
     ae_args = LuxArgs(; args_dict...)
-
-
 
     # @show aenode.ae_args.λdiv, aenode.ae_args.λcurl, aenode.ae_args.λstrain
     # ---- simulation running & AENODE using to integrate
@@ -46,13 +47,11 @@ function main()
         ae_args.retrain = true
         ae_args.checkpoint_path = AE_path
         # ae_args.full_data_path = tl_path
-        # ae_args.t_training = retraindata.time[end] * 0.8
+        ae_args.t_training = retraindata.time[end] * 0.8
         ae_args.test_downsample = 100
         ae_args.test_loss = true
         train_AE(ae_args)
     end
-
-
 end
 
 main()
