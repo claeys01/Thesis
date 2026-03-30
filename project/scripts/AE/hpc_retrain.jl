@@ -55,7 +55,7 @@ function main()
     retrain_crit = true
     # test = LuxArgs(aenode.ae_args)
     if retrain_crit
-        ae_args.epochs = 10
+        ae_args.epochs = 100
         ae_args.retrain = true
         ae_args.checkpoint_path = AE_path
         ae_args.full_data_path = tl_path
