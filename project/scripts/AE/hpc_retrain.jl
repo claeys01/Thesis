@@ -29,7 +29,7 @@ function main()
     AE_path = joinpath(root_path, "data/saved_models/u/Lux/256h_16l/RE2500/2e8/Feb12-1530__E1000_HW256x256_C4to2_nc6_nd2_z16_C8_lr0p001_wd0p0009_bs16_NY_LL1_Tl0p0471/checkpoint.jld2")
     # tl_path = joinpath(root_path, "data/datasets/RE2500/2e8/U_128_transfer.jld2")
     tl_path = joinpath(root_path, "data/datasets/RE2500/2e8/U_128_full.jld2")    
-    
+
     @info "Loading checkpoint from: $AE_path"
     @info "Loading training data from: $tl_path"
     
@@ -59,7 +59,7 @@ function main()
         ae_args.retrain = true
         ae_args.checkpoint_path = AE_path
         ae_args.full_data_path = tl_path
-        ae_args.t_training = retraindata.time[end] * 0.8
+        # ae_args.t_training = retraindata.time[end] * 0.8
         ae_args.test_downsample = 100
         ae_args.test_loss = true
         train_AE(ae_args)
