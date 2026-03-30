@@ -14,7 +14,7 @@ using JLD2
 
 function main()
     
-
+    root_path = ""
     if is_hpc()
         root_path = "/scratch/mfbclaeys"
         # Log job info
@@ -23,12 +23,11 @@ function main()
         @info "  SLURM_NTASKS: $(get(ENV, "SLURM_NTASKS", "N/A"))"
         @info "  SLURM_CPUS_PER_TASK: $(get(ENV, "SLURM_CPUS_PER_TASK", "N/A"))"
         @info "  Hostname: $(gethostname())"   
-    else
-        root_path = ""
     end
 
     node_path = joinpath(root_path, "data/saved_models/NODE/16/RE2500/E1000_curldiv_MS_Adam_250/node_params.jld2")
     AE_path = joinpath(root_path, "data/saved_models/u/Lux/256h_16l/RE2500/2e8/Feb12-1530__E1000_HW256x256_C4to2_nc6_nd2_z16_C8_lr0p001_wd0p0009_bs16_NY_LL1_Tl0p0471/checkpoint.jld2")
+    println(AE_path)
     # aenode = AENODE(AE_path, node_path)
     checkpoint = JLD2.load(AE_path)
     args_dict = checkpoint["args"]
