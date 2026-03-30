@@ -58,7 +58,7 @@ function main()
         ae_args.epochs = 10
         ae_args.retrain = true
         ae_args.checkpoint_path = AE_path
-        # ae_args.full_data_path = tl_path
+        ae_args.full_data_path = tl_path
         ae_args.t_training = retraindata.time[end] * 0.8
         ae_args.test_downsample = 100
         ae_args.test_loss = true
