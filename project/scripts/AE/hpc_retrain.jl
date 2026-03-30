@@ -16,7 +16,7 @@ function main()
     
 
     if is_hpc()
-        root_path = "scratch/mfbclaeys"
+        root_path = "/scratch/mfbclaeys"
         # Log job info
         @info "Starting HPC AE training job"
         @info "  SLURM_JOB_ID: $(get(ENV, "SLURM_JOB_ID", "N/A"))"
