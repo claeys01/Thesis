@@ -5,18 +5,31 @@ using Statistics
 using Plots
 using TimerOutputs
 
-sim = circle_shedding_biot(;mem=Array, Re=2500, n=2^8, m=2^8, perturb=false, Δt=0.0)
+# sim = circle_shedding_biot(;mem=Array, Re=2500, n=2^8, m=2^8, perturb=false, Δt=0.0)
 reset_timer!(to::TimerOutput)
 
 # 1000 with physics in loss func
 node_path = "data/saved_models/NODE/16/RE2500/E1000_curldiv_MS_Adam_250/node_params.jld2"
 AE_path = "data/saved_models/u/Lux/256h_16l/RE2500/2e8/Feb12-1530__E1000_HW256x256_C4to2_nc6_nd2_z16_C8_lr0p001_wd0p0009_bs16_NY_LL1_Tl0p0471/checkpoint.jld2"
-aenode = AENODE(AE_path, node_path)
+# aenode = AENODE(AE_path, node_path)
 
 # simdata = load_simdata(aenode.ae_args.full_data_path)
-simdata = load_simdata("data/datasets/RE2500/2e8/U_128_transfer.jld2")
-@show simdata.time[1], simdata.time[end]
+# simdata = load_simdata("data/datasets/RE2500/2e8/U_128_transfer.jld2")
+# @show simdata.time[1], simdata.time[end]
 
+
+if is_hpc()
+    root_path = "scratch/mfbclaeys"
+    println("is hpc")
+else
+    root_path = ""
+end
+# node_path = joinpath(root_path, "data/saved_models/NODE/16/RE2500/E1000_curldiv_MS_Adam_250/node_params.jld2")
+AE_path = joinpath(root_path, "data/saved_models/u/Lux/256h_16l/RE2500/2e8/Feb12-1530__E1000_HW256x256_C4to2_nc6_nd2_z16_C8_lr0p001_wd0p0009_bs16_NY_LL1_Tl0p0471/checkpoint.jld2")
+tl_path = joinpath(root_path, "data/datasets/RE2500/2e8/U_128_transfer.jld2")
+
+retraindata = simdata = load_simdata(tl_path)
+@show simdata.time[end] simdata.time[1]
 
 # idx_train = argmin(abs.(simdata.time .- aenode.ae_args.t_training))
 # idx_30 = argmin(abs.(simdata.time .- 30))
