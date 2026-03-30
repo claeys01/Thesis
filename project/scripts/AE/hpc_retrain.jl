@@ -51,7 +51,7 @@ function main()
     # ---- simulation running & AENODE using to integrate
     # ---- retrain criteria is triggered
 
-    # retraindata = simdata = load_simdata(tl_path)
+    retraindata = simdata = load_simdata(tl_path)
     retrain_crit = true
     # test = LuxArgs(aenode.ae_args)
     if retrain_crit
