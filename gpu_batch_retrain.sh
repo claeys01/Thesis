@@ -1,9 +1,9 @@
 #!/bin/sh
 #
-#SBATCH --job-name="Lux_AE_gpu"
+#SBATCH --job-name="Retrain_Lux_AE_gpu"
 #SBATCH --partition=gpu-a100
-#SBATCH --output=Lux_AE_gpu.out
-#SBATCH --error=Lux_AE_gpu.err
+#SBATCH --output=logs/%x_%j.out
+#SBATCH --error=logs/%x_%j.err
 #SBATCH --time=00:30:00
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
@@ -30,6 +30,6 @@ echo "Finished Loading Modules"
 
 echo "Running hpc_retrain.jl"
 
-srun julia --project project/scripts/AE/hpc_retrain.jl
+srun julia --project=project project/scripts/AE/hpc_retrain.jl
 
 echo "Finished at $(date)"

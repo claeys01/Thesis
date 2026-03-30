@@ -30,6 +30,6 @@ echo "Finished Loading Modules"
 
 echo "Running Lux_AE_train.jl"
 
-srun julia --project=project project/scripts/hpc_train.jl
+srun julia --project=project project/scripts/AE/hpc_train.jl
 
 echo "Finished at $(date)"

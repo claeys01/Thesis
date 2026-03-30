@@ -1,0 +1,36 @@
+ERROR: LoadError: ArgumentError: Package Thesis not found in current path.
+ERROR: LoadError: ArgumentError: Package Thesis not found in current path.
+- Run `import Pkg; Pkg.add("Thesis")` to install the Thesis package.
+- Run `import Pkg; Pkg.add("Thesis")` to install the Thesis package.
+Stacktrace:
+Stacktrace:
+ [1] macro expansion
+ [1] macro expansion
+   @ ./loading.jl:2296 [inlined]
+   @ ./loading.jl:2296 [inlined]
+ [2] macro expansion
+ [2] macro expansion
+   @ ./lock.jl:273 [inlined]
+ [3] __require(into::Module, mod::Symbol)
+   @ ./lock.jl:273 [inlined]
+ [3] __require(into::Module, mod::Symbol)
+   @ Base ./loading.jl:2271
+ [4] #invoke_in_world#3
+   @ Base ./loading.jl:2271
+ [4] #invoke_in_world#3
+   @ ./essentials.jl:1089 [inlined]
+   @ ./essentials.jl:1089 [inlined]
+ [5] invoke_in_world
+ [5] invoke_in_world
+   @ ./essentials.jl:1086 [inlined]
+   @ ./essentials.jl:1086 [inlined]
+ [6] require(into::Module, mod::Symbol)
+ [6] require(into::Module, mod::Symbol)
+   @ Base ./loading.jl:2260
+   @ Base ./loading.jl:2260
+in expression starting at /home/mfbclaeys/Thesis/project/scripts/AE/hpc_retrain.jl:14
+in expression starting at /home/mfbclaeys/Thesis/project/scripts/AE/hpc_retrain.jl:14
+srun: error: gpu012: task 0: Exited with exit code 1
+srun: launch/slurm: _step_signal: Terminating StepId=9476665.0
+srun: error: gpu012: task 0: Exited with exit code 1
+srun: launch/slurm: _step_signal: Terminating StepId=9476558.0
