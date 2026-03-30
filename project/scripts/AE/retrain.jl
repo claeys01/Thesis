@@ -1,8 +1,8 @@
 #!/usr/bin/env julia
 
 # Set HPC-specific environment variables BEFORE loading packages
-ENV["THESIS_HPC"] = "true"         # Mark as HPC environment
-ENV["THESIS_USE_CUDA"] = "true"  # Uncomment if using GPU nodes
+# ENV["THESIS_HPC"] = "true"         # Mark as HPC environment
+# ENV["THESIS_USE_CUDA"] = "true"  # Uncomment if using GPU nodes
 
 # Activate the project
 # using Pkg
@@ -15,7 +15,7 @@ using Thesis
 using JLD2
 function main()
 
-    sim = circle_shedding_biot(;mem=Array, Re=2500, n=2^8, m=2^8, perturb=false)
+    # sim = circle_shedding_biot(;mem=Array, Re=2500, n=2^8, m=2^8, perturb=false)
 
 
     node_path = "data/saved_models/NODE/16/RE2500/E1000_curldiv_MS_Adam_250/node_params.jld2"
@@ -31,7 +31,7 @@ function main()
     # ---- simulation running & AENODE using to integrate
     # ---- retrain criteria is triggered
     tl_path = "data/datasets/RE2500/2e8/U_128_full.jld2"
-    retraindata = simdata = load_simdata(tl_path)
+    # retraindata = simdata = load_simdata(tl_path)
     retrain_crit = true
     # test = LuxArgs(aenode.ae_args)
     if retrain_crit

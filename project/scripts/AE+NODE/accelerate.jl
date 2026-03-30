@@ -1,4 +1,5 @@
 using Thesis
+using Thesis: get_forces
 using WaterLily
 using WaterLily: MeanFlow
 using Statistics
@@ -47,13 +48,11 @@ pred_Δt = 0.35f0
 with_pred = true
 
 
-function get_forces(sim::BiotSimulation)
-    raw_force = WaterLily.pressure_force(sim)
-    scaled_force = Float32.(raw_force./(0.5sim.L*sim.U^2)) # scale the forces!
-    return scaled_force
-end
-forces1 = get_forces(sim)
-@show forces1
+# function get_forces(sim::BiotSimulation)
+#     raw_force = WaterLily.pressure_force(sim)
+#     scaled_force = Float32.(raw_force./(0.5sim.L*sim.U^2)) # scale the forces!
+#     return scaled_force
+# end
 
 function force_stats(forces::Vector{Vector{Float32}})
     drag = first.(forces)
@@ -96,7 +95,8 @@ warmup_sim = deepcopy(sim)
 predict_wall_time = predict_n!(warmup_sim, aenode, n_pred; 
     Δt=pred_Δt, 
     impose_biot=true)
-
+cID = "biot_sheddding"
+WaterLily.logger(cID)
 while sim_time(sim) < t_end
     # if (step % n_switch == 0 && sim_time(sim) > t_train[end])
     if step % n_switch == 0
@@ -108,7 +108,7 @@ while sim_time(sim) < t_end
             end
             closest_idx = argmin(abs.(simdata.time .- sim_time(sim)))
             @show closest_idx
-            # sim.flow.p .= simdata.p[:, :, closest_idx]
+            sim.flow.p .= simdata.p[:, :, closest_idx]
             # sim.flow.f .= simdata.f[:, :, :, closest_idx]
             # measure!(sim)
             # @assert sim.flow.p == simdata.p[:, :, closest_idx]
@@ -134,8 +134,8 @@ while sim_time(sim) < t_end
 
         forces = get_forces(sim)
         if forces[1] < -2.1
-            # display(plot(WaterLily.flood(sim.flow.u[:, :, 1]), WaterLily.flood(sim.flow.p)))
-            display(WaterLily.flood(sim.flow.p))
+            display(plot(WaterLily.flood(sim.flow.u[:, :, 1]), WaterLily.flood(sim.flow.p)))
+            # display(WaterLily.flood(sim.flow.p .* sim.flow.μ₀[:, :, 1]))
         end
         push!(hybrid_forces_wat, forces)
         push!(hybrid_time_wat, Float32(round(sim_time(sim),digits=4)))
@@ -172,7 +172,7 @@ while sim_time(sim) < t_end
 
     step +=1
 end
-
+plot_logger("$(cID).log")
 step = 0
 ref_step = 0
 
@@ -313,7 +313,6 @@ Thesis.region_spans!(plt_forces, t_train, t_test)
 # Plot 2: Timing comparison bar chart
 plt_timing = bar(
     ["WaterLily\n(per step)", "Prediction\n(per call)"],
-    
     [average_reference_wall, avg_hybrid_predict_wall],
     ylabel = "Wall time (ms)",
     title = "Average Computation Time",

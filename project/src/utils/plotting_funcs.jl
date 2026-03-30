@@ -121,16 +121,17 @@ function train_force_plot(simdata::SimData;
 end
 
 
-function velocity_flood(u::AbstractArray{T, 2}, v::AbstractArray{T, 2}; colorbar=false) where {T}
+function velocity_flood(u::AbstractArray{T, 2}, v::AbstractArray{T, 2};title="", colorbar=false) where {T}
     plt_u = u_flood(u; colorbar=colorbar)
     plt_v = v_flood(v; colorbar=colorbar)
     plt_combined = plot(plt_u, plt_v;
-        layout=(1, 2),
-        size=(800, 350), 
-        plot_title="",
+        layout=(2, 1),
+        size=(350, 800), 
+        plot_title=title,
+        titlefontsize=12,
         margin=0Plots.mm,
         framestyle=:none)
-    return plt_combined, plt_u, plt_v
+    return plt_combined, (plt_u, plt_v)
 end
 
 function u_flood(u::AbstractArray{T, 2}; colorbar=false) where {T}
@@ -146,6 +147,7 @@ function u_flood(u::AbstractArray{T, 2}; colorbar=false) where {T}
     border=:none,
     colorbar=colorbar,
     titlefontsize=12,
+    dpi=150,
     size=(400, 350))
 end
 
@@ -162,10 +164,11 @@ function v_flood(v::AbstractArray{T, 2}; colorbar=false) where {T}
     border=:none,
     colorbar=colorbar,
     titlefontsize=12,
+    dpi=150,
     size=(400, 350))    
 end
 
-velocity_flood(u::AbstractArray{T, 3}) where {T} = velocity_flood(u[:, :, 1], u[:, :, 2])
-velocity_flood(sim::AbstractSimulation) = velocity_flood(remove_ghosts(sim.flow.u))
+velocity_flood(u::AbstractArray{T, 3}; title="") where {T} = velocity_flood(u[:, :, 1], u[:, :, 2]; title=title)
+velocity_flood(sim::AbstractSimulation; title="") = velocity_flood(remove_ghosts(sim.flow.u); title=title)
 
 

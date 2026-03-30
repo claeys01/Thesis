@@ -55,6 +55,7 @@ function predict_n!(sim::BiotSimulation, aenode::AENODE, nₜ::Int64;
         Δt=Δt, return_traj=false)
     
     @timeit to "insert pred" insert_prediction!(sim, û) # insert predicted flow field into sim object
+    sim.flow.u⁰[2:end-1, 2:end-1, :] .= û    
     # Δt_arr = [Δt for _ in 1:nₜ-1]
     Δt_arr = Δt * (nₜ-1)
     append!(sim.flow.Δt, Δt_arr)
