@@ -36,7 +36,8 @@ function main()
     # @show aenode.ae_args.λdiv, aenode.ae_args.λcurl, aenode.ae_args.λstrain
     # ---- simulation running & AENODE using to integrate
     # ---- retrain criteria is triggered
-    tl_path = joinpath(root_path, "data/datasets/RE2500/2e8/U_128_transfer.jld2")
+    # tl_path = joinpath(root_path, "data/datasets/RE2500/2e8/U_128_transfer.jld2")
+    tl_path = joinpath(root_path, "data/datasets/RE2500/2e8/U_128_full.jld2")
     retraindata = simdata = load_simdata(tl_path)
     retrain_crit = true
     # test = LuxArgs(aenode.ae_args)
