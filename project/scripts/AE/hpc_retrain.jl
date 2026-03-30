@@ -27,7 +27,21 @@ function main()
 
     node_path = joinpath(root_path, "data/saved_models/NODE/16/RE2500/E1000_curldiv_MS_Adam_250/node_params.jld2")
     AE_path = joinpath(root_path, "data/saved_models/u/Lux/256h_16l/RE2500/2e8/Feb12-1530__E1000_HW256x256_C4to2_nc6_nd2_z16_C8_lr0p001_wd0p0009_bs16_NY_LL1_Tl0p0471/checkpoint.jld2")
-    println(AE_path)
+    # tl_path = joinpath(root_path, "data/datasets/RE2500/2e8/U_128_transfer.jld2")
+    tl_path = joinpath(root_path, "data/datasets/RE2500/2e8/U_128_full.jld2")    
+    
+    @info "Loading checkpoint from: $AE_path"
+    @info "Loading training data from: $tl_path"
+    
+    # Verify files exist
+    if !isfile(AE_path)
+        @error "Checkpoint not found: $AE_path"
+        return
+    end
+    if !isfile(tl_path)
+        @error "Training data not found: $tl_path"
+        return
+    end
     # aenode = AENODE(AE_path, node_path)
     checkpoint = JLD2.load(AE_path)
     args_dict = checkpoint["args"]
@@ -36,8 +50,7 @@ function main()
     # @show aenode.ae_args.λdiv, aenode.ae_args.λcurl, aenode.ae_args.λstrain
     # ---- simulation running & AENODE using to integrate
     # ---- retrain criteria is triggered
-    # tl_path = joinpath(root_path, "data/datasets/RE2500/2e8/U_128_transfer.jld2")
-    tl_path = joinpath(root_path, "data/datasets/RE2500/2e8/U_128_full.jld2")
+
     retraindata = simdata = load_simdata(tl_path)
     retrain_crit = true
     # test = LuxArgs(aenode.ae_args)
