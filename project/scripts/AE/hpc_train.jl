@@ -13,16 +13,31 @@ using Thesis
 
 function main()
     # Log job info
-    @info "Starting HPC AE training job"
-    @info "  SLURM_JOB_ID: $(get(ENV, "SLURM_JOB_ID", "N/A"))"
-    @info "  SLURM_NTASKS: $(get(ENV, "SLURM_NTASKS", "N/A"))"
-    @info "  SLURM_CPUS_PER_TASK: $(get(ENV, "SLURM_CPUS_PER_TASK", "N/A"))"
-    @info "  Hostname: $(gethostname())"
+    root_path = ""
+    if is_hpc()
+        root_path = "/scratch/mfbclaeys"
+        # Log job info
+        @info "Starting HPC AE training job"
+        @info "  SLURM_JOB_ID: $(get(ENV, "SLURM_JOB_ID", "N/A"))"
+        @info "  SLURM_NTASKS: $(get(ENV, "SLURM_NTASKS", "N/A"))"
+        @info "  SLURM_CPUS_PER_TASK: $(get(ENV, "SLURM_CPUS_PER_TASK", "N/A"))"
+        @info "  Hostname: $(gethostname())"   
+    end
+    full_data_path = joinpath(root_path, "data/datasets/RE2500/2e8/U_128_full.jld2")
     
     # Run training with HPC-appropriate settings
-    
-    println("\nTraining AE for 200 epochs with λdiv=$(div), λcurl=$(curl))")
-    train_AE(LuxArgs(epochs=200, λdiv=Float64(div), λcurl=Float64(curl)))
+    div = 1000.0
+    curl = 100.0
+    epochs = 1000
+    println("\nTraining AE for $epochs epochs with λdiv=$(div), λcurl=$(curl))")
+
+    train_AE(
+        LuxArgs(
+            epochs=1000, 
+            λdiv=Float64(div), 
+            λcurl=Float64(curl), 
+            full_data_path=full_data_path
+    ))
 
     # for div in 1:1000:10000
     #     for curl in 1:100:1000
