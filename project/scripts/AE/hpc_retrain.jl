@@ -25,13 +25,26 @@ function main()
         @info "  Hostname: $(gethostname())"   
     end
 
-    node_path = joinpath(root_path, "data/saved_models/NODE/16/RE2500/E1000_curldiv_MS_Adam_250/node_params.jld2")
-    AE_path = joinpath(root_path, "data/saved_models/u/Lux/256h_16l/RE2500/2e8/Feb12-1530__E1000_HW256x256_C4to2_nc6_nd2_z16_C8_lr0p001_wd0p0009_bs16_NY_LL1_Tl0p0471/checkpoint.jld2")
-    # tl_path = joinpath(root_path, "data/datasets/RE2500/2e8/U_128_transfer.jld2")
     tl_path = joinpath(root_path, "data/datasets/RE2500/2e8/U_128_full.jld2")    
-
-    @info "Loading checkpoint from: $AE_path"
     @info "Loading training data from: $tl_path"
+
+    # tl_path = joinpath(root_path, "data/datasets/RE2500/2e8/U_128_transfer.jld2")
+
+    # node_path = joinpath(root_path, "data/saved_models/NODE/16/RE2500/E1000_curldiv_MS_Adam_250/node_params.jld2")div = 1000.0
+    curl = 100.0
+    epochs = 1000
+    println("\nTraining AE for $epochs epochs with λdiv=$(div), λcurl=$(curl))")
+
+    AE_path = train_AE(
+        LuxArgs(
+            epochs=1000, 
+            λdiv=Float64(div), 
+            λcurl=Float64(curl), 
+            full_data_path=tl_path
+    ))
+
+    @info "Transfer learning criterion triggered"
+    @info "Loading checkpoint from: $AE_path"
     
     # Verify files exist
     if !isfile(AE_path)
@@ -56,7 +69,7 @@ function main()
     # test = LuxArgs(aenode.ae_args)
     if retrain_crit
         ae_args.η = 2e-4
-        ae_args.epochs = 1000
+        ae_args.epochs = 300
         ae_args.retrain = true
         ae_args.checkpoint_path = AE_path
         ae_args.full_data_path = tl_path

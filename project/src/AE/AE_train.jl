@@ -1,6 +1,6 @@
 # using Thesis
 
-function train_AE(args::LuxArgs)
+function train_AE(args::LuxArgs; return_path=false)
     args.seed > 0 && Random.seed!(args.seed)
 
     # load data and normalizer
@@ -233,6 +233,7 @@ function train_AE(args::LuxArgs)
         @warn "Failed to save loss plot: $e"
     end
     show(to)
+    return_path && return filepath
 end
 
 
