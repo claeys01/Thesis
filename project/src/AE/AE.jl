@@ -35,7 +35,7 @@ Base.@kwdef mutable struct LuxArgs
     checkpoint_path::String = "data/Lux_models/2025-12-16_12-37-28/checkpoint.jld2"
 end
 
-function get_data_in(Xtarget, μ₀; idx=nothing, normalise=false)
+function get_data_in(Xtarget, μ₀; idx=nothing)
     if isnothing(idx)
         Xin = cat(Xtarget, μ₀; dims=3)
     else
@@ -117,7 +117,7 @@ function get_data(batch_size, path; t_training=10, n_training=500, n_test=500, s
         ValData   = EpochData(get_data_in(simdata.u, simdata.μ₀; idx=idxs.val_idx)...),
         TestData  = EpochData(get_data_in(simdata.u, simdata.μ₀; idx=idxs.test_idx)...)
     )
-
+    @show mean(data.TrainData)
     simdata = nothing
     # DataLoaders over indices only (lightweight)
     loaders = (
