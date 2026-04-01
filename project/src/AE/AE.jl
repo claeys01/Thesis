@@ -117,7 +117,6 @@ function get_data(batch_size, path; t_training=10, n_training=500, n_test=500, s
         ValData   = EpochData(get_data_in(simdata.u, simdata.μ₀; idx=idxs.val_idx)...),
         TestData  = EpochData(get_data_in(simdata.u, simdata.μ₀; idx=idxs.test_idx)...)
     )
-    @show mean(data.TrainData)
     simdata = nothing
     # DataLoaders over indices only (lightweight)
     loaders = (

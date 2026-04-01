@@ -16,11 +16,10 @@ function train_AE(args::LuxArgs; return_path=false)
     TrainData, ValData, TestData = data
     train_loader, validation_loader, test_loader = loaders
 
-    # move data to gpu
-
-
+    
     device = get_device()
-
+    
+    # move data to gpu
     TrainData = EpochData(device(TrainData.Xin), device(TrainData.Xout), device(TrainData.μ₀))
     ValData = EpochData(device(ValData.Xin), device(ValData.Xout), device(ValData.μ₀))
     TestData = EpochData(device(TestData.Xin), device(TestData.Xout), device(TestData.μ₀))
