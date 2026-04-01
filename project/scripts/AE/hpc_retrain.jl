@@ -41,7 +41,8 @@ function main()
             λdiv=Float64(div), 
             λcurl=Float64(curl), 
             full_data_path=tl_path
-    ))
+        ); return_path=true
+    )
 
     @info "Transfer learning criterion triggered"
     @info "Loading checkpoint from: $AE_path"

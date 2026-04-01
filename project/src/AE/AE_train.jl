@@ -239,7 +239,10 @@ function train_AE(args::LuxArgs; return_path=false)
         @warn "Failed to save loss plot: $e"
     end
     show(to)
-    return_path && return filepath
+
+    if return_path
+        return filepath
+    end
 end
 
 
