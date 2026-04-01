@@ -25,12 +25,12 @@ function main()
         @info "  Hostname: $(gethostname())"   
     end
 
+    # tl_path = joinpath(root_path, "data/datasets/RE2500/2e8/U_128_transfer.jld2")
     tl_path = joinpath(root_path, "data/datasets/RE2500/2e8/U_128_full.jld2")    
     @info "Loading training data from: $tl_path"
 
-    # tl_path = joinpath(root_path, "data/datasets/RE2500/2e8/U_128_transfer.jld2")
-
     # node_path = joinpath(root_path, "data/saved_models/NODE/16/RE2500/E1000_curldiv_MS_Adam_250/node_params.jld2")div = 1000.0
+    div = 1000.0
     curl = 100.0
     epochs = 1000
     println("\nTraining AE for $epochs epochs with λdiv=$(div), λcurl=$(curl))")
