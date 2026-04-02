@@ -5,7 +5,7 @@ function train_AE(args::LuxArgs; return_path=false)
 
     # creating saving paths
     timestamp = Dates.format(now(), "udd-HHMM")
-    tag = args.test_loss ? run_tag(args; test_Lrec=test_Lrecs[end]) : tag = run_tag(args)
+    tag = run_tag(args)
 
     save_folder = joinpath(args.save_path, "$(timestamp)__$(tag)")
     !ispath(save_folder) && mkpath(save_folder)
