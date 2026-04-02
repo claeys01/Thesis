@@ -37,7 +37,7 @@ function main()
 
     AE_path = train_AE(
         LuxArgs(
-            epochs=1000, 
+            epochs=500, 
             λdiv=Float64(div), 
             λcurl=Float64(curl), 
             full_data_path=tl_path
@@ -75,8 +75,6 @@ function main()
         ae_args.checkpoint_path = AE_path
         ae_args.full_data_path = tl_path
         ae_args.t_training = retraindata.time[end] * 0.8
-        ae_args.train_downsample = 300
-        ae_args.test_downsample = 200
         ae_args.test_loss = true
         train_AE(ae_args)
     end

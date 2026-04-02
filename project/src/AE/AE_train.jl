@@ -3,6 +3,16 @@
 function train_AE(args::LuxArgs; return_path=false)
     args.seed > 0 && Random.seed!(args.seed)
 
+    # creating saving paths
+    timestamp = Dates.format(now(), "udd-HHMM")
+    tag = args.test_loss ? run_tag(args; test_Lrec=test_Lrecs[end]) : tag = run_tag(args)
+
+    save_folder = joinpath(args.save_path, "$(timestamp)__$(tag)")
+    !ispath(save_folder) && mkpath(save_folder)
+
+    filepath = joinpath(save_folder, "checkpoint.jld2")
+    loss_trajectory_path = joinpath(save_folder, "loss_trajectory.jld2")
+    trainig_force_path = joinpath(save_folder, "trainin_force.jld2")
     # load data and normalizer
     data, loaders, normalizer = @timeit to "get_data" get_data(
             args.batch_size,
@@ -11,6 +21,7 @@ function train_AE(args::LuxArgs; return_path=false)
             n_test = args.test_downsample,
             split = args.split,
             t_training = args.t_training,
+            plotpath = trainig_force_path
         )
 
     TrainData, ValData, TestData = data
@@ -174,15 +185,6 @@ function train_AE(args::LuxArgs; return_path=false)
     end
 
     # save model
-    timestamp = Dates.format(now(), "udd-HHMM")
-    tag = args.test_loss ? run_tag(args; test_Lrec=test_Lrecs[end]) : tag = run_tag(args)
-
-    save_folder = joinpath(args.save_path, "$(timestamp)__$(tag)")
-    !ispath(save_folder) && mkpath(save_folder)
-    filepath = joinpath(save_folder, "checkpoint.jld2")
-    loss_trajectory_path = joinpath(save_folder, "loss_trajectory.jld2")
-
-
     let cpu = cpu_device()
         # Always save on CPU for portability
         ps_cpu = cpu(train_state.parameters)
