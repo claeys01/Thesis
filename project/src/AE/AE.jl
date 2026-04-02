@@ -401,12 +401,12 @@ function (m::AE)(x, ps, st)
 end
 
 # losses
-div_loss(u::AbstractArray) = mean(abs, div_vectorized(u; buff=1))     # L2 of divergence field
+div_loss(u::AbstractArray) = mean(abs2, div_vectorized(u; buff=1))     # L2 of divergence field
 
 function curl_loss(x::AbstractArray, x̂::AbstractArray)
     x_curl = curl_vectorized(x)
     x̂_curl = curl_vectorized(x̂)
-    return mean(abs, x_curl .- x̂_curl)
+    return mean(abs2, x_curl .- x̂_curl)
 end
 
 function recon_loss(x, x̂; loss=:L2)
@@ -483,8 +483,8 @@ function total_loss(m::AE, ps, st, normalizer::Normalizer,
 
     # 5) Reconstruction + optional extra losses
     Lrec    = recon_loss(x_target, x̂; loss=loss)
-    Ldiv    = λdiv    != 0f0 ? div_loss(x̂)            : 0f0 # divergence loss
-    Lcurl   = λcurl   != 0f0 ? curl_loss(x_target, x̂) : 0f0 # curl loss
+    Ldiv    = λdiv    != 0f0 ? div_loss(x̂)               : 0f0 # divergence loss
+    Lcurl   = λcurl   != 0f0 ? curl_loss(x_target, x̂)    : 0f0 # curl loss
     Lstrain = λstrain != 0f0 ? strain_loss(x_target, x̂)  : 0f0 # strain loss
 
     L = Lrec + λdiv*Ldiv + λcurl*Lcurl + λstrain*Lstrain
