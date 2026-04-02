@@ -30,7 +30,7 @@ function train_AE(args::LuxArgs; return_path=false)
 
     # initialize encoder and decoder
     if args.retrain 
-        (enc, dec, ae, ps, st) = load_trained_AE(args.checkpoint_path; return_params=true, testmode=false)
+        (enc, dec, ae, ps, st, _) = load_trained_AE(args.checkpoint_path; device=device, return_params=true, testmode=false)
         ps = device(ps)
         st = device(st)
         @info "Retraining model saved at $(args.checkpoint_path)"
