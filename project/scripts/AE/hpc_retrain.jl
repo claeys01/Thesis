@@ -1,8 +1,8 @@
 #!/usr/bin/env julia
 
 # Set HPC-specific environment variables BEFORE loading packages
-ENV["THESIS_HPC"] = "true"         # Mark as HPC environment
-ENV["THESIS_USE_CUDA"] = "true"  # Uncomment if using GPU nodes
+# ENV["THESIS_HPC"] = "true"         # Mark as HPC environment
+# ENV["THESIS_USE_CUDA"] = "true"  # Uncomment if using GPU nodes
 
 # Activate the project
 # using Pkg
@@ -43,6 +43,7 @@ function main()
             full_data_path=tl_path
         ); return_path=true
     )
+
 
     @info "Transfer learning criterion triggered"
     @info "Loading checkpoint from: $AE_path"
