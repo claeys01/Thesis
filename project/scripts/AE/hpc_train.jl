@@ -26,8 +26,8 @@ function main()
     full_data_path = joinpath(root_path, "data/datasets/RE2500/2e8/U_128_full.jld2")
     
     # Run training with HPC-appropriate settings
-    div = 100.0
-    curl = 10.0
+    div = 1000.0
+    curl = 100.0
     epochs = 1000
     println("\nTraining AE for $epochs epochs with λdiv=$(div), λcurl=$(curl))")
 
