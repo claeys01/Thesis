@@ -9,7 +9,7 @@ Base.@kwdef mutable struct LuxArgs
     loss::Symbol = :L1                   # loss function for reconstruction (:L1, :L2, :charb)
     batch_size::Int = 16                 # batch size
     t_training::Float64 = 16.603
-    train_downsample::Int = 600          # amount of data used for training
+    train_downsample::Int = 200          # amount of data used for training
     test_downsample::Int = 200
     split::Float64 = 0.2
     epochs::Int = 1000                    # number of epochs

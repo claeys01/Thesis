@@ -1,20 +1,11 @@
-using Thesis
+using JLD2
 
-args = LuxArgs()
-Thesis.get_data(
-    args.batch_size,
-    args.full_data_path;
-    n_training = args.train_downsample,
-    n_test = args.test_downsample,
-    split = args.split,
-    t_training = args.t_training,
-)
+AE_path = "data/saved_models/u/Lux/256h_16l/RE2500/2e8/Feb12-1530__E1000_HW256x256_C4to2_nc6_nd2_z16_C8_lr0p001_wd0p0009_bs16_NY_LL1_Tl0p0471/checkpoint.jld2"
 
-# simdata = load_simdata("data/datasets/RE2500/2e8/U_128_full.jld2")
-# _, normalizer = normalize_batch(simdata.u; normalizer=nothing)
-# @show normalizer
+checkpoint = JLD2.load(AE_path)
+args_dict = checkpoint["args"]
 
-# simdata = load_simdata("data/datasets/RE2500/2e8/U_128_transfer.jld2")
-# _, normalizer = normalize_batch(simdata.u; normalizer=nothing)
-# @show normalizer
-nothing
+# Display all arguments
+for (k, v) in pairs(args_dict)
+    println("$k: $v")
+end
