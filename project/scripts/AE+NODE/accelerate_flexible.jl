@@ -14,7 +14,7 @@ function save_velocity_frame!(gif_frames::Vector, sim::AbstractSimulation, time_
     """
     Save velocity field plots (u and v components) as a frame for GIF animation.
     """
-    plt_combined, _, _  = Thesis.velocity_flood(sim)
+    plt_combined, _  = Thesis.velocity_flood(sim)
     # Combine both velocity fields in one frame
     plt_frame = plot(plt_combined,
         plot_title="Velocity Field at tU/L = $(round(time_step, digits=3))",
