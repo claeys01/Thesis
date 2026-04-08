@@ -45,27 +45,27 @@ function main()
     
     # ── Step 1: Train Autoencoder ──
     @info "── Step 1/2: Training Autoencoder ──"
-    ae_start = time()
-    ae, ae_ps, ae_st, AE_path = train_AE(ae_args; return_path=true)
-    @info "AE training complete" elapsed_min=round((time()-ae_start)/60; digits=1) checkpoint=AE_path
+    # ae_start = time()
+    # ae, ae_ps, ae_st, AE_path = train_AE(ae_args; return_path=true)
+    # @info "AE training complete" elapsed_min=round((time()-ae_start)/60; digits=1) checkpoint=AE_path
 
     normalizer = load_normalizer(AE_path)
 
     # ── Step 2: Train NODE ──
     @info "── Step 2/2: Training Neural ODE ──"
     node_start = time()
-    train_NODE(
+     train_NODE(
         NodeArgs(
             extrapolate = false,
-            use_gpu     = true,
-            latent_dim  = ae_args.latent_dim,
+            use_gpu = true,
+            latent_dim = ae_args.latent_dim,  # match AE latent dim
         );
-        ae         = ae,
-        ae_ps      = ae_ps,
-        ae_st      = ae_st,
+        ae = ae,
+        ae_ps = ae_ps,
+        ae_st = ae_st,
         normalizer = normalizer,
-        ae_args    = ae_args,
-    )
+        ae_args = ae_args,
+     )
     @info "NODE training complete" elapsed_min=round((time()-node_start)/60; digits=1)
 
     @info "Pipeline complete" total_min=round((time()-total_start)/60; digits=1)

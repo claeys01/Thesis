@@ -56,7 +56,6 @@ function main()
         ae_st = ae_st,
         normalizer = normalizer,
         ae_args = ae_args,
-        device = device,
     )
 end
 
