@@ -12,6 +12,9 @@ function train_NODE(args; kws...)
                 solver=args.solver, abstol=args.abstol, reltol=args.reltol)
     setup_lux!(node)
 
+    # Create ComponentArray on CPU BEFORE moving to GPU
+    pinit = ComponentArray(node.p0)
+
     # ---- Move to GPU if requested ----
     device = get_device()
     @info "NODE training on device: $device"
@@ -22,10 +25,12 @@ function train_NODE(args; kws...)
     node.p0 = device(node.p0)
     node.st = device(node.st)
 
+    # Move the ComponentArray to GPU
+    pinit = device(pinit)
+
     # unified loss callable used by optimization
     @inline loss_function(x) = node_loss(args, node, z, z0; p=x)
 
-    pinit = ComponentArray(node.p0)
     adtype = Optimization.AutoZygote()
     optf = Optimization.OptimizationFunction((x, p) -> loss_function(x), adtype)
     optprob = Optimization.OptimizationProblem(optf, pinit)
@@ -92,7 +97,9 @@ function train_NODE(args; kws...)
     total_time = time() - iter_start_time[]
     @info "Optimization finished" total_time=round(total_time; digits=1) final_loss=round(train_losses[end]; digits=6)
 
-    node.p0 = result.u # set final network parameters in struct
+    # Move result back to CPU before saving
+    cpu = cpu_device()
+    node.p0 = cpu(result.u)
 
     # saving the model
     @info "Saving model and plots"
