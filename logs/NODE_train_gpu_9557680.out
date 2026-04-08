@@ -1,0 +1,34 @@
+Running on host gpu017
+Using 8 Julia threads
+Starting at Wed Apr  8 12:24:30 CEST 2026
+Loading Modules
+Finished Loading Modules
+Running hpc_node_train.jl
+Iter 1/250 | loss=10074.246 | avg_time=50.939s/iter | elapsed=50.9s | ETA=12683.8s
+Iter 10/250 | loss=8002.5186 | avg_time=5.328s/iter | elapsed=53.3s | ETA=1278.6s
+Iter 20/250 | loss=5288.1772 | avg_time=2.774s/iter | elapsed=55.5s | ETA=638.0s
+Iter 30/250 | loss=3683.4558 | avg_time=1.922s/iter | elapsed=57.7s | ETA=422.9s
+Iter 40/250 | loss=2308.8643 | avg_time=1.501s/iter | elapsed=60.0s | ETA=315.1s
+Iter 50/250 | loss=1785.115 | avg_time=1.244s/iter | elapsed=62.2s | ETA=248.9s
+Iter 60/250 | loss=1357.7852 | avg_time=1.073s/iter | elapsed=64.4s | ETA=204.0s
+Iter 70/250 | loss=1099.7028 | avg_time=0.954s/iter | elapsed=66.8s | ETA=171.7s
+Iter 80/250 | loss=862.54895 | avg_time=0.86s/iter | elapsed=68.8s | ETA=146.2s
+Iter 90/250 | loss=692.5317 | avg_time=0.788s/iter | elapsed=71.0s | ETA=126.1s
+Iter 100/250 | loss=631.878 | avg_time=0.732s/iter | elapsed=73.2s | ETA=109.8s
+Iter 110/250 | loss=513.2394 | avg_time=0.686s/iter | elapsed=75.5s | ETA=96.1s
+Iter 120/250 | loss=466.79916 | avg_time=0.647s/iter | elapsed=77.6s | ETA=84.1s
+Iter 130/250 | loss=410.10187 | avg_time=0.614s/iter | elapsed=79.8s | ETA=73.7s
+Iter 140/250 | loss=455.1935 | avg_time=0.586s/iter | elapsed=82.1s | ETA=64.5s
+Iter 150/250 | loss=390.25266 | avg_time=0.563s/iter | elapsed=84.5s | ETA=56.3s
+Iter 160/250 | loss=354.67184 | avg_time=0.541s/iter | elapsed=86.6s | ETA=48.7s
+Iter 170/250 | loss=362.70844 | avg_time=0.522s/iter | elapsed=88.8s | ETA=41.8s
+Iter 180/250 | loss=329.6789 | avg_time=0.505s/iter | elapsed=91.0s | ETA=35.4s
+Iter 190/250 | loss=294.18716 | avg_time=0.491s/iter | elapsed=93.2s | ETA=29.4s
+Iter 200/250 | loss=307.1295 | avg_time=0.477s/iter | elapsed=95.4s | ETA=23.8s
+Iter 210/250 | loss=285.87476 | avg_time=0.464s/iter | elapsed=97.5s | ETA=18.6s
+Iter 220/250 | loss=284.41254 | avg_time=0.454s/iter | elapsed=99.9s | ETA=13.6s
+Iter 230/250 | loss=353.21094 | avg_time=0.444s/iter | elapsed=102.1s | ETA=8.9s
+Iter 240/250 | loss=325.76135 | avg_time=0.434s/iter | elapsed=104.3s | ETA=4.3s
+Iter 250/250 | loss=302.06735 | avg_time=0.426s/iter | elapsed=106.5s | ETA=0.0s
+Iter 250/250 | loss=258.66074 | avg_time=0.427s/iter | elapsed=106.7s | ETA=0.0s
+Finished at Wed Apr  8 12:30:17 CEST 2026
