@@ -57,7 +57,7 @@ function main()
      train_NODE(
         NodeArgs(
             extrapolate = false,
-            use_gpu = true,
+            use_gpu = false,
             latent_dim = ae_args.latent_dim,  # match AE latent dim
         );
         ae = ae,
