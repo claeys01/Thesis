@@ -2,9 +2,12 @@ make_optimiser(opt, η) = hasmethod(opt, Tuple{Float64}) ? opt(η) :
                          hasmethod(opt, Tuple{}) ? opt() :
                          error("Unsupported optimiser constructor: $(opt)")
 
-function train_NODE(args::NodeArgs; ae=nothing, ae_ps=nothing, ae_st=nothing, 
-                    normalizer=nothing, ae_args=nothing, device=cpu_device(), kws...)
+function train_NODE(args::NodeArgs; 
+    ae=nothing, ae_ps=nothing, ae_st=nothing, 
+    normalizer=nothing, ae_args=nothing, kws...)
     
+    device = args.use_gpu ? get_device() : cpu_device()
+
     if isnothing(ae)
         # Original path: load pre-saved latent data from disk
         z, t, tspan, z0 = get_NODE_data(args.train_latent_path; downsample=args.downsample)
@@ -33,7 +36,6 @@ function train_NODE(args::NodeArgs; ae=nothing, ae_ps=nothing, ae_st=nothing,
     pinit = ComponentArray(node.p0)
 
     # ---- Move to GPU if requested ----
-    device = get_device()
     @info "NODE training on device: $device"
 
     z    = device(z)
