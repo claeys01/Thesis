@@ -38,7 +38,6 @@ function get_NODE_data(latent_path; downsample=-1, verbose=true)
     return z, t, tspan, z0
 end
 
-
 mutable struct NODE
     dudt::Any
     tspan::Tuple{<:Real,<:Real}
@@ -73,13 +72,15 @@ end
 # Build a NeuralODE from the (possibly reconstructed) model and solve for given initial state z0 and params p.
 function predict(node::NODE, z0; p=nothing, t=nothing)
     t = t === nothing ? node.t : t
-    tspan = t === nothing ? node.tspan : (Float32(t[1]), Float32(t[end]))
+    tspan = t === nothing ? node.tspan : (t[1], t[end])
     p_used = p === nothing ? node.p0 : p
-    # Use sensealg for GPU-compatible adjoint
-    nnode = NeuralODE(node.dudt, tspan, node.solver; 
-                      saveat=t, abstol=node.abstol, reltol=node.reltol,
-                      sensealg=InterpolatingAdjoint(; autojacvec=ZygoteVJP()))
+    nnode = NeuralODE(node.dudt, tspan, node.solver; saveat=t, abstol=node.abstol, reltol=node.reltol)
     sol = nnode(z0, p_used, node.st)
+
+    # if isa(sol, Tuple)
+    #     sol = sol[1]
+    # end
+    # @show sol.stats.nf
     return sol
 end
 
@@ -109,10 +110,10 @@ function Base.show(io::IO, node::NODE)
     end
 end
 
-function build_node_problem(node::NODE, z0; p=nothing)
-    p_used = p === nothing ? node.p0 : p
+function build_node_problem(node::NODE, z0)
+    # Convert the Lux model to a function matching (u,p,t) -> du
     dudt(u, p, t) = node.dudt(u, p, node.st)[1]
-    ODEProblem(dudt, z0, node.tspan, p_used)
+    ODEProblem(dudt, z0, node.tspan, ComponentArray(node.p0))
 end
 
 function loss_multiple_shoot(node::NODE, z::AbstractMatrix, z0; p=nothing, t=nothing,
@@ -120,10 +121,10 @@ function loss_multiple_shoot(node::NODE, z::AbstractMatrix, z0; p=nothing, t=not
     tsteps = t === nothing ? node.t : t
     @assert tsteps !== nothing "t must be specified or set in node for multiple shooting"
 
+    prob_node = build_node_problem(node, z0)
+
     # map parameters into ComponentArray to preserve axes
     p_used = p === nothing ? node.p0 : p
-
-    prob_node = build_node_problem(node, z0; p=p_used)
 
     # simple L2 loss over all predicted segments (sum of segment losses)
     seg_loss(data_seg, pred_seg) = sum(abs, data_seg .- pred_seg)
