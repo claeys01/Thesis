@@ -109,10 +109,10 @@ function Base.show(io::IO, node::NODE)
     end
 end
 
-function build_node_problem(node::NODE, z0)
-    # Convert the Lux model to a function matching (u,p,t) -> du
+function build_node_problem(node::NODE, z0; p=nothing)
+    p_used = p === nothing ? node.p0 : p
     dudt(u, p, t) = node.dudt(u, p, node.st)[1]
-    ODEProblem(dudt, z0, node.tspan, ComponentArray(node.p0))
+    ODEProblem(dudt, z0, node.tspan, p_used)
 end
 
 function loss_multiple_shoot(node::NODE, z::AbstractMatrix, z0; p=nothing, t=nothing,
@@ -120,10 +120,10 @@ function loss_multiple_shoot(node::NODE, z::AbstractMatrix, z0; p=nothing, t=not
     tsteps = t === nothing ? node.t : t
     @assert tsteps !== nothing "t must be specified or set in node for multiple shooting"
 
-    prob_node = build_node_problem(node, z0)
-
     # map parameters into ComponentArray to preserve axes
     p_used = p === nothing ? node.p0 : p
+
+    prob_node = build_node_problem(node, z0; p=p_used)
 
     # simple L2 loss over all predicted segments (sum of segment losses)
     seg_loss(data_seg, pred_seg) = sum(abs, data_seg .- pred_seg)
