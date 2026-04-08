@@ -2,9 +2,26 @@ make_optimiser(opt, η) = hasmethod(opt, Tuple{Float64}) ? opt(η) :
                          hasmethod(opt, Tuple{}) ? opt() :
                          error("Unsupported optimiser constructor: $(opt)")
 
-function train_NODE(args; kws...)
-    z, t, tspan, z0 = get_NODE_data(args.train_latent_path; downsample=args.downsample)
+function train_NODE(args::NodeArgs; ae=nothing, ae_ps=nothing, ae_st=nothing, 
+                    normalizer=nothing, ae_args=nothing, device=cpu_device(), kws...)
     
+    if isnothing(ae)
+        # Original path: load pre-saved latent data from disk
+        z, t, tspan, z0 = get_NODE_data(args.train_latent_path; downsample=args.downsample)
+    else
+        # New path: encode on-the-fly using the trained AE already in memory
+        @info "Encoding latent vectors from AE in memory (no disk I/O)"
+        z, t, tspan, z0 = get_latent_vectors(ae, ae_ps, ae_st, normalizer, ae_args; device=device)
+        # Optionally downsample
+        if args.downsample > 0 && args.downsample < size(z, 2)
+            idx = downsample_equal(collect(1:size(z, 2)), args.downsample)
+            z = z[:, idx]
+            t = t[idx]
+            tspan = (t[1], t[end])
+            z0 = z[:, 1]
+        end
+    end
+
     # z_test, t_test, tspan_test, z0_test = get_NODE_data(args.test_latent_path; downsample=args.test_downsample)
 
     node = NODE(args.latent_dim, args.dense_mult; 

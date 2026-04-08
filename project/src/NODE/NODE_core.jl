@@ -236,3 +236,33 @@ function load_node(path::AbstractString; verbose=true)
     return node, node_args
 end
 
+"""
+    get_latent_vectors(ae, ps, st, normalizer, ae_args; device=cpu_device())
+
+Encode simulation data into latent vectors using a trained AE already in memory.
+Returns `(z, t, tspan, z0)` on CPU.
+"""
+function get_latent_vectors(ae::AE, ps, st, normalizer, ae_args::LuxArgs; device=cpu_device())
+    simdata = load_simdata(ae_args.full_data_path)
+    preprocess_data!(simdata; verbose=true)
+    
+    train_idx = get_trainval_idx(simdata, ae_args.t_training, ae_args.train_downsample)
+    
+    x_in, _, _ = build_batch(
+        EpochData(get_data_in(simdata.u, simdata.μ₀; idx=train_idx)...), 
+        1:ae_args.train_downsample; normalizer=normalizer
+    )
+    
+    x_in = device(x_in)
+    z, _ = ae.encoder(x_in, ps.encoder, st.encoder)
+    
+    # Always return CPU arrays for NODE training
+    z = Array(cpu_device()(z))
+    t = simdata.time[train_idx]
+    tspan = (t[1], t[end])
+    z0 = z[:, 1]
+    
+    @info "Generated latent vectors" size(z) n_samples=length(train_idx) time_range=tspan
+    return z, t, tspan, z0
+end
+
