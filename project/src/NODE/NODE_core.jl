@@ -1,4 +1,3 @@
-
 Base.@kwdef mutable struct NodeArgs
     η = 0.01                    # learning rate
     # optimiser = OptimizationPolyalgorithms.PolyOpt #PolyOpt
@@ -17,6 +16,7 @@ Base.@kwdef mutable struct NodeArgs
     clip_bc = true
     use_gpu = false             # use GPU
     multiple_shooting = true
+    extrapolate = true
     group_size = 20
     continuity_term = 200
     save_path = "data/models/NODE_models"   # results dir
@@ -37,6 +37,7 @@ function get_NODE_data(latent_path; downsample=-1, verbose=true)
     verbose && @info "Instantiated latent NODE data" size(z) size(t) tspan size(z0)
     return z, t, tspan, z0
 end
+
 
 mutable struct NODE
     dudt::Any
@@ -72,15 +73,13 @@ end
 # Build a NeuralODE from the (possibly reconstructed) model and solve for given initial state z0 and params p.
 function predict(node::NODE, z0; p=nothing, t=nothing)
     t = t === nothing ? node.t : t
-    tspan = t === nothing ? node.tspan : (t[1], t[end])
+    tspan = t === nothing ? node.tspan : (Float32(t[1]), Float32(t[end]))
     p_used = p === nothing ? node.p0 : p
-    nnode = NeuralODE(node.dudt, tspan, node.solver; saveat=t, abstol=node.abstol, reltol=node.reltol)
+    # Use sensealg for GPU-compatible adjoint
+    nnode = NeuralODE(node.dudt, tspan, node.solver; 
+                      saveat=t, abstol=node.abstol, reltol=node.reltol,
+                      sensealg=InterpolatingAdjoint(; autojacvec=ZygoteVJP()))
     sol = nnode(z0, p_used, node.st)
-
-    # if isa(sol, Tuple)
-    #     sol = sol[1]
-    # end
-    # @show sol.stats.nf
     return sol
 end
 

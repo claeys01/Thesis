@@ -63,8 +63,6 @@ function preprocess_data!(data::SimData;
 end
 
 
-
-
 function strain_field(u::AbstractArray{T,N}; buff::Int64=1) where {T,N}
     if N == 3
         H, W, C = size(u)

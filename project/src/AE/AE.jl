@@ -74,10 +74,16 @@ get_data_args(args) = get_data(
 
 get_idxs(simdata::SimData, args::LuxArgs) = get_idxs(simdata, args.t_training, args.train_downsample, args.test_downsample; split=args.split)
 
-function get_idxs(simdata::SimData, t_training, n_training, n_test; split=0.2)
-    N = size(simdata.u, 4)
+function get_trainval_idx(simdata::SimData, t_training, n_training)
     train_idxs_full = findall(t -> t < t_training, simdata.time)
     trainval_idx = downsample_equal(train_idxs_full, n_training)
+    return trainval_idx
+end
+
+function get_idxs(simdata::SimData, t_training, n_training, n_test; split=0.2)
+    # N = size(simdata.u, 4)
+    # train_idxs_full = findall(t -> t < t_training, simdata.time)
+    trainval_idx = get_trainval_idx(simdata, t_training, n_training)
     # Split into train / val by downsampling evenly from the combined pool
     n_val = clamp(round(Int, length(trainval_idx) * split), 0, length(trainval_idx))
     if n_val == 0
