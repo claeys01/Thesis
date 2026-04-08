@@ -81,7 +81,7 @@ function get_trainval_idx(simdata::SimData, t_training, n_training)
 end
 
 function get_idxs(simdata::SimData, t_training, n_training, n_test; split=0.2)
-    # N = size(simdata.u, 4)
+    N = size(simdata.u, 4)
     # train_idxs_full = findall(t -> t < t_training, simdata.time)
     trainval_idx = get_trainval_idx(simdata, t_training, n_training)
     # Split into train / val by downsampling evenly from the combined pool
