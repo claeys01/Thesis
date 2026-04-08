@@ -45,9 +45,9 @@ function main()
     
     # ── Step 1: Train Autoencoder ──
     @info "── Step 1/2: Training Autoencoder ──"
-    # ae_start = time()
-    # ae, ae_ps, ae_st, AE_path = train_AE(ae_args; return_path=true)
-    # @info "AE training complete" elapsed_min=round((time()-ae_start)/60; digits=1) checkpoint=AE_path
+    ae_start = time()
+    ae, ae_ps, ae_st, AE_path = train_AE(ae_args; return_path=true)
+    @info "AE training complete" elapsed_min=round((time()-ae_start)/60; digits=1) checkpoint=AE_path
 
     normalizer = load_normalizer(AE_path)
 
