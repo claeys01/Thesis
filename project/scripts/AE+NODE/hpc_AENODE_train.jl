@@ -32,12 +32,12 @@ function main()
     # node_path = joinpath(root_path, "data/saved_models/NODE/16/RE2500/E1000_curldiv_MS_Adam_250/node_params.jld2")div = 1000.0
     div = 1000.0
     curl = 100.0
-    epochs = 1000
+    epochs = 200
     println("\nTraining AE for $epochs epochs with λdiv=$(div), λcurl=$(curl))")
 
 
     ae_args = LuxArgs(
-            epochs=500, 
+            epochs=epochs, 
             λdiv=Float64(div), 
             λcurl=Float64(curl), 
             full_data_path=tl_path
@@ -65,7 +65,6 @@ function main()
         ae_st      = ae_st,
         normalizer = normalizer,
         ae_args    = ae_args,
-        device     = device,
     )
     @info "NODE training complete" elapsed_min=round((time()-node_start)/60; digits=1)
 

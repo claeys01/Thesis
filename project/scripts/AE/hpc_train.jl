@@ -13,7 +13,7 @@ using Thesis
 
 function main()
     # Log job info
-    root_path = ""
+   root_path = ""
     if is_hpc()
         root_path = "/scratch/mfbclaeys"
         # Log job info
@@ -23,28 +23,25 @@ function main()
         @info "  SLURM_CPUS_PER_TASK: $(get(ENV, "SLURM_CPUS_PER_TASK", "N/A"))"
         @info "  Hostname: $(gethostname())"   
     end
-    full_data_path = joinpath(root_path, "data/datasets/RE2500/2e8/U_128_full.jld2")
-    
-    # Run training with HPC-appropriate settings
+
+    # tl_path = joinpath(root_path, "data/datasets/RE2500/2e8/U_128_transfer.jld2")
+    tl_path = joinpath(root_path, "data/datasets/RE2500/2e8/U_128_full.jld2")    
+    @info "Loading training data from: $tl_path"
+
+    # node_path = joinpath(root_path, "data/saved_models/NODE/16/RE2500/E1000_curldiv_MS_Adam_250/node_params.jld2")div = 1000.0
     div = 1000.0
     curl = 100.0
     epochs = 1000
     println("\nTraining AE for $epochs epochs with λdiv=$(div), λcurl=$(curl))")
 
-    train_AE(
+    AE_path = train_AE(
         LuxArgs(
-            epochs=1000, 
+            epochs=500, 
             λdiv=Float64(div), 
             λcurl=Float64(curl), 
-            full_data_path=full_data_path
-    ))
-
-    # for div in 1:1000:10000
-    #     for curl in 1:100:1000
-    #         train_AE(LuxArgs(epochs=200, λdiv=Float64(div), λcurl=Float64(curl)))
-    #         println("\n")
-    #     end
-    # end
+            full_data_path=tl_path
+        ); return_path=true
+    )
 end
 
 main()
