@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-#SBATCH --job-name="NODE_train_gpu"
+#SBATCH --job-name="combi_train_gpu"
 #SBATCH --partition=gpu-a100
 #SBATCH --output=logs/%x_%j.out
 #SBATCH --error=logs/%x_%j.err
@@ -32,6 +32,6 @@ echo "Finished Loading Modules"
 
 echo "Running hpc_AENODE_train.jl"
 
-srun julia --project=project project/scripts/NODE/hpc_AENODE_train.jl
+srun julia --project=project project/scripts/AE+NODE/hpc_AENODE_train.jl
 
 echo "Finished at $(date)"
