@@ -124,7 +124,7 @@ function main()
             maxiters = 100,
             downsample = 750,
             retrain = true,
-            multiple_shooting = false,
+            multiple_shooting = true,
             node_checkpoint = node_path,
         );
         ae = ae,
