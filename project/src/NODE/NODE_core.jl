@@ -4,8 +4,8 @@ Base.@kwdef mutable struct NodeArgs
     optimiser = OptimizationOptimisers.Adam
     maxiters = 250
     solver = Tsit5()
-    reltol = 1e-3
-    abstol = 1e-5
+    reltol = 1e-4
+    abstol = 1e-6
     seed = 42                   # random seed
     latent_dim = 16
     dense_mult = 2
@@ -17,7 +17,7 @@ Base.@kwdef mutable struct NodeArgs
     use_gpu = false             # use GPU
     multiple_shooting = true
     extrapolate = true
-    group_size = 20
+    group_size = 10
     continuity_term = 200
     save_path = "data/models/NODE_models"   # results dir
     train_latent_path = "data/latent_data/16/RE2500/2e8/U_128_latent_curldiv_E1000_train.jld2"
@@ -54,7 +54,7 @@ function NODE(latent_dim, dense_mult; tspan=(0.0f0, 1.0f0), solver=Tsit5(), abst
     hidden_nodes = dense_mult * latent_dim
     nn = Chain(
         Dense(latent_dim, hidden_nodes, activation),
-        # Dense(hidden_nodes, hidden_nodes, activation),
+        Dense(hidden_nodes, hidden_nodes, activation),
         Dense(hidden_nodes, latent_dim))
     verbose && @info "NODE initialized" latent_dim = latent_dim dense_mult = dense_mult tspan = tspan solver = typeof(solver) reltol = reltol abstol = abstol t = t activation = activation
     return NODE(nn, tspan, solver, abstol, reltol, t, nothing, nothing)
