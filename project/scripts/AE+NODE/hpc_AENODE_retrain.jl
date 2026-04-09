@@ -122,7 +122,9 @@ function main()
             latent_dim = ae_args.latent_dim,
             η = 0.001,
             maxiters = 100,
+            downsample = 750,
             retrain = true,
+            multiple_shooting = false,
             node_checkpoint = node_path,
         );
         ae = ae,
