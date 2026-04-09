@@ -125,6 +125,7 @@ function main()
             downsample = 750,
             retrain = true,
             multiple_shooting = true,
+            use_gpu = true, 
             node_checkpoint = node_path,
         );
         ae = ae,
