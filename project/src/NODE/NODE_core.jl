@@ -8,7 +8,7 @@ Base.@kwdef mutable struct NodeArgs
     abstol = 1e-6
     seed = 42                   # random seed
     latent_dim = 16
-    dense_mult = 2
+    dense_mult = 3
     activation = tanhshrink
     n_reconstruct = 4
     downsample = 300
@@ -16,8 +16,10 @@ Base.@kwdef mutable struct NodeArgs
     clip_bc = true
     use_gpu = false             # use GPU
     multiple_shooting = true
+    retrain = false
+    node_checkpoint = ""
     extrapolate = true
-    group_size = 10
+    group_size = 20
     continuity_term = 200
     save_path = "data/models/NODE_models"   # results dir
     train_latent_path = "data/latent_data/16/RE2500/2e8/U_128_latent_curldiv_E1000_train.jld2"
@@ -29,7 +31,7 @@ function get_NODE_data(latent_path; downsample=-1, verbose=true)
     @load latent_path latent_data
     n_total = size(latent_data.z, 2)
     idx = collect(1:n_total)
-    idx_downsample = downsample_equal(idx, downsample)
+    idx_downsample = downsample <= 0 || downsample >= n_total ? idx : downsample_equal(idx, downsample)
     z = latent_data.z[:, idx_downsample]
     t = latent_data.time[idx_downsample]
     tspan = (t[1], t[end])
@@ -54,7 +56,8 @@ function NODE(latent_dim, dense_mult; tspan=(0.0f0, 1.0f0), solver=Tsit5(), abst
     hidden_nodes = dense_mult * latent_dim
     nn = Chain(
         Dense(latent_dim, hidden_nodes, activation),
-        Dense(hidden_nodes, hidden_nodes, activation),
+        # Dense(hidden_nodes, 2*hidden_nodes, activation),
+        # Dense(2*hidden_nodes, hidden_nodes, activation),
         Dense(hidden_nodes, latent_dim))
     verbose && @info "NODE initialized" latent_dim = latent_dim dense_mult = dense_mult tspan = tspan solver = typeof(solver) reltol = reltol abstol = abstol t = t activation = activation
     return NODE(nn, tspan, solver, abstol, reltol, t, nothing, nothing)

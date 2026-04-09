@@ -41,7 +41,8 @@ function main()
     normalizer = load_normalizer(ae_checkpoint)
     @info "AE loaded into memory"
 
-    # ── Step 2: Train NODE using in-memory AE ──
+    node_checkpoint = joinpath(root_path, "data/saved_models/NODE/16/RE2500/E1000_curldiv_MS_Adam_250/node_params.jld2")
+
     train_NODE(
         NodeArgs(
             train_latent_path = train_latent_path,
@@ -49,13 +50,17 @@ function main()
             total_latent_path = total_latent_path,
             extrapolate = false,
             use_gpu = false,
-            latent_dim = ae_args.latent_dim,  # match AE latent dim
+            latent_dim = ae_args.latent_dim,
+            η = 0.001,              # optionally use a lower LR for fine-tuning
+            # maxiters = 500,         # additional iterations
+            retrain = true,
+            node_checkpoint = node_checkpoint,
         );
-        ae = ae,
-        ae_ps = ae_ps,
-        ae_st = ae_st,
-        normalizer = normalizer,
-        ae_args = ae_args,
+        # ae = ae,
+        # ae_ps = ae_ps,
+        # ae_st = ae_st,
+        # normalizer = normalizer,
+        # ae_args = ae_args,
     )
 end
 

@@ -27,10 +27,23 @@ function train_NODE(args::NodeArgs;
 
     # z_test, t_test, tspan_test, z0_test = get_NODE_data(args.test_latent_path; downsample=args.test_downsample)
 
-    node = NODE(args.latent_dim, args.dense_mult; 
-                tspan=tspan, t=t, activation=args.activation, 
-                solver=args.solver, abstol=args.abstol, reltol=args.reltol)
-    setup_lux!(node)
+    if args.retrain && !isempty(args.node_checkpoint)
+        # ── Retrain: load existing NODE and override time/tspan from data ──
+        @info "Retraining NODE from checkpoint: $(args.node_checkpoint)"
+        node, prev_args = load_node(args.node_checkpoint; verbose=true)
+        node.tspan = tspan
+        node.t = t
+        # Optionally override solver tolerances from new args
+        node.solver = args.solver
+        node.abstol = args.abstol
+        node.reltol = args.reltol
+    else
+        # ── Fresh training ──
+        node = NODE(args.latent_dim, args.dense_mult; 
+                    tspan=tspan, t=t, activation=args.activation, 
+                    solver=args.solver, abstol=args.abstol, reltol=args.reltol)
+        setup_lux!(node)
+    end
 
     # Create ComponentArray on CPU BEFORE moving to GPU
     pinit = ComponentArray(node.p0)
@@ -158,6 +171,7 @@ function train_NODE(args::NodeArgs;
         savefig(extrapolation_plot, extrapolation_path)
         @info "  Saved extrapolation plot to $extrapolation_path"
     end
+    return node_path
 end
 
 # if abspath(PROGRAM_FILE) == @__FILE__
