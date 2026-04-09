@@ -72,6 +72,7 @@ function main()
     @info "NODE training complete" elapsed_min=node_elapsed node_path=node_path
 
     @info "Steps 1-2 complete" elapsed_min=round((time() - total_start) / 60; digits=1)
+    GC.gc()
 
     # ================================ Simulation / AENODE integration ================================
     # ─── (placeholder: simulation running & AENODE integration would go here) ───
@@ -109,6 +110,7 @@ function main()
 
     # ================================ Step 4: Retrain NODE ================================
     @info "── Step 4/4: Retraining Neural ODE ──"
+    GC.gc()
     node_retrain_start = time()
 
     normalizer = load_normalizer(AE_path)
