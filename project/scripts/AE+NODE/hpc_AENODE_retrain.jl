@@ -28,7 +28,6 @@ function main()
     end
 
    
-    
     # ================================ Step 1: Train Autoencoder ================================
     @info "── Step 1/4: Training Autoencoder ──"
     ae_start = time()
@@ -38,7 +37,7 @@ function main()
 
     div = 1000.0
     curl = 100.0
-    epochs = 200
+    epochs = 400
     @info "AE hyperparameters" epochs=epochs λdiv=div λcurl=curl
 
     ae_args = LuxArgs(
@@ -87,9 +86,9 @@ function main()
     checkpoint = JLD2.load(AE_path)
     args_dict = checkpoint["args"]
     # Ensure keys are Symbols for keyword splatting
-    if eltype(keys(args_dict)) <: AbstractString
-        args_dict = Dict(Symbol(k) => v for (k, v) in args_dict)
-    end
+    # if eltype(keys(args_dict)) <: AbstractString
+        # args_dict = Dict(Symbol(k) => v for (k, v) in args_dict)
+    # end
     ae_args = LuxArgs(; args_dict...)
 
     retraindata = load_simdata(tl_path)
