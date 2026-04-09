@@ -254,7 +254,7 @@ function get_latent_vectors(ae::AE, ps, st, normalizer, ae_args::LuxArgs; device
     )
     
     x_in = device(x_in)
-    z, _ = ae.encoder(x_in, ps.encoder, LuxCore.testmode(st.encoder))
+    z, _ = ae.encoder(x_in, device(ps.encoder), device(LuxCore.testmode(st.encoder)))
     
     # Always return CPU arrays for NODE training
     z = Array(cpu_device()(z))

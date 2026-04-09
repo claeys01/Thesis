@@ -13,6 +13,7 @@ using Thesis
 using JLD2
 
 function main()
+    total_start = time()   # ← was missing, caused UndefVarError at the end
     
     root_path = ""
     if is_hpc()
