@@ -118,7 +118,6 @@ function main()
     node_retrain_path = train_NODE(
         NodeArgs(
             extrapolate = false,
-            use_gpu = false,
             latent_dim = ae_args.latent_dim,
             η = 0.001,
             maxiters = 100,
