@@ -531,6 +531,9 @@ function load_trained_AE(checkpoint_path::String; device=cpu_device(), return_pa
         st = device(st)
     end
     testmode ? st = LuxCore.testmode(st) : st = st
+    if !is_hpc()
+        args.full_data_path = "data/datasets/RE2500/2e8/U_128_full.jld2"
+    end
     return return_params ? (enc, dec, ae, ps, st, args) : (enc, dec, ae, args)
 end
 

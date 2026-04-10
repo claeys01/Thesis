@@ -37,6 +37,8 @@ function train_NODE(args::NodeArgs;
         node.solver = args.solver
         node.abstol = args.abstol
         node.reltol = args.reltol
+        @info "NODE reloaded" latent_dim = prev_args.latent_dim dense_mult = prev_args.dense_mult tspan = tspan solver = typeof(args.solver) reltol = args.reltol abstol = args.abstol t = t activation = args.activation
+
     else
         # ── Fresh training ──
         node = NODE(args.latent_dim, args.dense_mult; 
@@ -84,7 +86,7 @@ function train_NODE(args::NodeArgs;
     anim = Plots.Animation()
     iter_start_time = Ref(time())
 
-    callback = function (state, l; plotting=false)
+    callback = function (state, l; plotting=false, gif=true)
         step = state.iter              # current iteration index
         if step % eval_every == 0
             push!(epochs, step)
@@ -107,7 +109,7 @@ function train_NODE(args::NodeArgs;
             ], " | "))
         end
 
-        if plotting
+        if gif
             if args.multiple_shooting
                 _, preds = loss_multiple_shoot(node, z, z0; p=ComponentArray(state.u),
                                                t=node.t, group_size=args.group_size,
@@ -116,7 +118,8 @@ function train_NODE(args::NodeArgs;
             else
                 plt = plot_node_trajectory(node, z, z0; p=state.u, loss=l)
             end
-            frame(anim); display(plt)
+            frame(anim)
+            plotting && display(plt)
         end
         return false
     end
@@ -171,6 +174,7 @@ function train_NODE(args::NodeArgs;
         savefig(extrapolation_plot, extrapolation_path)
         @info "  Saved extrapolation plot to $extrapolation_path"
     end
+
     return node_path
 end
 

@@ -37,7 +37,7 @@ function main()
 
     div = 1000.0
     curl = 100.0
-    epochs = 400
+    epochs = 1000
     @info "AE hyperparameters" epochs=epochs λdiv=div λcurl=curl
 
     ae_args = LuxArgs(

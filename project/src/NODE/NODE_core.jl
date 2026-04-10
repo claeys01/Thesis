@@ -1,7 +1,7 @@
 Base.@kwdef mutable struct NodeArgs
     η = 0.01                    # learning rate
     # optimiser = OptimizationPolyalgorithms.PolyOpt #PolyOpt
-    optimiser = OptimizationOptimisers.Adam
+    optimiser = OptimizationOptimisers.AdamW
     maxiters = 250
     solver = Tsit5()
     reltol = 1e-4
@@ -253,7 +253,7 @@ function get_latent_vectors(ae::AE, ps, st, normalizer, ae_args::LuxArgs; downsa
     
     x_in, _, _ = build_batch(
         EpochData(get_data_in(simdata.u, simdata.μ₀; idx=train_idx)...), 
-        1:ae_args.train_downsample; normalizer=normalizer
+        1:downsample; normalizer=normalizer
     )
     
     x_in = device(x_in)
