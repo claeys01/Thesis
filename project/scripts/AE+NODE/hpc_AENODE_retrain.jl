@@ -119,19 +119,18 @@ function main()
         NodeArgs(
             extrapolate = false,
             latent_dim = ae_args.latent_dim,
-            η = 0.001,
-            maxiters = 100,
-            downsample = 750,
+            η = 0.005,              # lower LR for fine-tuning
+            maxiters = 100,          # more iterations
+            group_size = 20,         # keep tighter segments
+            continuity_term = 400,   # stronger continuity for stability
+            downsample = 600,  
             retrain = true,
             multiple_shooting = true,
             use_gpu = false, 
             node_checkpoint = node_path,
         );
-        ae = ae,
-        ae_ps = ae_ps,
-        ae_st = ae_st,
-        normalizer = normalizer,
-        ae_args = ae_args,
+        ae = ae, ae_ps = ae_ps, ae_st = ae_st,
+        normalizer = normalizer, ae_args = ae_args,
     )
     node_retrain_elapsed = round((time() - node_retrain_start) / 60; digits=1)
     @info "NODE retraining complete" elapsed_min=node_retrain_elapsed node_path=node_retrain_path
