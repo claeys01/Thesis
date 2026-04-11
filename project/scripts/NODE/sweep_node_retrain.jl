@@ -70,7 +70,7 @@ function main()
             elapsed = time() - t_start
 
             node_retrained, _ = load_node(retrain_path; verbose=false)
-            z, t, _, z0 = get_latent_vectors(ae, ae_ps, ae_st, normalizer, ae_args; device=cpu_device(), downsample=-1)
+            z, t, _, z0 = Thesis.get_latent_vectors(ae, ae_ps, ae_st, normalizer, ae_args; device=cpu_device(), downsample=ds)
             eval = eval_node_loss(node_retrained, z, z0)
 
             entry = (;
