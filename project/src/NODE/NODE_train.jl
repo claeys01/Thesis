@@ -38,6 +38,8 @@ function train_NODE(args::NodeArgs;
         node.abstol = args.abstol
         node.reltol = args.reltol
         @info "NODE reloaded" latent_dim = prev_args.latent_dim dense_mult = prev_args.dense_mult tspan = tspan solver = typeof(args.solver) reltol = args.reltol abstol = args.abstol t = t activation = args.activation
+        baseline_eval = eval_node_loss(node, z, z0)
+        @info "Baseline eval before retraining" baseline_eval.mae baseline_eval.rmse baseline_eval.rel_l2
 
     else
         # ── Fresh training ──
@@ -131,6 +133,9 @@ function train_NODE(args::NodeArgs;
     result = solve(optprob, opt_instance; callback=callback, maxiters=args.maxiters)
     total_time = time() - iter_start_time[]
     @info "Optimization finished" total_time=round(total_time; digits=1) final_loss=round(train_losses[end]; digits=6)
+
+    final_eval = eval_node_loss(node, z, z0; p=result.u)
+    @info "Eval loss (comparable across runs)" final_eval.mae final_eval.rmse final_eval.rel_l2
 
     # Move result back to CPU before saving
     cpu = cpu_device()

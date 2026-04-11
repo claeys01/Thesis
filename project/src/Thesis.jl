@@ -176,7 +176,7 @@ export NODE, setup_lux!
 export L2_loss, loss_multiple_shoot
 export plot_node_trajectory, plot_multiple_shoot
 export save_node, load_node
-export node_loss
+export node_loss, eval_node_loss
 export extrapolate_node, load_datasets, encode_datasets, make_nodes
 export predictions_and_losses, plot_trajectories, plot_losses
 export region_spans!

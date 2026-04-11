@@ -101,6 +101,14 @@ function L2_loss(node::NODE, z::AbstractMatrix, z0; p=nothing, t=nothing)
     return sum(abs2, z .- pred)
 end
 
+function eval_node_loss(node::NODE, z::AbstractMatrix, z0; p=nothing, t=nothing)
+    pred = predict_array(node, z0; p=p, t=t)
+    mae = mean(abs, z .- pred)
+    rmse = sqrt(mean(abs2, z .- pred))
+    rel_l2 = sqrt(sum(abs2, z .- pred)) / sqrt(sum(abs2, z))
+    return (; mae, rmse, rel_l2)
+end
+
 # small utility to print a short summary
 function Base.show(io::IO, node::NODE)
     println(io, "NODE wrapper:")
