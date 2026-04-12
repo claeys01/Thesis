@@ -11,10 +11,11 @@ mutable struct AENODE{P,S}
 end
 
 function AENODE(AE_path::String, NODE_path::String; verbose=false, k=5, q=0.99)
-    enc, dec, _, ps, st, ae_args = load_trained_AE(AE_path; return_params=true)
+    enc, dec, ae, ps, st, ae_args = load_trained_AE(AE_path; return_params=true)
     normalizer = load_normalizer(AE_path)
     node, node_args = load_node(NODE_path; verbose=verbose)
-    knnood = fit_knn_ood(get_NODE_data(node_args.train_latent_path; downsample=node_args.downsample, verbose=verbose)[1], k=k, q=q)
+    # knnood = fit_knn_ood(get_NODE_data(node_args.train_latent_path; downsample=node_args.downsample, verbose=verbose)[1], k=k, q=q)
+    knnood = fit_knn_ood(get_latent_vectors(ae, ps, st, normalizer, ae_args; downsample=node_args.downsample)[1])
     return AENODE(enc, dec, normalizer, ae_args, node, node_args, knnood,
         ps,  # concrete NamedTuple type inferred
         st   # concrete NamedTuple type inferred
@@ -42,6 +43,7 @@ end
 function apply_prediction!(sim::BiotSimulation, û, Δt::Float32, n_steps::Int; impose_biot=false)
     @timeit to "insert pred" insert_prediction!(sim, û)
     sim.flow.u⁰[2:end-1, 2:end-1, :] .= û
+    fill!(sim.flow.p, 0)
     append!(sim.flow.Δt, Δt * (n_steps - 1))
     push!(sim.flow.Δt, WaterLily.CFL(sim.flow))
     impose_biot && @timeit to "impose biot" impose_biot_bc!(sim)

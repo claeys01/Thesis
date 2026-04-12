@@ -9,8 +9,11 @@ using TimerOutputs
 sim = circle_shedding_biot(;mem=Array, Re=2500, n=2^8, m=2^8, perturb=false)
 reset_timer!(to::TimerOutput)
 
-node_path = "data/saved_models/NODE/16/RE2500/E1000_curldiv_MS_Adam_250/node_params.jld2"
-AE_path = "data/saved_models/u/Lux/256h_16l/RE2500/2e8/Feb12-1530__E1000_HW256x256_C4to2_nc6_nd2_z16_C8_lr0p001_wd0p0009_bs16_NY_LL1_Tl0p0471/checkpoint.jld2"
+# node_path = "data/saved_models/NODE/16/RE2500/E1000_curldiv_MS_Adam_250/node_params.jld2"
+# AE_path = "data/saved_models/u/Lux/256h_16l/RE2500/2e8/Feb12-1530__E1000_HW256x256_C4to2_nc6_nd2_z16_C8_lr0p001_wd0p0009_bs16_NY_LL1_Tl0p0471/checkpoint.jld2"
+
+AE_path = "data/saved_models/u/Lux/256h_16l/RE2500/2e8/TL2_E300_HW256x256_C4to2_nc6_nd2_z16_C8_lr0p0002_wd0p0009_bs16_NY_LL1_Tl0p0/checkpoint.jld2"
+node_path = "data/saved_models/NODE/16/RE2500/TL2_E300_curldiv_MS_Adam_250/node_params.jld2"
 aenode = AENODE(AE_path, node_path)
 
 simdata = load_simdata(aenode.ae_args.full_data_path)
@@ -41,7 +44,8 @@ ref_meanflow = MeanFlow(ref_sim.flow; uu_stats=true)
 predict_flex(aenode, deepcopy(sim); Δt=pred_Δt, impose_biot=true)
 
 while sim_time(sim) < t_end
-    if step % n_switch == 0
+    # if step % n_switch == 0
+    if step % n_switch == 0 && sim_time(sim) > aenode.ae_args.t_training
         sim_time_before = sim_time(sim)
         predict_wall_time = @elapsed begin
             sim, n_integr = predict_flex(aenode, sim; Δt=pred_Δt, impose_biot=true, next_save=next_save)
@@ -82,9 +86,9 @@ rst_comp_plot = plot_rst_comparison(sim_meanflow, ref_meanflow)
 plt_meanflow = plot_meanflow_comparison(sim_meanflow, ref_meanflow)
 
 display(plt_combined)
-display(rst_comp_plot)
-display(plt_meanflow)
+# display(rst_comp_plot)
+# display(plt_meanflow)
 
-savedir = "figs/acceleration/t$(t_end)_nflex_ns$(n_switch)/"
-save_accel_plots(savedir, plt_combined, rst_comp_plot, plt_meanflow)
-create_velocity_gif(gif_frames, savedir)
+# savedir = "figs/acceleration/t$(t_end)_nflex_ns$(n_switch)/"
+# save_accel_plots(savedir, plt_combined, rst_comp_plot, plt_meanflow)
+# create_velocity_gif(gif_frames, savedir)

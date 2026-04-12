@@ -203,28 +203,30 @@ Use for imposing BCs and pressure field on predicted flow field
 function impose_biot_bc!(a::Flow{N}, b, ω...;λ=quick, fmm=true) where {N}
     t₁ = sum(a.Δt)
     U = BiotSavartBCs.BCTuple(a.uBC, t₁, N) 
-
-    a.u⁰ .= a.u; WaterLily.scale_u!(a,0)
-    conv_diff!(a.f,a.u⁰,a.σ,λ,ν=a.ν)
-    WaterLily.BDIM!(a);
     custom_biot_project!(a,b,ω...,U;fmm) # new
 
-    WaterLily.conv_diff!(a.f,a.u,a.σ,λ,ν=a.ν)
-    WaterLily.BDIM!(a); WaterLily.scale_u!(a,0.5)
-    custom_biot_project!(a,b,ω...,U;fmm,w=0.5) # new
+    biot_mom_step!(a, b, ω...; quick, fmm=true)
+    # a.u⁰ .= a.u; WaterLily.scale_u!(a,0)
+    # conv_diff!(a.f,a.u⁰,a.σ,λ,ν=a.ν)
+    # WaterLily.BDIM!(a);
+    # custom_biot_project!(a,b,ω...,U;fmm) # new
+
+    # WaterLily.conv_diff!(a.f,a.u,a.σ,λ,ν=a.ν)
+    # WaterLily.BDIM!(a); WaterLily.scale_u!(a,0.5)
+    # custom_biot_project!(a,b,ω...,U;fmm,w=0.5) # new
     # push!(a.Δt,WaterLily.CFL(a))
 
-    # WaterLily.measure!(a,body;t₁,ϵ=1)
-    WaterLily.update!(b)
+    # # WaterLily.measure!(a,body;t₁,ϵ=1)
+    # WaterLily.update!(b)
 
-    a.u⁰ .= a.u; WaterLily.scale_u!(a,0)
-    conv_diff!(a.f,a.u⁰,a.σ,λ,ν=a.ν)
-    WaterLily.BDIM!(a);
-    custom_biot_project!(a,b,ω...,U;fmm) # new
+    # a.u⁰ .= a.u; WaterLily.scale_u!(a,0)
+    # conv_diff!(a.f,a.u⁰,a.σ,λ,ν=a.ν)
+    # WaterLily.BDIM!(a);
+    # custom_biot_project!(a,b,ω...,U;fmm) # new
 
-    WaterLily.conv_diff!(a.f,a.u,a.σ,λ,ν=a.ν)
-    WaterLily.BDIM!(a); WaterLily.scale_u!(a,0.5)
-    custom_biot_project!(a,b,ω...,U;fmm,w=0.5) # new
+    # WaterLily.conv_diff!(a.f,a.u,a.σ,λ,ν=a.ν)
+    # WaterLily.BDIM!(a); WaterLily.scale_u!(a,0.5)
+    # custom_biot_project!(a,b,ω...,U;fmm,w=0.5) # new
 end
 
 impose_biot_bc!(sim::BiotSimulation) = impose_biot_bc!(sim.flow, sim.pois, sim.ω, sim.x₀,sim.tar,sim.ftar;fmm=sim.fmm)  

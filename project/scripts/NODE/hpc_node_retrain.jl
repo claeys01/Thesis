@@ -64,7 +64,7 @@ function main()
             extrapolate = false,
             latent_dim = ae_args.latent_dim,
             η = 0.005,              # lower LR for fine-tuning
-            maxiters = 100,          # more iterations
+            maxiters = 300,          # more iterations
             group_size = 20,         # keep tighter segments
             continuity_term = 400,   # stronger continuity for stability
             downsample = 600,  
