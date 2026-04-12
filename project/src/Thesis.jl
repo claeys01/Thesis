@@ -138,6 +138,9 @@ include("AENODE.jl")
 include("utils/AE_reconstructer.jl")
 include("utils/AE_loss_plot.jl")
 
+# Acceleration benchmarking
+include("utils/acceleration.jl")
+
 
 
 # Data getters
@@ -226,6 +229,14 @@ export build_batch
 export get_latent_data
 export get_NODE_data
 export get_idxs
+
+# Acceleration benchmarking
+export AccelResults
+export force_stats, record_waterlily_step!, record_prediction!, step_reference!
+export compute_metrics, print_metrics
+export plot_forces_comparison, plot_timing_bars, plot_accel_combined
+export rst_plot, plot_rst_comparison, plot_meanflow_comparison
+export save_velocity_frame!, create_velocity_gif, save_accel_plots
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Exports - Utilities
