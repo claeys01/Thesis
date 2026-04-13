@@ -39,7 +39,7 @@ function main()
             epochs=500, 
             λdiv=Float64(div), 
             λcurl=Float64(curl), 
-            train_downsample = 1000,
+            train_downsample = 500,
             t_training = 48,
             full_data_path=tl_path
         ); return_path=true
