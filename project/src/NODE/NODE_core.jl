@@ -4,8 +4,8 @@ Base.@kwdef mutable struct NodeArgs
     optimiser = OptimizationOptimisers.AdamW
     maxiters = 250
     solver = Tsit5()
-    reltol = 1e-4
-    abstol = 1e-6
+    reltol = 1e-3
+    abstol = 1e-5
     seed = 42                   # random seed
     latent_dim = 16
     dense_mult = 3

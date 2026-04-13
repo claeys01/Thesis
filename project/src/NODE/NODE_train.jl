@@ -79,6 +79,7 @@ function train_NODE(args::NodeArgs;
     end
 
     train_losses = Float64[]
+    rmse_errors  = Float64[]
     test_losses  = Float64[]
     epochs       = Int[]
     eval_every   = 1  # change for sparser evaluation
@@ -88,11 +89,13 @@ function train_NODE(args::NodeArgs;
     anim = Plots.Animation()
     iter_start_time = Ref(time())
 
-    callback = function (state, l; plotting=false, gif=true)
+    callback = function (state, l; plotting=false, gif=false)
         step = state.iter              # current iteration index
         if step % eval_every == 0
             push!(epochs, step)
             push!(train_losses, l)
+            rmse_eval = eval_node_loss(node, z, z0; p=state.u)
+            push!(rmse_errors, rmse_eval.rmse)
             # Evaluate test loss with current params
             # test_l = L2_loss(node, z_test, z0_test; p=state.u, t=t_test)
             # push!(test_losses, test_l)
@@ -137,6 +140,13 @@ function train_NODE(args::NodeArgs;
     final_eval = eval_node_loss(node, z, z0; p=result.u)
     @info "Eval loss (comparable across runs)" final_eval.mae final_eval.rmse final_eval.rel_l2
 
+    # Ensure final point is present in training curves when eval cadence skips it.
+    if isempty(epochs) || epochs[end] != args.maxiters
+        push!(epochs, args.maxiters)
+        push!(train_losses, loss_function(result.u))
+        push!(rmse_errors, final_eval.rmse)
+    end
+
     # Move result back to CPU before saving
     cpu = cpu_device()
     node.p0 = cpu(result.u)
@@ -164,6 +174,21 @@ function train_NODE(args::NodeArgs;
     png_path = joinpath(out_dir, "trajectories.png")
     @info "  Saved trajectory plot to $png_path"
     savefig(plt, png_path)
+
+    metrics_path = joinpath(out_dir, "training_loss_rmse.png")
+    if !isempty(epochs) && !isempty(train_losses) && !isempty(rmse_errors)
+        loss_for_plot = max.(train_losses, eps(Float64))
+        rmse_for_plot = max.(rmse_errors, eps(Float64))
+        metrics_plot = plot(layout=(2, 1), size=(900, 700))
+        plot!(metrics_plot[1], epochs, loss_for_plot;
+            xlabel="Iteration", ylabel="Loss", title="Training Loss", legend=false, yscale=:log10)
+        plot!(metrics_plot[2], epochs, rmse_for_plot;
+            xlabel="Iteration", ylabel="RMSE", title="Training RMSE", legend=false, color=:red, yscale=:log10)
+        savefig(metrics_plot, metrics_path)
+        @info "  Saved training metrics plot to $metrics_path"
+    else
+        @warn "Training metrics arrays are empty; skipping loss/RMSE plot"
+    end
 
     gif_path = joinpath(out_dir, "training_trajectories.gif")
     try gif(anim, gif_path; fps = 15, show_msg=false)

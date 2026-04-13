@@ -28,28 +28,21 @@ function main()
     device = get_device()
 
     # ── Step 1: Train (or load) the Autoencoder ──
-    ae_checkpoint = joinpath(root_path, "data/saved_models/u/Lux/256h_16l/RE2500/2e8/TL1_E500_HW256x256_C4to2_nc6_nd2_z16_C8_lr0p001_wd0p0009_bs16_NY_LL1_Tl0p0/checkpoint.jld2")
-    
-    # Load the trained AE into memory (no need to reload later)
-    _, _, ae, ae_ps, ae_st, ae_args = load_trained_AE(ae_checkpoint; device=device, return_params=true)
- 
-    normalizer = load_normalizer(ae_checkpoint)
-    @info "AE loaded into memory"
+       # Load the initial NODE checkpoint (trained on TL1 AE)
+    ae_checkpoint_tl1 = joinpath("", "data/saved_models/u/Lux/256h_16l/RE2500/2e8/TL1_E500_HW256x256_C4to2_nc6_nd2_z16_C8_lr0p001_wd0p0009_bs16_NY_LL1_Tl0p0/checkpoint.jld2")
+    _, _, ae_tl1, ae_ps_tl1, ae_st_tl1, ae_args_tl1 = load_trained_AE(ae_checkpoint_tl1; device=device, return_params=true)
+    ae_args_tl1.full_data_path = joinpath(root_path, ae_args_tl1.full_data_path)
+    normalizer_tl1 = load_normalizer(ae_checkpoint_tl1)
 
     node_path = train_NODE(
         NodeArgs(
-            # maxiters=3,
-            extrapolate = false,
-            use_gpu = false,
-            latent_dim = ae_args.latent_dim,
-            retrain = false,
+            extrapolate=false, use_gpu=false,
+            latent_dim=ae_args_tl1.latent_dim, retrain=false,
         );
-        ae = ae,
-        ae_ps = ae_ps,
-        ae_st = ae_st,
-        normalizer = normalizer,
-        ae_args = ae_args,
+        ae=ae_tl1, ae_ps=ae_ps_tl1, ae_st=ae_st_tl1,
+        normalizer=normalizer_tl1, ae_args=ae_args_tl1,
     )
+    @info "Initial NODE trained" node_path
 
     # ── Step 2: Autoencoder has been retrained ──
     ae_checkpoint = joinpath(root_path, "data/saved_models/u/Lux/256h_16l/RE2500/2e8/TL2_E300_HW256x256_C4to2_nc6_nd2_z16_C8_lr0p0002_wd0p0009_bs16_NY_LL1_Tl0p0/checkpoint.jld2")
@@ -63,11 +56,11 @@ function main()
         NodeArgs(
             extrapolate = false,
             latent_dim = ae_args.latent_dim,
-            η = 0.005,              # lower LR for fine-tuning
-            maxiters = 300,          # more iterations
-            group_size = 20,         # keep tighter segments
-            continuity_term = 400,   # stronger continuity for stability
-            downsample = 600,  
+            η = 0.01,              # lower LR for fine-tuning
+            maxiters = 75,          # more iterations
+            group_size = 30,         # keep tighter segments
+            continuity_term = 100,   # stronger continuity for stability
+            downsample = 300,  
             retrain = true,
             multiple_shooting = true,
             use_gpu = false, 
