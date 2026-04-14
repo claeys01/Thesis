@@ -1,3 +1,4 @@
+# Make plotting/headless execution work both locally and on HPC.
 ENV["GKSwstype"] = get(ENV, "GKSwstype", "100")
 ENV["THESIS_USE_CUDA"] = get(ENV, "THESIS_USE_CUDA", "true")
 
@@ -8,17 +9,9 @@ using Statistics
 using Dates
 using Plots
 
-# use_gpu = lowercase(get(ENV, "THESIS_USE_CUDA", "false")) == "true"
 
-# t_inline = parse(Float32, get(ENV, "T_INLINE", "10.0"))
-# t_train = parse(Float32, get(ENV, "T_TRAIN", "8.0"))
-# t_accel_end = parse(Float32, get(ENV, "T_ACCEL_END", "25.0"))
-# ae_epochs = parse(Int, get(ENV, "AE_EPOCHS", "1"))
-# node_iters = parse(Int, get(ENV, "NODE_ITERS", "250"))
-# n_switch = parse(Int, get(ENV, "N_SWITCH", "150"))
-# pred_Δt = parse(Float32, get(ENV, "PRED_DT", "0.35"))
-# save_interval = parse(Float32, get(ENV, "SAVE_INTERVAL", "0.5"))
 
+# Small container for the main timing/training knobs of the experiment.
 Base.@kwdef struct InlineParams
     t_run = 10.0
     t_train = 8.0
@@ -33,6 +26,7 @@ end
 params = InlineParams()
 
     
+# Create a timestamped output folder and seed the run from a saved flow field.
 savedir = joinpath("data", "inline_runs", Dates.format(now(), "yyyy-mm-dd_HH-MM-SS"))
 mkpath(savedir)
 simdata_path = joinpath(savedir, "U_inline.jld2")
@@ -43,9 +37,11 @@ initdata = load_simdata(init_path)
 u₀ = copy(initdata.u[:, :, :, 1])
 initdata = nothing; GC.gc()
 
+# Generate a short inline trajectory that will be used to train AE + NODE.
 sim = circle_shedding_biot(; mem=Array, perturb=false)
-sim, simdata = run_sim(sim; t_end=t_inline, u₀=u₀, save_path=simdata_path, verbose=false)
+sim, simdata = run_sim(sim; t_end=params.t_run, u₀=u₀, save_path=simdata_path, verbose=false)
 
+# Train the autoencoder directly on the freshly generated inline data.
 ae_args = LuxArgs(
     simdata_ram=simdata,
     full_data_path=simdata_path,
@@ -61,6 +57,7 @@ normalizer = load_normalizer(AE_path)
 ae_args.simdata_ram = nothing
 # simdata = nothing; GC.gc()
 
+# Fit a latent-space NODE on the AE representation.
 node_args = NodeArgs(
     use_gpu=false,
     latent_dim=ae_args.latent_dim,
@@ -85,6 +82,7 @@ ae_ps = nothing
 ae_st = nothing
 GC.gc()
 
+# Reload the trained pipeline and recover the train/test split for plotting.
 aenode = AENODE(AE_path, node_path)
 plotdata = load_simdata(simdata_path)
 train_idx, val_idx, test_idx = Thesis.get_idxs(plotdata, aenode.ae_args)
@@ -93,6 +91,7 @@ t_test_plot = plotdata.time[test_idx]
 plotdata = nothing
 GC.gc()
 
+# Start both the accelerated and reference simulations from the same state.
 sim = circle_shedding_biot(; mem=Array, Re=Re, n=n, m=m, perturb=false)
 if !isnothing(u₀)
     sim.flow.u .= u₀
@@ -105,16 +104,17 @@ ref_meanflow = MeanFlow(ref_sim.flow; uu_stats=true)
 res = AccelResults()
 n_integrs = Int[]
 gif_frames = []
-next_save = save_interval
+next_save = params.save_interval
 step = 1
 
-predict_flex(aenode, deepcopy(sim); Δt=pred_Δt, impose_biot=true)
+# Warm up the predictor once, then alternate between ML prediction and CFD stepping.
+predict_flex(aenode, deepcopy(sim); Δt=params.pred_Δt, impose_biot=true)
 
-while sim_time(sim) < t_accel_end
-    if step % n_switch == 0 && sim_time(sim) > aenode.ae_args.t_training
+while sim_time(sim) < params.t_accel_end
+    if step % params.n_switch == 0 && sim_time(sim) > aenode.ae_args.t_training
         sim_time_before = sim_time(sim)
         predict_wall_time = @elapsed begin
-            sim, n_integr = predict_flex(aenode, sim; Δt=pred_Δt, impose_biot=true, next_save=next_save)
+            sim, n_integr = predict_flex(aenode, sim; Δt=params.pred_Δt, impose_biot=true, next_save=next_save)
         end
         sim_dt = sim_time(sim) - sim_time_before
 
@@ -137,16 +137,17 @@ while sim_time(sim) < t_accel_end
     if sim_time(sim) > next_save
         WaterLily.update!(sim_meanflow, sim.flow)
         WaterLily.update!(ref_meanflow, ref_sim.flow)
-        next_save = sim_time(sim) + save_interval
+        next_save = sim_time(sim) + params.save_interval
         save_velocity_frame!(gif_frames, sim, sim_time(sim))
     end
 
     step += 1
 end
 
+# Summarise performance and save the diagnostic figures.
 print_metrics(res; pred_label="(flexible OOD)", avg_steps_per_pred=isempty(n_integrs) ? nothing : mean(n_integrs))
 
-plt_combined = plot_accel_combined(res, t_train_plot, t_test_plot, t_accel_end)
+plt_combined = plot_accel_combined(res, t_train_plot, t_test_plot, params.t_accel_end)
 rst_comp_plot = plot_rst_comparison(sim_meanflow, ref_meanflow)
 plt_meanflow = plot_meanflow_comparison(sim_meanflow, ref_meanflow)
 save_accel_plots(savedir, plt_combined, rst_comp_plot, plt_meanflow)
