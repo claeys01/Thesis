@@ -1,0 +1,729 @@
+┌ Info: CUDA loaded successfully
+│   device = CuDevice(0): NVIDIA A100 80GB PCIe
+└   capability = v"8.0.0"
+┌ Info: cuDNN loaded successfully
+└   version = v"8.90.7"
+[ Info: Starting HPC AE+NODE retrain pipeline
+[ Info:   SLURM_JOB_ID: 9582885
+[ Info:   SLURM_NTASKS: 1
+[ Info:   SLURM_CPUS_PER_TASK: 16
+[ Info:   Hostname: gpu011
+[ Info:   Julia threads: 16
+[ Info: ── Step 1/4: Training Autoencoder ──
+[ Info: Loading training data from: /scratch/mfbclaeys/data/datasets/RE2500/2e8/U_128_full.jld2
+┌ Info: AE hyperparameters
+│   epochs = 400
+│   λdiv = 1000.0
+└   λcurl = 100.0
+[ Info: removed ghost cells; input data size (u): (256, 256, 2, 4402)
+GKS: cannot open display - headless operation mode active
+[ Info: training force plot saved to data/Lux_models/Apr09-1642__E400_HW256x256_C4to2_nc6_nd2_z16_C8_lr0p001_wd0p0009_bs16_NY_LL1_Tl0p0/trainin_force.png
+[ Info: Training on CUDADevice{Nothing, Missing}(nothing)
+[ Info: Parametric Encoder built:
+[ Info:   Conv: 4→8 -> 8→16 -> 16→32 -> 32→64 -> 64→128 -> 128→256
+[ Info:   Sizes: (256, 256, 4) -> (128, 128, 8) -> (64, 64, 16) -> (32, 32, 32) -> (16, 16, 64) -> (8, 8, 128) -> (4, 4, 256)
+[ Info:   Dense: 4096→2048 -> 2048→16
+[ Info: Parametric Decoder built:
+[ Info:   Dense: 16→2048 -> 2048→4096
+[ Info:   Sizes: (4, 4, 256) -> (8, 8, 128) -> (16, 16, 64) -> (32, 32, 32) -> (64, 64, 16) -> (128, 128, 8) -> (256, 256, 4) -> (256, 256, 2) -> (256, 256, 2)
+[ Info:   Conv: 256→128 -> 128→64 -> 64→32 -> 32→16 -> 16→8 -> 8→4 -> 4→2 -> 2→2
+[ Info: AE initiated
+┌ Info: CUDA.functional()
+└   CUDA.functional() = true
+┌ Info: CUDA device
+└   CUDA.device() = CuDevice(0): NVIDIA A100 80GB PCIe
+[ Info: Start Training, total 400 epochs
+[ Info: Epoch 1/400
+[ Info: Epoch 2/400
+[ Info: Epoch 3/400
+[ Info: Epoch 4/400
+[ Info: Epoch 5/400
+[ Info: Epoch 6/400
+[ Info: Epoch 7/400
+[ Info: Epoch 8/400
+[ Info: Epoch 9/400
+[ Info: Epoch 10/400
+[ Info: Epoch 11/400
+[ Info: Epoch 12/400
+[ Info: Epoch 13/400
+[ Info: Epoch 14/400
+[ Info: Epoch 15/400
+[ Info: Epoch 16/400
+[ Info: Epoch 17/400
+[ Info: Epoch 18/400
+[ Info: Epoch 19/400
+[ Info: Epoch 20/400
+[ Info: Epoch 21/400
+[ Info: Epoch 22/400
+[ Info: Epoch 23/400
+[ Info: Epoch 24/400
+[ Info: Epoch 25/400
+[ Info: Epoch 26/400
+[ Info: Epoch 27/400
+[ Info: Epoch 28/400
+[ Info: Epoch 29/400
+[ Info: Epoch 30/400
+[ Info: Epoch 31/400
+[ Info: Epoch 32/400
+[ Info: Epoch 33/400
+[ Info: Epoch 34/400
+[ Info: Epoch 35/400
+[ Info: Epoch 36/400
+[ Info: Epoch 37/400
+[ Info: Epoch 38/400
+[ Info: Epoch 39/400
+[ Info: Epoch 40/400
+[ Info: Epoch 41/400
+[ Info: Epoch 42/400
+[ Info: Epoch 43/400
+[ Info: Epoch 44/400
+[ Info: Epoch 45/400
+[ Info: Epoch 46/400
+[ Info: Epoch 47/400
+[ Info: Epoch 48/400
+[ Info: Epoch 49/400
+[ Info: Epoch 50/400
+[ Info: Epoch 51/400
+[ Info: Epoch 52/400
+[ Info: Epoch 53/400
+[ Info: Epoch 54/400
+[ Info: Epoch 55/400
+[ Info: Epoch 56/400
+[ Info: Epoch 57/400
+[ Info: Epoch 58/400
+[ Info: Epoch 59/400
+[ Info: Epoch 60/400
+[ Info: Epoch 61/400
+[ Info: Epoch 62/400
+[ Info: Epoch 63/400
+[ Info: Epoch 64/400
+[ Info: Epoch 65/400
+[ Info: Epoch 66/400
+[ Info: Epoch 67/400
+[ Info: Epoch 68/400
+[ Info: Epoch 69/400
+[ Info: Epoch 70/400
+[ Info: Epoch 71/400
+[ Info: Epoch 72/400
+[ Info: Epoch 73/400
+[ Info: Epoch 74/400
+[ Info: Epoch 75/400
+[ Info: Epoch 76/400
+[ Info: Epoch 77/400
+[ Info: Epoch 78/400
+[ Info: Epoch 79/400
+[ Info: Epoch 80/400
+[ Info: Epoch 81/400
+[ Info: Epoch 82/400
+[ Info: Epoch 83/400
+[ Info: Epoch 84/400
+[ Info: Epoch 85/400
+[ Info: Epoch 86/400
+[ Info: Epoch 87/400
+[ Info: Epoch 88/400
+[ Info: Epoch 89/400
+[ Info: Epoch 90/400
+[ Info: Epoch 91/400
+[ Info: Epoch 92/400
+[ Info: Epoch 93/400
+[ Info: Epoch 94/400
+[ Info: Epoch 95/400
+[ Info: Epoch 96/400
+[ Info: Epoch 97/400
+[ Info: Epoch 98/400
+[ Info: Epoch 99/400
+[ Info: Epoch 100/400
+[ Info: Epoch 101/400
+[ Info: Epoch 102/400
+[ Info: Epoch 103/400
+[ Info: Epoch 104/400
+[ Info: Epoch 105/400
+[ Info: Epoch 106/400
+[ Info: Epoch 107/400
+[ Info: Epoch 108/400
+[ Info: Epoch 109/400
+[ Info: Epoch 110/400
+[ Info: Epoch 111/400
+[ Info: Epoch 112/400
+[ Info: Epoch 113/400
+[ Info: Epoch 114/400
+[ Info: Epoch 115/400
+[ Info: Epoch 116/400
+[ Info: Epoch 117/400
+[ Info: Epoch 118/400
+[ Info: Epoch 119/400
+[ Info: Epoch 120/400
+[ Info: Epoch 121/400
+[ Info: Epoch 122/400
+[ Info: Epoch 123/400
+[ Info: Epoch 124/400
+[ Info: Epoch 125/400
+[ Info: Epoch 126/400
+[ Info: Epoch 127/400
+[ Info: Epoch 128/400
+[ Info: Epoch 129/400
+[ Info: Epoch 130/400
+[ Info: Epoch 131/400
+[ Info: Epoch 132/400
+[ Info: Epoch 133/400
+[ Info: Epoch 134/400
+[ Info: Epoch 135/400
+[ Info: Epoch 136/400
+[ Info: Epoch 137/400
+[ Info: Epoch 138/400
+[ Info: Epoch 139/400
+[ Info: Epoch 140/400
+[ Info: Epoch 141/400
+[ Info: Epoch 142/400
+[ Info: Epoch 143/400
+[ Info: Epoch 144/400
+[ Info: Epoch 145/400
+[ Info: Epoch 146/400
+[ Info: Epoch 147/400
+[ Info: Epoch 148/400
+[ Info: Epoch 149/400
+[ Info: Epoch 150/400
+[ Info: Epoch 151/400
+[ Info: Epoch 152/400
+[ Info: Epoch 153/400
+[ Info: Epoch 154/400
+[ Info: Epoch 155/400
+[ Info: Epoch 156/400
+[ Info: Epoch 157/400
+[ Info: Epoch 158/400
+[ Info: Epoch 159/400
+[ Info: Epoch 160/400
+[ Info: Epoch 161/400
+[ Info: Epoch 162/400
+[ Info: Epoch 163/400
+[ Info: Epoch 164/400
+[ Info: Epoch 165/400
+[ Info: Epoch 166/400
+[ Info: Epoch 167/400
+[ Info: Epoch 168/400
+[ Info: Epoch 169/400
+[ Info: Epoch 170/400
+[ Info: Epoch 171/400
+[ Info: Epoch 172/400
+[ Info: Epoch 173/400
+[ Info: Epoch 174/400
+[ Info: Epoch 175/400
+[ Info: Epoch 176/400
+[ Info: Epoch 177/400
+[ Info: Epoch 178/400
+[ Info: Epoch 179/400
+[ Info: Epoch 180/400
+[ Info: Epoch 181/400
+[ Info: Epoch 182/400
+[ Info: Epoch 183/400
+[ Info: Epoch 184/400
+[ Info: Epoch 185/400
+[ Info: Epoch 186/400
+[ Info: Epoch 187/400
+[ Info: Epoch 188/400
+[ Info: Epoch 189/400
+[ Info: Epoch 190/400
+[ Info: Epoch 191/400
+[ Info: Epoch 192/400
+[ Info: Epoch 193/400
+[ Info: Epoch 194/400
+[ Info: Epoch 195/400
+[ Info: Epoch 196/400
+[ Info: Epoch 197/400
+[ Info: Epoch 198/400
+[ Info: Epoch 199/400
+[ Info: Epoch 200/400
+[ Info: Epoch 201/400
+[ Info: Epoch 202/400
+[ Info: Epoch 203/400
+[ Info: Epoch 204/400
+[ Info: Epoch 205/400
+[ Info: Epoch 206/400
+[ Info: Epoch 207/400
+[ Info: Epoch 208/400
+[ Info: Epoch 209/400
+[ Info: Epoch 210/400
+[ Info: Epoch 211/400
+[ Info: Epoch 212/400
+[ Info: Epoch 213/400
+[ Info: Epoch 214/400
+[ Info: Epoch 215/400
+[ Info: Epoch 216/400
+[ Info: Epoch 217/400
+[ Info: Epoch 218/400
+[ Info: Epoch 219/400
+[ Info: Epoch 220/400
+[ Info: Epoch 221/400
+[ Info: Epoch 222/400
+[ Info: Epoch 223/400
+[ Info: Epoch 224/400
+[ Info: Epoch 225/400
+[ Info: Epoch 226/400
+[ Info: Epoch 227/400
+[ Info: Epoch 228/400
+[ Info: Epoch 229/400
+[ Info: Epoch 230/400
+[ Info: Epoch 231/400
+[ Info: Epoch 232/400
+[ Info: Epoch 233/400
+[ Info: Epoch 234/400
+[ Info: Epoch 235/400
+[ Info: Epoch 236/400
+[ Info: Epoch 237/400
+[ Info: Epoch 238/400
+[ Info: Epoch 239/400
+[ Info: Epoch 240/400
+[ Info: Epoch 241/400
+[ Info: Epoch 242/400
+[ Info: Epoch 243/400
+[ Info: Epoch 244/400
+[ Info: Epoch 245/400
+[ Info: Epoch 246/400
+[ Info: Epoch 247/400
+[ Info: Epoch 248/400
+[ Info: Epoch 249/400
+[ Info: Epoch 250/400
+[ Info: Epoch 251/400
+[ Info: Epoch 252/400
+[ Info: Epoch 253/400
+[ Info: Epoch 254/400
+[ Info: Epoch 255/400
+[ Info: Epoch 256/400
+[ Info: Epoch 257/400
+[ Info: Epoch 258/400
+[ Info: Epoch 259/400
+[ Info: Epoch 260/400
+[ Info: Epoch 261/400
+[ Info: Epoch 262/400
+[ Info: Epoch 263/400
+[ Info: Epoch 264/400
+[ Info: Epoch 265/400
+[ Info: Epoch 266/400
+[ Info: Epoch 267/400
+[ Info: Epoch 268/400
+[ Info: Epoch 269/400
+[ Info: Epoch 270/400
+[ Info: Epoch 271/400
+[ Info: Epoch 272/400
+[ Info: Epoch 273/400
+[ Info: Epoch 274/400
+[ Info: Epoch 275/400
+[ Info: Epoch 276/400
+[ Info: Epoch 277/400
+[ Info: Epoch 278/400
+[ Info: Epoch 279/400
+[ Info: Epoch 280/400
+[ Info: Epoch 281/400
+[ Info: Epoch 282/400
+[ Info: Epoch 283/400
+[ Info: Epoch 284/400
+[ Info: Epoch 285/400
+[ Info: Epoch 286/400
+[ Info: Epoch 287/400
+[ Info: Epoch 288/400
+[ Info: Epoch 289/400
+[ Info: Epoch 290/400
+[ Info: Epoch 291/400
+[ Info: Epoch 292/400
+[ Info: Epoch 293/400
+[ Info: Epoch 294/400
+[ Info: Epoch 295/400
+[ Info: Epoch 296/400
+[ Info: Epoch 297/400
+[ Info: Epoch 298/400
+[ Info: Epoch 299/400
+[ Info: Epoch 300/400
+[ Info: Epoch 301/400
+[ Info: Epoch 302/400
+[ Info: Epoch 303/400
+[ Info: Epoch 304/400
+[ Info: Epoch 305/400
+[ Info: Epoch 306/400
+[ Info: Epoch 307/400
+[ Info: Epoch 308/400
+[ Info: Epoch 309/400
+[ Info: Epoch 310/400
+[ Info: Epoch 311/400
+[ Info: Epoch 312/400
+[ Info: Epoch 313/400
+[ Info: Epoch 314/400
+[ Info: Epoch 315/400
+[ Info: Epoch 316/400
+[ Info: Epoch 317/400
+[ Info: Epoch 318/400
+[ Info: Epoch 319/400
+[ Info: Epoch 320/400
+[ Info: Epoch 321/400
+[ Info: Epoch 322/400
+[ Info: Epoch 323/400
+[ Info: Epoch 324/400
+[ Info: Epoch 325/400
+[ Info: Epoch 326/400
+[ Info: Epoch 327/400
+[ Info: Epoch 328/400
+[ Info: Epoch 329/400
+[ Info: Epoch 330/400
+[ Info: Epoch 331/400
+[ Info: Epoch 332/400
+[ Info: Epoch 333/400
+[ Info: Epoch 334/400
+[ Info: Epoch 335/400
+[ Info: Epoch 336/400
+[ Info: Epoch 337/400
+[ Info: Epoch 338/400
+[ Info: Epoch 339/400
+[ Info: Epoch 340/400
+[ Info: Epoch 341/400
+[ Info: Epoch 342/400
+[ Info: Epoch 343/400
+[ Info: Epoch 344/400
+[ Info: Epoch 345/400
+[ Info: Epoch 346/400
+[ Info: Epoch 347/400
+[ Info: Epoch 348/400
+[ Info: Epoch 349/400
+[ Info: Epoch 350/400
+[ Info: Epoch 351/400
+[ Info: Epoch 352/400
+[ Info: Epoch 353/400
+[ Info: Epoch 354/400
+[ Info: Epoch 355/400
+[ Info: Epoch 356/400
+[ Info: Epoch 357/400
+[ Info: Epoch 358/400
+[ Info: Epoch 359/400
+[ Info: Epoch 360/400
+[ Info: Epoch 361/400
+[ Info: Epoch 362/400
+[ Info: Epoch 363/400
+[ Info: Epoch 364/400
+[ Info: Epoch 365/400
+[ Info: Epoch 366/400
+[ Info: Epoch 367/400
+[ Info: Epoch 368/400
+[ Info: Epoch 369/400
+[ Info: Epoch 370/400
+[ Info: Epoch 371/400
+[ Info: Epoch 372/400
+[ Info: Epoch 373/400
+[ Info: Epoch 374/400
+[ Info: Epoch 375/400
+[ Info: Epoch 376/400
+[ Info: Epoch 377/400
+[ Info: Epoch 378/400
+[ Info: Epoch 379/400
+[ Info: Epoch 380/400
+[ Info: Epoch 381/400
+[ Info: Epoch 382/400
+[ Info: Epoch 383/400
+[ Info: Epoch 384/400
+[ Info: Epoch 385/400
+[ Info: Epoch 386/400
+[ Info: Epoch 387/400
+[ Info: Epoch 388/400
+[ Info: Epoch 389/400
+[ Info: Epoch 390/400
+[ Info: Epoch 391/400
+[ Info: Epoch 392/400
+[ Info: Epoch 393/400
+[ Info: Epoch 394/400
+[ Info: Epoch 395/400
+[ Info: Epoch 396/400
+[ Info: Epoch 397/400
+[ Info: Epoch 398/400
+[ Info: Epoch 399/400
+[ Info: Epoch 400/400
+[ Info: Model saved: data/Lux_models/Apr09-1642__E400_HW256x256_C4to2_nc6_nd2_z16_C8_lr0p001_wd0p0009_bs16_NY_LL1_Tl0p0/checkpoint.jld2
+[ Info: Selected 2 snapshots with indices [3547, 1759] for reconstruction
+[ Info: Saved reconstruction plot to data/Lux_models/Apr09-1642__E400_HW256x256_C4to2_nc6_nd2_z16_C8_lr0p001_wd0p0009_bs16_NY_LL1_Tl0p0/reconstruction.png
+[ Info: Saved loss plot to data/Lux_models/Apr09-1642__E400_HW256x256_C4to2_nc6_nd2_z16_C8_lr0p001_wd0p0009_bs16_NY_LL1_Tl0p0/loss_evolution.png
+┌ Info: AE initial training complete
+│   elapsed_min = 7.3
+└   checkpoint = "data/Lux_models/Apr09-1642__E400_HW256x256_C4to2_nc6_nd2_z16_C8_lr0p001_wd0p0009_bs16_NY_LL1_Tl0p0/checkpoint.jld2"
+[ Info: ── Step 2/4: Training Neural ODE ──
+[ Info: Encoding latent vectors from AE in memory (no disk I/O)
+[ Info: removed ghost cells; input data size (u): (256, 256, 2, 4402)
+┌ Info: Generated latent vectors
+│   size(z) = (16, 200)
+│   n_samples = 200
+└   time_range = (0.0f0, 16.507103f0)
+┌ Info: NODE initialized
+│   latent_dim = 16
+│   dense_mult = 3
+│   tspan = (0.0f0, 16.507103f0)
+│   solver = OrdinaryDiffEqTsit5.Tsit5{typeof(OrdinaryDiffEqCore.trivial_limiter!), typeof(OrdinaryDiffEqCore.trivial_limiter!), Static.False}
+│   reltol = 0.0001
+│   abstol = 1.0e-6
+│   t = 200-element Vector{Float32}: …
+└   activation = tanhshrink (generic function with 6 methods)
+[ Info: NODE weights initialized
+[ Info: NODE training on device: CPUDevice{Missing}()
+┌ Info: Starting optimization
+│   maxiters = 250
+│   optimiser = Optimisers.Adam
+└   η = 0.01
+┌ Info: Optimization finished
+│   total_time = 80.7
+└   final_loss = 772.851501
+[ Info: Saving model and plots
+[ Info:   Saved NODE to data/NODE_models/Apr09-1651/node_params.jld2
+[ Info:   Saved trajectory plot to data/NODE_models/Apr09-1651/trajectories.png
+┌ Warning: plotting turned off in callback, no gif saved
+└ @ Thesis ~/Thesis/project/src/NODE/NODE_train.jl:164
+┌ Info: NODE training complete
+│   elapsed_min = 1.5
+└   node_path = "data/NODE_models/Apr09-1651/node_params.jld2"
+┌ Info: Steps 1-2 complete
+└   elapsed_min = 8.8
+[ Info: Transfer learning criterion triggered
+[ Info: ── Step 3/4: Retraining AE ──
+┌ Info: Retrain data loaded
+│   n_snapshots = 4402
+└   t_end = 49.998604f0
+┌ Info: AE retrain hyperparameters
+│   η = 0.0002
+│   epochs = 200
+└   t_training = 39.99888305664063
+[ Info: removed ghost cells; input data size (u): (256, 256, 2, 4402)
+[ Info: training force plot saved to data/Lux_models/Apr09-1651__E200_HW256x256_C4to2_nc6_nd2_z16_C8_lr0p0002_wd0p0009_bs16_NY_LL1_Tl0p0/trainin_force.png
+[ Info: Training on CUDADevice{Nothing, Missing}(nothing)
+[ Info: Retraining model saved at data/Lux_models/Apr09-1642__E400_HW256x256_C4to2_nc6_nd2_z16_C8_lr0p001_wd0p0009_bs16_NY_LL1_Tl0p0/checkpoint.jld2
+┌ Info: CUDA.functional()
+└   CUDA.functional() = true
+┌ Info: CUDA device
+└   CUDA.device() = CuDevice(0): NVIDIA A100 80GB PCIe
+[ Info: Start Training, total 200 epochs
+[ Info: Epoch 1/200
+[ Info: Epoch 2/200
+[ Info: Epoch 3/200
+[ Info: Epoch 4/200
+[ Info: Epoch 5/200
+[ Info: Epoch 6/200
+[ Info: Epoch 7/200
+[ Info: Epoch 8/200
+[ Info: Epoch 9/200
+[ Info: Epoch 10/200
+[ Info: Epoch 11/200
+[ Info: Epoch 12/200
+[ Info: Epoch 13/200
+[ Info: Epoch 14/200
+[ Info: Epoch 15/200
+[ Info: Epoch 16/200
+[ Info: Epoch 17/200
+[ Info: Epoch 18/200
+[ Info: Epoch 19/200
+[ Info: Epoch 20/200
+[ Info: Epoch 21/200
+[ Info: Epoch 22/200
+[ Info: Epoch 23/200
+[ Info: Epoch 24/200
+[ Info: Epoch 25/200
+[ Info: Epoch 26/200
+[ Info: Epoch 27/200
+[ Info: Epoch 28/200
+[ Info: Epoch 29/200
+[ Info: Epoch 30/200
+[ Info: Epoch 31/200
+[ Info: Epoch 32/200
+[ Info: Epoch 33/200
+[ Info: Epoch 34/200
+[ Info: Epoch 35/200
+[ Info: Epoch 36/200
+[ Info: Epoch 37/200
+[ Info: Epoch 38/200
+[ Info: Epoch 39/200
+[ Info: Epoch 40/200
+[ Info: Epoch 41/200
+[ Info: Epoch 42/200
+[ Info: Epoch 43/200
+[ Info: Epoch 44/200
+[ Info: Epoch 45/200
+[ Info: Epoch 46/200
+[ Info: Epoch 47/200
+[ Info: Epoch 48/200
+[ Info: Epoch 49/200
+[ Info: Epoch 50/200
+[ Info: Epoch 51/200
+[ Info: Epoch 52/200
+[ Info: Epoch 53/200
+[ Info: Epoch 54/200
+[ Info: Epoch 55/200
+[ Info: Epoch 56/200
+[ Info: Epoch 57/200
+[ Info: Epoch 58/200
+[ Info: Epoch 59/200
+[ Info: Epoch 60/200
+[ Info: Epoch 61/200
+[ Info: Epoch 62/200
+[ Info: Epoch 63/200
+[ Info: Epoch 64/200
+[ Info: Epoch 65/200
+[ Info: Epoch 66/200
+[ Info: Epoch 67/200
+[ Info: Epoch 68/200
+[ Info: Epoch 69/200
+[ Info: Epoch 70/200
+[ Info: Epoch 71/200
+[ Info: Epoch 72/200
+[ Info: Epoch 73/200
+[ Info: Epoch 74/200
+[ Info: Epoch 75/200
+[ Info: Epoch 76/200
+[ Info: Epoch 77/200
+[ Info: Epoch 78/200
+[ Info: Epoch 79/200
+[ Info: Epoch 80/200
+[ Info: Epoch 81/200
+[ Info: Epoch 82/200
+[ Info: Epoch 83/200
+[ Info: Epoch 84/200
+[ Info: Epoch 85/200
+[ Info: Epoch 86/200
+[ Info: Epoch 87/200
+[ Info: Epoch 88/200
+[ Info: Epoch 89/200
+[ Info: Epoch 90/200
+[ Info: Epoch 91/200
+[ Info: Epoch 92/200
+[ Info: Epoch 93/200
+[ Info: Epoch 94/200
+[ Info: Epoch 95/200
+[ Info: Epoch 96/200
+[ Info: Epoch 97/200
+[ Info: Epoch 98/200
+[ Info: Epoch 99/200
+[ Info: Epoch 100/200
+[ Info: Epoch 101/200
+[ Info: Epoch 102/200
+[ Info: Epoch 103/200
+[ Info: Epoch 104/200
+[ Info: Epoch 105/200
+[ Info: Epoch 106/200
+[ Info: Epoch 107/200
+[ Info: Epoch 108/200
+[ Info: Epoch 109/200
+[ Info: Epoch 110/200
+[ Info: Epoch 111/200
+[ Info: Epoch 112/200
+[ Info: Epoch 113/200
+[ Info: Epoch 114/200
+[ Info: Epoch 115/200
+[ Info: Epoch 116/200
+[ Info: Epoch 117/200
+[ Info: Epoch 118/200
+[ Info: Epoch 119/200
+[ Info: Epoch 120/200
+[ Info: Epoch 121/200
+[ Info: Epoch 122/200
+[ Info: Epoch 123/200
+[ Info: Epoch 124/200
+[ Info: Epoch 125/200
+[ Info: Epoch 126/200
+[ Info: Epoch 127/200
+[ Info: Epoch 128/200
+[ Info: Epoch 129/200
+[ Info: Epoch 130/200
+[ Info: Epoch 131/200
+[ Info: Epoch 132/200
+[ Info: Epoch 133/200
+[ Info: Epoch 134/200
+[ Info: Epoch 135/200
+[ Info: Epoch 136/200
+[ Info: Epoch 137/200
+[ Info: Epoch 138/200
+[ Info: Epoch 139/200
+[ Info: Epoch 140/200
+[ Info: Epoch 141/200
+[ Info: Epoch 142/200
+[ Info: Epoch 143/200
+[ Info: Epoch 144/200
+[ Info: Epoch 145/200
+[ Info: Epoch 146/200
+[ Info: Epoch 147/200
+[ Info: Epoch 148/200
+[ Info: Epoch 149/200
+[ Info: Epoch 150/200
+[ Info: Epoch 151/200
+[ Info: Epoch 152/200
+[ Info: Epoch 153/200
+[ Info: Epoch 154/200
+[ Info: Epoch 155/200
+[ Info: Epoch 156/200
+[ Info: Epoch 157/200
+[ Info: Epoch 158/200
+[ Info: Epoch 159/200
+[ Info: Epoch 160/200
+[ Info: Epoch 161/200
+[ Info: Epoch 162/200
+[ Info: Epoch 163/200
+[ Info: Epoch 164/200
+[ Info: Epoch 165/200
+[ Info: Epoch 166/200
+[ Info: Epoch 167/200
+[ Info: Epoch 168/200
+[ Info: Epoch 169/200
+[ Info: Epoch 170/200
+[ Info: Epoch 171/200
+[ Info: Epoch 172/200
+[ Info: Epoch 173/200
+[ Info: Epoch 174/200
+[ Info: Epoch 175/200
+[ Info: Epoch 176/200
+[ Info: Epoch 177/200
+[ Info: Epoch 178/200
+[ Info: Epoch 179/200
+[ Info: Epoch 180/200
+[ Info: Epoch 181/200
+[ Info: Epoch 182/200
+[ Info: Epoch 183/200
+[ Info: Epoch 184/200
+[ Info: Epoch 185/200
+[ Info: Epoch 186/200
+[ Info: Epoch 187/200
+[ Info: Epoch 188/200
+[ Info: Epoch 189/200
+[ Info: Epoch 190/200
+[ Info: Epoch 191/200
+[ Info: Epoch 192/200
+[ Info: Epoch 193/200
+[ Info: Epoch 194/200
+[ Info: Epoch 195/200
+[ Info: Epoch 196/200
+[ Info: Epoch 197/200
+[ Info: Epoch 198/200
+[ Info: Epoch 199/200
+[ Info: Epoch 200/200
+[ Info: Model saved: data/Lux_models/Apr09-1651__E200_HW256x256_C4to2_nc6_nd2_z16_C8_lr0p0002_wd0p0009_bs16_NY_LL1_Tl0p0/checkpoint.jld2
+[ Info: Selected 2 snapshots with indices [3547, 1759] for reconstruction
+[ Info: Saved reconstruction plot to data/Lux_models/Apr09-1651__E200_HW256x256_C4to2_nc6_nd2_z16_C8_lr0p0002_wd0p0009_bs16_NY_LL1_Tl0p0/reconstruction.png
+[ Info: Saved loss plot to data/Lux_models/Apr09-1651__E200_HW256x256_C4to2_nc6_nd2_z16_C8_lr0p0002_wd0p0009_bs16_NY_LL1_Tl0p0/loss_evolution.png
+┌ Info: AE retraining complete
+│   elapsed_min = 2.4
+└   checkpoint = "data/Lux_models/Apr09-1651__E200_HW256x256_C4to2_nc6_nd2_z16_C8_lr0p0002_wd0p0009_bs16_NY_LL1_Tl0p0/checkpoint.jld2"
+[ Info: ── Step 4/4: Retraining Neural ODE ──
+[ Info: Encoding latent vectors from AE in memory (no disk I/O)
+[ Info: removed ghost cells; input data size (u): (256, 256, 2, 4402)
+┌ Info: Generated latent vectors
+│   size(z) = (16, 200)
+│   n_samples = 200
+└   time_range = (0.0f0, 39.803802f0)
+[ Info: Retraining NODE from checkpoint: data/NODE_models/Apr09-1651/node_params.jld2
+[ Info: NODE sucessfully loaded from data/NODE_models/Apr09-1651/node_params.jld2
+[ Info: NODE training on device: CPUDevice{Missing}()
+┌ Info: Starting optimization
+│   maxiters = 100
+│   optimiser = Optimisers.Adam
+└   η = 0.001
+┌ Info: Optimization finished
+│   total_time = 18.5
+└   final_loss = 4735.022461
+[ Info: Saving model and plots
+[ Info:   Saved NODE to data/NODE_models/Apr09-1654/node_params.jld2
+[ Info:   Saved trajectory plot to data/NODE_models/Apr09-1654/trajectories.png
+┌ Warning: plotting turned off in callback, no gif saved
+└ @ Thesis ~/Thesis/project/src/NODE/NODE_train.jl:164
+┌ Info: NODE retraining complete
+│   elapsed_min = 0.4
+└   node_path = "data/NODE_models/Apr09-1654/node_params.jld2"
+┌ Info: Pipeline complete
+└   total_min = 11.6

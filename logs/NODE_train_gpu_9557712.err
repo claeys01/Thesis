@@ -1,0 +1,92 @@
+┌ Info: CUDA loaded successfully
+│   device = CuDevice(0): NVIDIA A100 80GB PCIe
+└   capability = v"8.0.0"
+┌ Info: cuDNN loaded successfully
+└   version = v"8.90.7"
+[ Info: Starting HPC NODE training job
+[ Info:   SLURM_JOB_ID: 9557712
+[ Info:   SLURM_NTASKS: 1
+[ Info:   SLURM_CPUS_PER_TASK: 8
+[ Info:   Hostname: gpu011
+┌ Info: Instantiated latent NODE data
+│   size(z) = (16, 300)
+│   size(t) = (300,)
+│   tspan = (0.0f0, 16.543304f0)
+└   size(z0) = (16,)
+┌ Info: NODE initialized
+│   latent_dim = 16
+│   dense_mult = 2
+│   tspan = (0.0f0, 16.543304f0)
+│   solver = OrdinaryDiffEqTsit5.Tsit5{typeof(OrdinaryDiffEqCore.trivial_limiter!), typeof(OrdinaryDiffEqCore.trivial_limiter!), Static.False}
+│   reltol = 0.001
+│   abstol = 1.0e-5
+│   t = 300-element Vector{Float32}: …
+└   activation = tanhshrink (generic function with 6 methods)
+[ Info: NODE weights initialized
+[ Info: NODE training on device: CUDADevice{Nothing, Missing}(nothing)
+ERROR: LoadError: Scalar indexing is disallowed.
+Invocation of getindex resulted in scalar indexing of a GPU array.
+This is typically caused by calling an iterating implementation of a method.
+Such implementations *do not* execute on the GPU, but very slowly on the CPU,
+and therefore should be avoided.
+
+If you want to allow scalar iteration, use `allowscalar` or `@allowscalar`
+to enable scalar iteration globally or for the operations in question.
+Stacktrace:
+  [1] error(s::String)
+    @ Base ./error.jl:35
+  [2] errorscalar(op::String)
+    @ GPUArraysCore ~/.julia/packages/GPUArraysCore/aNaXo/src/GPUArraysCore.jl:151
+  [3] _assertscalar(op::String, behavior::GPUArraysCore.ScalarIndexing)
+    @ GPUArraysCore ~/.julia/packages/GPUArraysCore/aNaXo/src/GPUArraysCore.jl:124
+  [4] assertscalar(op::String)
+    @ GPUArraysCore ~/.julia/packages/GPUArraysCore/aNaXo/src/GPUArraysCore.jl:112
+  [5] getindex
+    @ ~/.julia/packages/GPUArrays/lOLhM/src/host/indexing.jl:50 [inlined]
+  [6] iterate
+    @ ./abstractarray.jl:1209 [inlined]
+  [7] iterate
+    @ ./abstractarray.jl:1207 [inlined]
+  [8] _append!(a::Vector{Float32}, ::Base.HasShape{2}, iter::CUDA.CuArray{Float32, 2, CUDA.DeviceMemory})
+    @ Base ./array.jl:1337
+  [9] append!
+    @ ./array.jl:1329 [inlined]
+ [10] make_idx(data::Vector{Float32}, x::CUDA.CuArray{Float32, 2, CUDA.DeviceMemory}, last_val::Int64)
+    @ ComponentArrays ~/.julia/packages/ComponentArrays/IAdmd/src/componentarray.jl:253
+ [11] #28
+    @ ~/.julia/packages/ComponentArrays/IAdmd/src/componentarray.jl:221 [inlined]
+ [12] (::ComponentArrays.var"#28#29"{Vector{Float32}, Base.RefValue{Int64}})(::Pair{Symbol, CUDA.CuArray{Float32, N, CUDA.DeviceMemory} where N})
+    @ ComponentArrays ./none:0
+ [13] iterate
+    @ ./generator.jl:48 [inlined]
+ [14] merge(a::@NamedTuple{}, itr::Base.Generator{@Kwargs{weight::CUDA.CuArray{Float32, 2, CUDA.DeviceMemory}, bias::CUDA.CuArray{Float32, 1, CUDA.DeviceMemory}}, ComponentArrays.var"#28#29"{Vector{Float32}, Base.RefValue{Int64}}})
+    @ Base ./namedtuple.jl:371
+ [15] make_idx(data::Vector{Float32}, nt::@NamedTuple{weight::CUDA.CuArray{Float32, 2, CUDA.DeviceMemory}, bias::CUDA.CuArray{Float32, 1, CUDA.DeviceMemory}}, last_val::Int64)
+    @ ComponentArrays ~/.julia/packages/ComponentArrays/IAdmd/src/componentarray.jl:218
+ [16] #28
+    @ ~/.julia/packages/ComponentArrays/IAdmd/src/componentarray.jl:221 [inlined]
+ [17] (::ComponentArrays.var"#28#29"{Vector{Float32}, Base.RefValue{Int64}})(::Pair{Symbol, @NamedTuple{weight::CUDA.CuArray{Float32, 2, CUDA.DeviceMemory}, bias::CUDA.CuArray{Float32, 1, CUDA.DeviceMemory}}})
+    @ ComponentArrays ./none:0
+ [18] iterate
+    @ ./generator.jl:48 [inlined]
+ [19] merge(a::@NamedTuple{}, itr::Base.Generator{@Kwargs{layer_1::@NamedTuple{weight::CUDA.CuArray{Float32, 2, CUDA.DeviceMemory}, bias::CUDA.CuArray{Float32, 1, CUDA.DeviceMemory}}, layer_2::@NamedTuple{weight::CUDA.CuArray{Float32, 2, CUDA.DeviceMemory}, bias::CUDA.CuArray{Float32, 1, CUDA.DeviceMemory}}}, ComponentArrays.var"#28#29"{Vector{Float32}, Base.RefValue{Int64}}})
+    @ Base ./namedtuple.jl:371
+ [20] make_idx(data::Vector{Float32}, nt::@NamedTuple{layer_1::@NamedTuple{weight::CUDA.CuArray{Float32, 2, CUDA.DeviceMemory}, bias::CUDA.CuArray{Float32, 1, CUDA.DeviceMemory}}, layer_2::@NamedTuple{weight::CUDA.CuArray{Float32, 2, CUDA.DeviceMemory}, bias::CUDA.CuArray{Float32, 1, CUDA.DeviceMemory}}}, last_val::Int64)
+    @ ComponentArrays ~/.julia/packages/ComponentArrays/IAdmd/src/componentarray.jl:218
+ [21] make_carray_args(A::Type{Vector}, nt::@NamedTuple{layer_1::@NamedTuple{weight::CUDA.CuArray{Float32, 2, CUDA.DeviceMemory}, bias::CUDA.CuArray{Float32, 1, CUDA.DeviceMemory}}, layer_2::@NamedTuple{weight::CUDA.CuArray{Float32, 2, CUDA.DeviceMemory}, bias::CUDA.CuArray{Float32, 1, CUDA.DeviceMemory}}})
+    @ ComponentArrays ~/.julia/packages/ComponentArrays/IAdmd/src/componentarray.jl:210
+ [22] make_carray_args(nt::@NamedTuple{layer_1::@NamedTuple{weight::CUDA.CuArray{Float32, 2, CUDA.DeviceMemory}, bias::CUDA.CuArray{Float32, 1, CUDA.DeviceMemory}}, layer_2::@NamedTuple{weight::CUDA.CuArray{Float32, 2, CUDA.DeviceMemory}, bias::CUDA.CuArray{Float32, 1, CUDA.DeviceMemory}}})
+    @ ComponentArrays ~/.julia/packages/ComponentArrays/IAdmd/src/componentarray.jl:203
+ [23] ComponentArrays.ComponentArray(nt::@NamedTuple{layer_1::@NamedTuple{weight::CUDA.CuArray{Float32, 2, CUDA.DeviceMemory}, bias::CUDA.CuArray{Float32, 1, CUDA.DeviceMemory}}, layer_2::@NamedTuple{weight::CUDA.CuArray{Float32, 2, CUDA.DeviceMemory}, bias::CUDA.CuArray{Float32, 1, CUDA.DeviceMemory}}})
+    @ ComponentArrays ~/.julia/packages/ComponentArrays/IAdmd/src/componentarray.jl:97
+ [24] train_NODE(args::NodeArgs; kws::@Kwargs{})
+    @ Thesis ~/Thesis/project/src/NODE/NODE_train.jl:28
+ [25] train_NODE
+    @ ~/Thesis/project/src/NODE/NODE_train.jl:5 [inlined]
+ [26] main()
+    @ Main ~/Thesis/project/scripts/NODE/hpc_node_train.jl:33
+ [27] top-level scope
+    @ ~/Thesis/project/scripts/NODE/hpc_node_train.jl:44
+in expression starting at /home/mfbclaeys/Thesis/project/scripts/NODE/hpc_node_train.jl:44
+srun: error: gpu011: task 0: Exited with exit code 1
+srun: launch/slurm: _step_signal: Terminating StepId=9557712.0

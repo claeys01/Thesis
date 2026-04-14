@@ -1,0 +1,10 @@
+ERROR: SystemError: opening file "/home/mfbclaeys/Thesis/project/scripts/NODE/hpc_AENODE_train.jl": No such file or directory
+srun: error: gpu012: task 0: Exited with exit code 1
+srun: launch/slurm: _step_signal: Terminating StepId=9563121.0
+Stacktrace:
+ [1] include(mod::Module, _path::String)
+   @ Base ./Base.jl:562
+ [2] exec_options(opts::Base.JLOptions)
+   @ Base ./client.jl:323
+ [3] _start()
+   @ Base ./client.jl:531
