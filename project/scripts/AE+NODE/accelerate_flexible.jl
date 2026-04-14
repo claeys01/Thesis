@@ -27,7 +27,7 @@ t_train = simdata.time[train_idx]
 t_test = simdata.time[test_idx]
 simdata = nothing; GC.gc()
 
-t_end = 50
+t_end = 100
 n_switch = 150
 pred_Δt = 0.35f0
 save_interval = 0.5

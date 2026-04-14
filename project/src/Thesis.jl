@@ -201,7 +201,7 @@ export compute_normalizer
 # ═══════════════════════════════════════════════════════════════════════════════
 # Exports - Simulation Functions
 # ═══════════════════════════════════════════════════════════════════════════════
-export circle_shedding_biot
+export circle_shedding_biot, run_sim
 export sim_time
 export impose_biot_bc_on_snapshot
 export flood

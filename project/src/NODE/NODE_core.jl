@@ -266,13 +266,13 @@ function get_latent_vectors(ae::AE, ps, st, normalizer, ae_args::LuxArgs; downsa
     
     x_in = device(x_in)
     z, _ = ae.encoder(x_in, device(ps.encoder), device(LuxCore.testmode(st.encoder)))
-    
+    x_in = nothing; GC.gc()
     # Always return CPU arrays for NODE training
     z = Array(cpu_device()(z))
     t = simdata.time[train_idx]
     tspan = (t[1], t[end])
     z0 = z[:, 1]
-    
+    simdata = nothing; GC.gc()
     @info "Generated latent vectors" size(z) n_samples=length(train_idx) time_range=tspan
     return z, t, tspan, z0
 end

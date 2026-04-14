@@ -12,7 +12,7 @@ function train_AE(args::LuxArgs; return_path=false)
 
     filepath = joinpath(save_folder, "checkpoint.jld2")
     loss_trajectory_path = joinpath(save_folder, "loss_trajectory.jld2")
-    trainig_force_path = joinpath(save_folder, "trainin_force.png")
+    trainig_force_path = joinpath(save_folder, "training_force.png")
     # load data and normalizer
     data, loaders, normalizer = @timeit to "get_data" get_data(
             args.batch_size,
@@ -21,7 +21,8 @@ function train_AE(args::LuxArgs; return_path=false)
             n_test = args.test_downsample,
             split = args.split,
             t_training = args.t_training,
-            plotpath = trainig_force_path
+            plotpath = trainig_force_path,
+            simdata_ram=args.simdata_ram
         )
 
     TrainData, ValData, TestData = data
@@ -195,7 +196,9 @@ function train_AE(args::LuxArgs; return_path=false)
         Array(normalizer.σ),
         normalizer.method
     )
-        args = struct2dict(args)
+        args_to_save = deepcopy(args)
+        args_to_save.simdata_ram = nothing
+        args = struct2dict(args_to_save)
         JLD2.save(filepath,
             "ps", ps_cpu,
             "st", st_cpu,
