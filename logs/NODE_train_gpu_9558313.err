@@ -1,0 +1,127 @@
+Precompiling Thesis...
+  55462.0 ms  ✓ Thesis
+  1 dependency successfully precompiled in 196 seconds. 713 already precompiled.
+┌ Info: CUDA loaded successfully
+│   device = CuDevice(0): NVIDIA A100 80GB PCIe
+└   capability = v"8.0.0"
+┌ Info: cuDNN loaded successfully
+└   version = v"8.90.7"
+[ Info: Starting HPC NODE training job
+[ Info:   SLURM_JOB_ID: 9558313
+[ Info:   SLURM_NTASKS: 1
+[ Info:   SLURM_CPUS_PER_TASK: 8
+[ Info:   Hostname: gpu012
+┌ Info: Instantiated latent NODE data
+│   size(z) = (16, 300)
+│   size(t) = (300,)
+│   tspan = (0.0f0, 16.543304f0)
+└   size(z0) = (16,)
+┌ Info: NODE initialized
+│   latent_dim = 16
+│   dense_mult = 2
+│   tspan = (0.0f0, 16.543304f0)
+│   solver = OrdinaryDiffEqTsit5.Tsit5{typeof(OrdinaryDiffEqCore.trivial_limiter!), typeof(OrdinaryDiffEqCore.trivial_limiter!), Static.False}
+│   reltol = 0.001
+│   abstol = 1.0e-5
+│   t = 300-element Vector{Float32}: …
+└   activation = tanhshrink (generic function with 6 methods)
+[ Info: NODE weights initialized
+[ Info: NODE training on device: CUDADevice{Nothing, Missing}(nothing)
+┌ Info: Starting optimization
+│   maxiters = 250
+│   optimiser = Optimisers.Adam
+└   η = 0.01
+┌ Info: Optimization finished
+│   total_time = 500.8
+└   final_loss = 237.080505
+[ Info: Saving model and plots
+[ Info:   Saved NODE to data/NODE_models/Apr08-1423/node_params.jld2
+ERROR: LoadError: ArgumentError: Objects are on devices with different types: CPUDevice and CUDADevice.
+Stacktrace:
+  [1] combine_devices(T1::Type{CPUDevice}, T2::Type{CUDADevice})
+    @ MLDataDevices.Internal ~/.julia/packages/MLDataDevices/Zv4TL/src/internal.jl:146
+  [2] macro expansion
+    @ ~/.julia/packages/MLDataDevices/Zv4TL/src/internal.jl:265 [inlined]
+  [3] unrolled_mapreduce
+    @ ~/.julia/packages/MLDataDevices/Zv4TL/src/internal.jl:252 [inlined]
+  [4] unrolled_mapreduce(f::typeof(get_device_type), op::typeof(MLDataDevices.Internal.combine_devices), itr::Tuple{Base.ReshapedArray{Float32, 2, SubArray{Float32, 1, Vector{Float32}, Tuple{UnitRange{Int64}}, true}, Tuple{}}, CUDA.CuArray{Float32, 2, CUDA.DeviceMemory}, SubArray{Float32, 1, Vector{Float32}, Tuple{UnitRange{Int64}}, true}})
+    @ MLDataDevices.Internal ~/.julia/packages/MLDataDevices/Zv4TL/src/internal.jl:243
+  [5] get_device_type(x::Tuple{Base.ReshapedArray{Float32, 2, SubArray{Float32, 1, Vector{Float32}, Tuple{UnitRange{Int64}}, true}, Tuple{}}, CUDA.CuArray{Float32, 2, CUDA.DeviceMemory}, SubArray{Float32, 1, Vector{Float32}, Tuple{UnitRange{Int64}}, true}})
+    @ MLDataDevices.Internal ~/.julia/packages/MLDataDevices/Zv4TL/src/internal.jl:217
+  [6] get_device_type(x::Tuple{Base.ReshapedArray{Float32, 2, SubArray{Float32, 1, Vector{Float32}, Tuple{UnitRange{Int64}}, true}, Tuple{}}, CUDA.CuArray{Float32, 2, CUDA.DeviceMemory}, SubArray{Float32, 1, Vector{Float32}, Tuple{UnitRange{Int64}}, true}})
+    @ MLDataDevices ~/.julia/packages/MLDataDevices/Zv4TL/src/public.jl:520
+  [7] internal_operation_mode(xs::Tuple{Base.ReshapedArray{Float32, 2, SubArray{Float32, 1, Vector{Float32}, Tuple{UnitRange{Int64}}, true}, Tuple{}}, CUDA.CuArray{Float32, 2, CUDA.DeviceMemory}, SubArray{Float32, 1, Vector{Float32}, Tuple{UnitRange{Int64}}, true}})
+    @ LuxLib ~/.julia/packages/LuxLib/26qlD/src/traits.jl:193
+  [8] select_fastest_activation(::typeof(tanhshrink), ::Base.ReshapedArray{Float32, 2, SubArray{Float32, 1, Vector{Float32}, Tuple{UnitRange{Int64}}, true}, Tuple{}}, ::CUDA.CuArray{Float32, 2, CUDA.DeviceMemory}, ::SubArray{Float32, 1, Vector{Float32}, Tuple{UnitRange{Int64}}, true})
+    @ LuxLib.Impl ~/.julia/packages/LuxLib/26qlD/src/impl/activation.jl:158
+  [9] fused_dense_bias_activation(σ::typeof(tanhshrink), weight::Base.ReshapedArray{Float32, 2, SubArray{Float32, 1, Vector{Float32}, Tuple{UnitRange{Int64}}, true}, Tuple{}}, x::CUDA.CuArray{Float32, 2, CUDA.DeviceMemory}, b::SubArray{Float32, 1, Vector{Float32}, Tuple{UnitRange{Int64}}, true})
+    @ LuxLib.API ~/.julia/packages/LuxLib/26qlD/src/api/dense.jl:36
+ [10] var"##d::Denseinternal#298"(d::Dense{typeof(tanhshrink), Int64, Int64, Nothing, Nothing, Static.True}, x::CUDA.CuArray{Float32, 1, CUDA.DeviceMemory}, ps::ComponentArrays.ComponentVector{Float32, SubArray{Float32, 1, Vector{Float32}, Tuple{UnitRange{Int64}}, true}, Tuple{ComponentArrays.Axis{(weight = ViewAxis(1:512, ShapedAxis((32, 16))), bias = ViewAxis(513:544, Shaped1DAxis((32,))))}}}, st::@NamedTuple{})
+    @ Lux ~/.julia/packages/Lux/Cf0S4/src/layers/basic.jl:369
+ [11] Dense
+    @ ~/.julia/packages/ReactantCore/SEqVX/src/ReactantCore.jl:286 [inlined]
+ [12] (::Dense{typeof(tanhshrink), Int64, Int64, Nothing, Nothing, Static.True})(x::CUDA.CuArray{Float32, 1, CUDA.DeviceMemory}, ps::ComponentArrays.ComponentVector{Float32, SubArray{Float32, 1, Vector{Float32}, Tuple{UnitRange{Int64}}, true}, Tuple{ComponentArrays.Axis{(weight = ViewAxis(1:512, ShapedAxis((32, 16))), bias = ViewAxis(513:544, Shaped1DAxis((32,))))}}}, st::@NamedTuple{})
+    @ Lux ./none:0
+ [13] apply
+    @ ~/.julia/packages/LuxCore/kQC9S/src/LuxCore.jl:155 [inlined]
+ [14] macro expansion
+    @ ~/.julia/packages/Lux/Cf0S4/src/layers/containers.jl:0 [inlined]
+ [15] applychain(layers::@NamedTuple{layer_1::Dense{typeof(tanhshrink), Int64, Int64, Nothing, Nothing, Static.True}, layer_2::Dense{typeof(identity), Int64, Int64, Nothing, Nothing, Static.True}}, x::CUDA.CuArray{Float32, 1, CUDA.DeviceMemory}, ps::ComponentArrays.ComponentVector{Float32, Vector{Float32}, Tuple{ComponentArrays.Axis{(layer_1 = ViewAxis(1:544, Axis(weight = ViewAxis(1:512, ShapedAxis((32, 16))), bias = ViewAxis(513:544, Shaped1DAxis((32,))))), layer_2 = ViewAxis(545:1072, Axis(weight = ViewAxis(1:512, ShapedAxis((16, 32))), bias = ViewAxis(513:528, Shaped1DAxis((16,))))))}}}, st::@NamedTuple{layer_1::@NamedTuple{}, layer_2::@NamedTuple{}})
+    @ Lux ~/.julia/packages/Lux/Cf0S4/src/layers/containers.jl:577
+ [16] (::Chain{@NamedTuple{layer_1::Dense{typeof(tanhshrink), Int64, Int64, Nothing, Nothing, Static.True}, layer_2::Dense{typeof(identity), Int64, Int64, Nothing, Nothing, Static.True}}, Nothing})(x::CUDA.CuArray{Float32, 1, CUDA.DeviceMemory}, ps::ComponentArrays.ComponentVector{Float32, Vector{Float32}, Tuple{ComponentArrays.Axis{(layer_1 = ViewAxis(1:544, Axis(weight = ViewAxis(1:512, ShapedAxis((32, 16))), bias = ViewAxis(513:544, Shaped1DAxis((32,))))), layer_2 = ViewAxis(545:1072, Axis(weight = ViewAxis(1:512, ShapedAxis((16, 32))), bias = ViewAxis(513:528, Shaped1DAxis((16,))))))}}}, st::@NamedTuple{layer_1::@NamedTuple{}, layer_2::@NamedTuple{}})
+    @ Lux ~/.julia/packages/Lux/Cf0S4/src/layers/containers.jl:575
+ [17] (::Thesis.var"#dudt#117"{NODE})(u::CUDA.CuArray{Float32, 1, CUDA.DeviceMemory}, p::ComponentArrays.ComponentVector{Float32, Vector{Float32}, Tuple{ComponentArrays.Axis{(layer_1 = ViewAxis(1:544, Axis(weight = ViewAxis(1:512, ShapedAxis((32, 16))), bias = ViewAxis(513:544, Shaped1DAxis((32,))))), layer_2 = ViewAxis(545:1072, Axis(weight = ViewAxis(1:512, ShapedAxis((16, 32))), bias = ViewAxis(513:528, Shaped1DAxis((16,))))))}}}, t::Float32)
+    @ Thesis ~/Thesis/project/src/NODE/NODE_core.jl:114
+ [18] ODEFunction
+    @ ~/.julia/packages/SciMLBase/c9FfR/src/scimlfunctions.jl:2651 [inlined]
+ [19] initialize!(integrator::OrdinaryDiffEqCore.ODEIntegrator{OrdinaryDiffEqTsit5.Tsit5{typeof(OrdinaryDiffEqCore.trivial_limiter!), typeof(OrdinaryDiffEqCore.trivial_limiter!), Static.False}, false, CUDA.CuArray{Float32, 1, CUDA.DeviceMemory}, Nothing, Float32, ComponentArrays.ComponentVector{Float32, Vector{Float32}, Tuple{ComponentArrays.Axis{(layer_1 = ViewAxis(1:544, Axis(weight = ViewAxis(1:512, ShapedAxis((32, 16))), bias = ViewAxis(513:544, Shaped1DAxis((32,))))), layer_2 = ViewAxis(545:1072, Axis(weight = ViewAxis(1:512, ShapedAxis((16, 32))), bias = ViewAxis(513:528, Shaped1DAxis((16,))))))}}}, Float32, Float32, Float32, Float32, Vector{CUDA.CuArray{Float32, 1, CUDA.DeviceMemory}}, SciMLBase.ODESolution{Float32, 2, Vector{CUDA.CuArray{Float32, 1, CUDA.DeviceMemory}}, Nothing, Nothing, Vector{Float32}, Vector{Vector{CUDA.CuArray{Float32, 1, CUDA.DeviceMemory}}}, Nothing, SciMLBase.ODEProblem{CUDA.CuArray{Float32, 1, CUDA.DeviceMemory}, Tuple{Float32, Float32}, false, ComponentArrays.ComponentVector{Float32, Vector{Float32}, Tuple{ComponentArrays.Axis{(layer_1 = ViewAxis(1:544, Axis(weight = ViewAxis(1:512, ShapedAxis((32, 16))), bias = ViewAxis(513:544, Shaped1DAxis((32,))))), layer_2 = ViewAxis(545:1072, Axis(weight = ViewAxis(1:512, ShapedAxis((16, 32))), bias = ViewAxis(513:528, Shaped1DAxis((16,))))))}}}, SciMLBase.ODEFunction{false, SciMLBase.AutoSpecialize, Thesis.var"#dudt#117"{NODE}, LinearAlgebra.UniformScaling{Bool}, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, typeof(SciMLBase.DEFAULT_OBSERVED), Nothing, Nothing, Nothing, Nothing}, @Kwargs{}, SciMLBase.StandardODEProblem}, OrdinaryDiffEqTsit5.Tsit5{typeof(OrdinaryDiffEqCore.trivial_limiter!), typeof(OrdinaryDiffEqCore.trivial_limiter!), Static.False}, OrdinaryDiffEqCore.InterpolationData{SciMLBase.ODEFunction{false, SciMLBase.AutoSpecialize, Thesis.var"#dudt#117"{NODE}, LinearAlgebra.UniformScaling{Bool}, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, typeof(SciMLBase.DEFAULT_OBSERVED), Nothing, Nothing, Nothing, Nothing}, Vector{CUDA.CuArray{Float32, 1, CUDA.DeviceMemory}}, Vector{Float32}, Vector{Vector{CUDA.CuArray{Float32, 1, CUDA.DeviceMemory}}}, Nothing, OrdinaryDiffEqTsit5.Tsit5ConstantCache, Nothing}, SciMLBase.DEStats, Nothing, Nothing, Nothing, Nothing}, SciMLBase.ODEFunction{false, SciMLBase.AutoSpecialize, Thesis.var"#dudt#117"{NODE}, LinearAlgebra.UniformScaling{Bool}, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, typeof(SciMLBase.DEFAULT_OBSERVED), Nothing, Nothing, Nothing, Nothing}, OrdinaryDiffEqTsit5.Tsit5ConstantCache, OrdinaryDiffEqCore.DEOptions{Float32, Float32, Float32, Float32, OrdinaryDiffEqCore.PIController{Rational{Int64}}, typeof(DiffEqBase.ODE_DEFAULT_NORM), typeof(LinearAlgebra.opnorm), Nothing, SciMLBase.CallbackSet{Tuple{}, Tuple{}}, typeof(DiffEqBase.ODE_DEFAULT_ISOUTOFDOMAIN), typeof(DiffEqBase.ODE_DEFAULT_PROG_MESSAGE), typeof(DiffEqBase.ODE_DEFAULT_UNSTABLE_CHECK), DataStructures.BinaryHeap{Float32, DataStructures.FasterForward}, DataStructures.BinaryHeap{Float32, DataStructures.FasterForward}, Nothing, Nothing, Int64, Tuple{}, Vector{Float32}, Tuple{}, OrdinaryDiffEqCore.DEVerbosity{SciMLLogging.Minimal, SciMLLogging.Minimal, SciMLLogging.WarnLevel, SciMLLogging.WarnLevel, SciMLLogging.WarnLevel, SciMLLogging.WarnLevel, SciMLLogging.WarnLevel, SciMLLogging.WarnLevel, SciMLLogging.Silent, SciMLLogging.Silent, SciMLLogging.Silent, SciMLLogging.Silent, SciMLLogging.Silent, SciMLLogging.Silent, SciMLLogging.WarnLevel, SciMLLogging.Silent, SciMLLogging.Silent, SciMLLogging.Silent, SciMLLogging.WarnLevel, SciMLLogging.Silent, SciMLLogging.WarnLevel, SciMLLogging.Silent, SciMLLogging.Silent, SciMLLogging.Silent, SciMLLogging.Silent, SciMLLogging.Silent, SciMLLogging.Silent, SciMLLogging.Silent, SciMLLogging.Silent, SciMLLogging.Silent, SciMLLogging.Silent, SciMLLogging.Silent}}, CUDA.CuArray{Float32, 1, CUDA.DeviceMemory}, Float32, Nothing, DiffEqBase.DefaultInit, Nothing}, cache::OrdinaryDiffEqTsit5.Tsit5ConstantCache)
+    @ OrdinaryDiffEqTsit5 ~/.julia/packages/OrdinaryDiffEqTsit5/7fE34/src/tsit_perform_step.jl:128
+ [20] __init(prob::SciMLBase.ODEProblem{CUDA.CuArray{Float32, 1, CUDA.DeviceMemory}, Tuple{Float32, Float32}, false, ComponentArrays.ComponentVector{Float32, Vector{Float32}, Tuple{ComponentArrays.Axis{(layer_1 = ViewAxis(1:544, Axis(weight = ViewAxis(1:512, ShapedAxis((32, 16))), bias = ViewAxis(513:544, Shaped1DAxis((32,))))), layer_2 = ViewAxis(545:1072, Axis(weight = ViewAxis(1:512, ShapedAxis((16, 32))), bias = ViewAxis(513:528, Shaped1DAxis((16,))))))}}}, SciMLBase.ODEFunction{false, SciMLBase.AutoSpecialize, Thesis.var"#dudt#117"{NODE}, LinearAlgebra.UniformScaling{Bool}, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, typeof(SciMLBase.DEFAULT_OBSERVED), Nothing, Nothing, Nothing, Nothing}, @Kwargs{}, SciMLBase.StandardODEProblem}, alg::OrdinaryDiffEqTsit5.Tsit5{typeof(OrdinaryDiffEqCore.trivial_limiter!), typeof(OrdinaryDiffEqCore.trivial_limiter!), Static.False}, timeseries_init::Tuple{}, ts_init::Tuple{}, ks_init::Tuple{}; saveat::Vector{Float32}, tstops::Tuple{}, d_discontinuities::Tuple{}, save_idxs::Nothing, save_everystep::Bool, save_on::Bool, save_discretes::Bool, save_start::Bool, save_end::Nothing, callback::Nothing, dense::Bool, calck::Bool, dt::Float32, dtmin::Float32, dtmax::Float32, force_dtmin::Bool, adaptive::Bool, gamma::Rational{Int64}, abstol::Nothing, reltol::Nothing, qmin::Rational{Int64}, qmax::Int64, qsteady_min::Int64, qsteady_max::Int64, beta1::Nothing, beta2::Nothing, qoldinit::Rational{Int64}, controller::Nothing, fullnormalize::Bool, failfactor::Int64, maxiters::Int64, internalnorm::typeof(DiffEqBase.ODE_DEFAULT_NORM), internalopnorm::typeof(LinearAlgebra.opnorm), isoutofdomain::typeof(DiffEqBase.ODE_DEFAULT_ISOUTOFDOMAIN), unstable_check::typeof(DiffEqBase.ODE_DEFAULT_UNSTABLE_CHECK), verbose::SciMLLogging.Standard, timeseries_errors::Bool, dense_errors::Bool, advance_to_tstop::Bool, stop_at_next_tstop::Bool, initialize_save::Bool, progress::Bool, progress_steps::Int64, progress_name::String, progress_message::typeof(DiffEqBase.ODE_DEFAULT_PROG_MESSAGE), progress_id::Symbol, userdata::Nothing, allow_extrapolation::Bool, initialize_integrator::Bool, alias::SciMLBase.ODEAliasSpecifier, initializealg::DiffEqBase.DefaultInit, kwargs::@Kwargs{})
+    @ OrdinaryDiffEqCore ~/.julia/packages/OrdinaryDiffEqCore/woaRt/src/solve.jl:649
+ [21] __init (repeats 2 times)
+    @ ~/.julia/packages/OrdinaryDiffEqCore/woaRt/src/solve.jl:14 [inlined]
+ [22] #__solve#61
+    @ ~/.julia/packages/OrdinaryDiffEqCore/woaRt/src/solve.jl:9 [inlined]
+ [23] __solve
+    @ ~/.julia/packages/OrdinaryDiffEqCore/woaRt/src/solve.jl:1 [inlined]
+ [24] solve_call(_prob::SciMLBase.ODEProblem{CUDA.CuArray{Float32, 1, CUDA.DeviceMemory}, Tuple{Float32, Float32}, false, ComponentArrays.ComponentVector{Float32, Vector{Float32}, Tuple{ComponentArrays.Axis{(layer_1 = ViewAxis(1:544, Axis(weight = ViewAxis(1:512, ShapedAxis((32, 16))), bias = ViewAxis(513:544, Shaped1DAxis((32,))))), layer_2 = ViewAxis(545:1072, Axis(weight = ViewAxis(1:512, ShapedAxis((16, 32))), bias = ViewAxis(513:528, Shaped1DAxis((16,))))))}}}, SciMLBase.ODEFunction{false, SciMLBase.AutoSpecialize, Thesis.var"#dudt#117"{NODE}, LinearAlgebra.UniformScaling{Bool}, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, typeof(SciMLBase.DEFAULT_OBSERVED), Nothing, Nothing, Nothing, Nothing}, @Kwargs{}, SciMLBase.StandardODEProblem}, args::OrdinaryDiffEqTsit5.Tsit5{typeof(OrdinaryDiffEqCore.trivial_limiter!), typeof(OrdinaryDiffEqCore.trivial_limiter!), Static.False}; merge_callbacks::Bool, kwargshandle::Nothing, kwargs::@Kwargs{saveat::Vector{Float32}})
+    @ DiffEqBase ~/.julia/packages/DiffEqBase/wx0FA/src/solve.jl:172
+ [25] solve_call
+    @ ~/.julia/packages/DiffEqBase/wx0FA/src/solve.jl:137 [inlined]
+ [26] #solve_up#38
+    @ ~/.julia/packages/DiffEqBase/wx0FA/src/solve.jl:630 [inlined]
+ [27] solve_up
+    @ ~/.julia/packages/DiffEqBase/wx0FA/src/solve.jl:603 [inlined]
+ [28] #solve#37
+    @ ~/.julia/packages/DiffEqBase/wx0FA/src/solve.jl:587 [inlined]
+ [29] solve
+    @ ~/.julia/packages/DiffEqBase/wx0FA/src/solve.jl:575 [inlined]
+ [30] (::DiffEqFlux.var"#51#54"{@Kwargs{}, ComponentArrays.ComponentVector{Float32, Vector{Float32}, Tuple{ComponentArrays.Axis{(layer_1 = ViewAxis(1:544, Axis(weight = ViewAxis(1:512, ShapedAxis((32, 16))), bias = ViewAxis(513:544, Shaped1DAxis((32,))))), layer_2 = ViewAxis(545:1072, Axis(weight = ViewAxis(1:512, ShapedAxis((16, 32))), bias = ViewAxis(513:528, Shaped1DAxis((16,))))))}}}, CUDA.CuArray{Float32, 2, CUDA.DeviceMemory}, Vector{Float32}, SciMLBase.ODEProblem{CUDA.CuArray{Float32, 1, CUDA.DeviceMemory}, Tuple{Float32, Float32}, false, ComponentArrays.ComponentVector{Float32, Vector{Float32}, Tuple{ComponentArrays.Axis{(layer_1 = ViewAxis(1:544, Axis(weight = ViewAxis(1:512, ShapedAxis((32, 16))), bias = ViewAxis(513:544, Shaped1DAxis((32,))))), layer_2 = ViewAxis(545:1072, Axis(weight = ViewAxis(1:512, ShapedAxis((16, 32))), bias = ViewAxis(513:528, Shaped1DAxis((16,))))))}}}, SciMLBase.ODEFunction{false, SciMLBase.AutoSpecialize, Thesis.var"#dudt#117"{NODE}, LinearAlgebra.UniformScaling{Bool}, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, typeof(SciMLBase.DEFAULT_OBSERVED), Nothing, Nothing, Nothing, Nothing}, @Kwargs{}, SciMLBase.StandardODEProblem}, OrdinaryDiffEqTsit5.Tsit5{typeof(OrdinaryDiffEqCore.trivial_limiter!), typeof(OrdinaryDiffEqCore.trivial_limiter!), Static.False}, Tuple{Colon}})(rg::UnitRange{Int64})
+    @ DiffEqFlux ./none:0
+ [31] iterate
+    @ ./generator.jl:48 [inlined]
+ [32] collect(itr::Base.Generator{Vector{UnitRange{Int64}}, DiffEqFlux.var"#51#54"{@Kwargs{}, ComponentArrays.ComponentVector{Float32, Vector{Float32}, Tuple{ComponentArrays.Axis{(layer_1 = ViewAxis(1:544, Axis(weight = ViewAxis(1:512, ShapedAxis((32, 16))), bias = ViewAxis(513:544, Shaped1DAxis((32,))))), layer_2 = ViewAxis(545:1072, Axis(weight = ViewAxis(1:512, ShapedAxis((16, 32))), bias = ViewAxis(513:528, Shaped1DAxis((16,))))))}}}, CUDA.CuArray{Float32, 2, CUDA.DeviceMemory}, Vector{Float32}, SciMLBase.ODEProblem{CUDA.CuArray{Float32, 1, CUDA.DeviceMemory}, Tuple{Float32, Float32}, false, ComponentArrays.ComponentVector{Float32, Vector{Float32}, Tuple{ComponentArrays.Axis{(layer_1 = ViewAxis(1:544, Axis(weight = ViewAxis(1:512, ShapedAxis((32, 16))), bias = ViewAxis(513:544, Shaped1DAxis((32,))))), layer_2 = ViewAxis(545:1072, Axis(weight = ViewAxis(1:512, ShapedAxis((16, 32))), bias = ViewAxis(513:528, Shaped1DAxis((16,))))))}}}, SciMLBase.ODEFunction{false, SciMLBase.AutoSpecialize, Thesis.var"#dudt#117"{NODE}, LinearAlgebra.UniformScaling{Bool}, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, typeof(SciMLBase.DEFAULT_OBSERVED), Nothing, Nothing, Nothing, Nothing}, @Kwargs{}, SciMLBase.StandardODEProblem}, OrdinaryDiffEqTsit5.Tsit5{typeof(OrdinaryDiffEqCore.trivial_limiter!), typeof(OrdinaryDiffEqCore.trivial_limiter!), Static.False}, Tuple{Colon}}})
+    @ Base ./array.jl:791
+ [33] multiple_shoot(p::ComponentArrays.ComponentVector{Float32, Vector{Float32}, Tuple{ComponentArrays.Axis{(layer_1 = ViewAxis(1:544, Axis(weight = ViewAxis(1:512, ShapedAxis((32, 16))), bias = ViewAxis(513:544, Shaped1DAxis((32,))))), layer_2 = ViewAxis(545:1072, Axis(weight = ViewAxis(1:512, ShapedAxis((16, 32))), bias = ViewAxis(513:528, Shaped1DAxis((16,))))))}}}, ode_data::CUDA.CuArray{Float32, 2, CUDA.DeviceMemory}, tsteps::Vector{Float32}, prob::SciMLBase.ODEProblem{CUDA.CuArray{Float32, 1, CUDA.DeviceMemory}, Tuple{Float32, Float32}, false, ComponentArrays.ComponentVector{Float32, Vector{Float32}, Tuple{ComponentArrays.Axis{(layer_1 = ViewAxis(1:544, Axis(weight = ViewAxis(1:512, ShapedAxis((32, 16))), bias = ViewAxis(513:544, Shaped1DAxis((32,))))), layer_2 = ViewAxis(545:1072, Axis(weight = ViewAxis(1:512, ShapedAxis((16, 32))), bias = ViewAxis(513:528, Shaped1DAxis((16,))))))}}}, SciMLBase.ODEFunction{false, SciMLBase.AutoSpecialize, Thesis.var"#dudt#117"{NODE}, LinearAlgebra.UniformScaling{Bool}, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, Nothing, typeof(SciMLBase.DEFAULT_OBSERVED), Nothing, Nothing, Nothing, Nothing}, @Kwargs{}, SciMLBase.StandardODEProblem}, loss_function::Thesis.var"#seg_loss#119", continuity_loss::typeof(DiffEqFlux._default_continuity_loss), solver::OrdinaryDiffEqTsit5.Tsit5{typeof(OrdinaryDiffEqCore.trivial_limiter!), typeof(OrdinaryDiffEqCore.trivial_limiter!), Static.False}, group_size::Int64; continuity_term::Int64, kwargs::@Kwargs{})
+    @ DiffEqFlux ~/.julia/packages/DiffEqFlux/UwHwI/src/multiple_shooting.jl:50
+ [34] multiple_shoot
+    @ ~/.julia/packages/DiffEqFlux/UwHwI/src/multiple_shooting.jl:36 [inlined]
+ [35] #multiple_shoot#56
+    @ ~/.julia/packages/DiffEqFlux/UwHwI/src/multiple_shooting.jl:81 [inlined]
+ [36] loss_multiple_shoot(node::NODE, z::CUDA.CuArray{Float32, 2, CUDA.DeviceMemory}, z0::CUDA.CuArray{Float32, 1, CUDA.DeviceMemory}; p::ComponentArrays.ComponentVector{Float32, Vector{Float32}, Tuple{ComponentArrays.Axis{(layer_1 = ViewAxis(1:544, Axis(weight = ViewAxis(1:512, ShapedAxis((32, 16))), bias = ViewAxis(513:544, Shaped1DAxis((32,))))), layer_2 = ViewAxis(545:1072, Axis(weight = ViewAxis(1:512, ShapedAxis((16, 32))), bias = ViewAxis(513:528, Shaped1DAxis((16,))))))}}}, t::Nothing, group_size::Int64, continuity_term::Int64)
+    @ Thesis ~/Thesis/project/src/NODE/NODE_core.jl:132
+ [37] node_loss(args::NodeArgs, node::NODE, z::CUDA.CuArray{Float32, 2, CUDA.DeviceMemory}, z0::CUDA.CuArray{Float32, 1, CUDA.DeviceMemory}; p::ComponentArrays.ComponentVector{Float32, Vector{Float32}, Tuple{ComponentArrays.Axis{(layer_1 = ViewAxis(1:544, Axis(weight = ViewAxis(1:512, ShapedAxis((32, 16))), bias = ViewAxis(513:544, Shaped1DAxis((32,))))), layer_2 = ViewAxis(545:1072, Axis(weight = ViewAxis(1:512, ShapedAxis((16, 32))), bias = ViewAxis(513:528, Shaped1DAxis((16,))))))}}}, t::Nothing)
+    @ Thesis ~/Thesis/project/src/NODE/NODE_core.jl:139
+ [38] loss_function
+    @ ~/Thesis/project/src/NODE/NODE_train.jl:32 [inlined]
+ [39] train_NODE(args::NodeArgs; kws::@Kwargs{})
+    @ Thesis ~/Thesis/project/src/NODE/NODE_train.jl:116
+ [40] train_NODE
+    @ ~/Thesis/project/src/NODE/NODE_train.jl:5 [inlined]
+ [41] main()
+    @ Main ~/Thesis/project/scripts/NODE/hpc_node_train.jl:33
+ [42] top-level scope
+    @ ~/Thesis/project/scripts/NODE/hpc_node_train.jl:44
+in expression starting at /home/mfbclaeys/Thesis/project/scripts/NODE/hpc_node_train.jl:44
+srun: error: gpu012: task 0: Exited with exit code 1
+srun: launch/slurm: _step_signal: Terminating StepId=9558313.0

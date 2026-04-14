@@ -1,0 +1,15 @@
+Precompiling Thesis...
+  53909.5 ms  ✓ Thesis
+  1 dependency successfully precompiled in 202 seconds. 713 already precompiled.
+┌ Info: CUDA loaded successfully
+│   device = CuDevice(0): NVIDIA A100 80GB PCIe
+└   capability = v"8.0.0"
+┌ Info: cuDNN loaded successfully
+└   version = v"8.90.7"
+ERROR: LoadError: syntax: keyword argument "use_gpu" repeated in call to "NodeArgs" around /home/mfbclaeys/Thesis/project/scripts/AE+NODE/hpc_AENODE_retrain.jl:118
+Stacktrace:
+ [1] top-level scope
+   @ ~/Thesis/project/scripts/AE+NODE/hpc_AENODE_retrain.jl:15
+in expression starting at /home/mfbclaeys/Thesis/project/scripts/AE+NODE/hpc_AENODE_retrain.jl:15
+srun: error: gpu017: task 0: Exited with exit code 1
+srun: launch/slurm: _step_signal: Terminating StepId=9588069.0

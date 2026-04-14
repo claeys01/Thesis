@@ -1,0 +1,8 @@
+Running on host gpu011
+Using 8 Julia threads
+Starting at Thu Apr  9 15:09:54 CEST 2026
+Loading Modules
+Finished Loading Modules
+Running hpc_retrain.jl
+
+Training AE for 1000 epochs with λdiv=1000.0, λcurl=100.0)
