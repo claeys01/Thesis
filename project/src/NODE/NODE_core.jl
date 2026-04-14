@@ -1,15 +1,14 @@
-
 Base.@kwdef mutable struct NodeArgs
     η = 0.01                    # learning rate
     # optimiser = OptimizationPolyalgorithms.PolyOpt #PolyOpt
-    optimiser = OptimizationOptimisers.Adam
+    optimiser = OptimizationOptimisers.AdamW
     maxiters = 250
     solver = Tsit5()
     reltol = 1e-3
     abstol = 1e-5
     seed = 42                   # random seed
     latent_dim = 16
-    dense_mult = 2
+    dense_mult = 3
     activation = tanhshrink
     n_reconstruct = 4
     downsample = 300
@@ -17,6 +16,9 @@ Base.@kwdef mutable struct NodeArgs
     clip_bc = true
     use_gpu = false             # use GPU
     multiple_shooting = true
+    retrain = false
+    node_checkpoint = ""
+    extrapolate = true
     group_size = 20
     continuity_term = 200
     save_path = "data/models/NODE_models"   # results dir
@@ -29,7 +31,7 @@ function get_NODE_data(latent_path; downsample=-1, verbose=true)
     @load latent_path latent_data
     n_total = size(latent_data.z, 2)
     idx = collect(1:n_total)
-    idx_downsample = downsample_equal(idx, downsample)
+    idx_downsample = downsample <= 0 || downsample >= n_total ? idx : downsample_equal(idx, downsample)
     z = latent_data.z[:, idx_downsample]
     t = latent_data.time[idx_downsample]
     tspan = (t[1], t[end])
@@ -54,7 +56,8 @@ function NODE(latent_dim, dense_mult; tspan=(0.0f0, 1.0f0), solver=Tsit5(), abst
     hidden_nodes = dense_mult * latent_dim
     nn = Chain(
         Dense(latent_dim, hidden_nodes, activation),
-        # Dense(hidden_nodes, hidden_nodes, activation),
+        # Dense(hidden_nodes, 2*hidden_nodes, activation),
+        # Dense(2*hidden_nodes, hidden_nodes, activation),
         Dense(hidden_nodes, latent_dim))
     verbose && @info "NODE initialized" latent_dim = latent_dim dense_mult = dense_mult tspan = tspan solver = typeof(solver) reltol = reltol abstol = abstol t = t activation = activation
     return NODE(nn, tspan, solver, abstol, reltol, t, nothing, nothing)
@@ -98,6 +101,14 @@ function L2_loss(node::NODE, z::AbstractMatrix, z0; p=nothing, t=nothing)
     return sum(abs2, z .- pred)
 end
 
+function eval_node_loss(node::NODE, z::AbstractMatrix, z0; p=nothing, t=nothing)
+    pred = predict_array(node, z0; p=p, t=t)
+    mae = mean(abs, z .- pred)
+    rmse = sqrt(mean(abs2, z .- pred))
+    rel_l2 = sqrt(sum(abs2, z .- pred)) / sqrt(sum(abs2, z))
+    return (; mae, rmse, rel_l2)
+end
+
 # small utility to print a short summary
 function Base.show(io::IO, node::NODE)
     println(io, "NODE wrapper:")
@@ -110,10 +121,11 @@ function Base.show(io::IO, node::NODE)
     end
 end
 
-function build_node_problem(node::NODE, z0)
+function build_node_problem(node::NODE, z0; p=nothing)
+    p_used = p === nothing ? node.p0 : p
     # Convert the Lux model to a function matching (u,p,t) -> du
     dudt(u, p, t) = node.dudt(u, p, node.st)[1]
-    ODEProblem(dudt, z0, node.tspan, ComponentArray(node.p0))
+    ODEProblem(dudt, z0, node.tspan, p_used)
 end
 
 function loss_multiple_shoot(node::NODE, z::AbstractMatrix, z0; p=nothing, t=nothing,
@@ -121,10 +133,10 @@ function loss_multiple_shoot(node::NODE, z::AbstractMatrix, z0; p=nothing, t=not
     tsteps = t === nothing ? node.t : t
     @assert tsteps !== nothing "t must be specified or set in node for multiple shooting"
 
-    prob_node = build_node_problem(node, z0)
-
     # map parameters into ComponentArray to preserve axes
     p_used = p === nothing ? node.p0 : p
+
+    prob_node = build_node_problem(node, z0; p=p_used)
 
     # simple L2 loss over all predicted segments (sum of segment losses)
     seg_loss(data_seg, pred_seg) = sum(abs, data_seg .- pred_seg)
@@ -233,5 +245,35 @@ function load_node(path::AbstractString; verbose=true)
     node.t = node_t
     verbose && @info "NODE sucessfully loaded from $path"
     return node, node_args
+end
+
+"""
+    get_latent_vectors(ae, ps, st, normalizer, ae_args; device=cpu_device())
+
+Encode simulation data into latent vectors using a trained AE already in memory.
+Returns `(z, t, tspan, z0)` on CPU.
+"""
+function get_latent_vectors(ae::AE, ps, st, normalizer, ae_args::LuxArgs; downsample=300, device=cpu_device())
+    simdata = load_simdata(ae_args.full_data_path)
+    preprocess_data!(simdata; verbose=true)
+    
+    train_idx = get_trainval_idx(simdata, ae_args.t_training, downsample)
+    
+    x_in, _, _ = build_batch(
+        EpochData(get_data_in(simdata.u, simdata.μ₀; idx=train_idx)...), 
+        1:downsample; normalizer=normalizer
+    )
+    
+    x_in = device(x_in)
+    z, _ = ae.encoder(x_in, device(ps.encoder), device(LuxCore.testmode(st.encoder)))
+    x_in = nothing; GC.gc()
+    # Always return CPU arrays for NODE training
+    z = Array(cpu_device()(z))
+    t = simdata.time[train_idx]
+    tspan = (t[1], t[end])
+    z0 = z[:, 1]
+    simdata = nothing; GC.gc()
+    @info "Generated latent vectors" size(z) n_samples=length(train_idx) time_range=tspan
+    return z, t, tspan, z0
 end
 

@@ -2,21 +2,21 @@ Base.@kwdef mutable struct LuxArgs
     η::Float64 = 1e-3                    # learning rate
     λ::Float64 = 9e-4                    # regularization parameter
     Autodiff::Any = AutoZygote()
-    λdiv::Float64 = 1.0                  # divergence loss weight
+    λdiv::Float64 = 1000.0                  # divergence loss weight
     λmask::Float64 = 0.0                 # weight of body mask loss
     λstrain::Float64 = 0.0
-    λcurl::Float64 = 1.0
+    λcurl::Float64 = 100.0
     loss::Symbol = :L1                   # loss function for reconstruction (:L1, :L2, :charb)
     batch_size::Int = 16                 # batch size
     t_training::Float64 = 16.603
-    train_downsample::Int = 600          # amount of data used for training
+    train_downsample::Int = 200          # amount of data used for training
     test_downsample::Int = 200
     split::Float64 = 0.2
-    epochs::Int = 2                    # number of epochs
+    epochs::Int = 1000                   # number of epochs
     seed::Int = 42                       # random seed
     n_reconstruct::Int = 2               # sampling size for output
     test_loss::Bool = true
-    use_gpu::Bool = true                # use GPU
+    use_gpu::Bool = true                 # use GPU
     clip_bc::Bool = true                 # removes the ghost cells from the snapshot
     input_dim::Tuple{Int,Int,Int} = (2^8, 2^8, 4)   # flow field size with μ₀ concatenated
     output_dim::Tuple{Int,Int,Int} = (2^8, 2^8, 2)  # size of reconstructed RHS field
@@ -30,12 +30,13 @@ Base.@kwdef mutable struct LuxArgs
     normalize::Bool = true               # normalise training data
     save_path::String = "data/Lux_models"   # results path
     data_path::String = "data/datasets/RE2500/2e8/U_128_period.jld2"
+    simdata_ram::Any = nothing
     full_data_path::String = "data/datasets/RE2500/2e8/U_128_full.jld2"
     retrain::Bool = false
     checkpoint_path::String = "data/Lux_models/2025-12-16_12-37-28/checkpoint.jld2"
 end
 
-function get_data_in(Xtarget, μ₀; idx=nothing, normalise=false)
+function get_data_in(Xtarget, μ₀; idx=nothing)
     if isnothing(idx)
         Xin = cat(Xtarget, μ₀; dims=3)
     else
@@ -54,8 +55,8 @@ end
 function downsample_equal(v::AbstractVector, M::Integer)
     N = length(v)
     M ≤ N || @warn "Cannot downsample to $M entries from $N points, returning $N points"
-    if M < 0
-        return v
+    if M ≤ 0
+        return nothing
     end
     M = clamp(M, 1, N)
     # idx = round.(Int, range(1, N, length = M))
@@ -64,20 +65,26 @@ function downsample_equal(v::AbstractVector, M::Integer)
 end
 
 
-get_data_args(args) = get_data(
+get_data(args::LuxArgs) = get_data(
     args.batch_size,
     args.full_data_path;
     n_training=args.train_downsample,
     n_test=args.test_downsample,
     split=args.split,
-    t_training=args.t_training)
+    t_training=args.t_training,
+    simdata_ram=args.simdata_ram)
 
 get_idxs(simdata::SimData, args::LuxArgs) = get_idxs(simdata, args.t_training, args.train_downsample, args.test_downsample; split=args.split)
 
-function get_idxs(simdata::SimData, t_training, n_training, n_test; split=0.2)
-    N = size(simdata.u, 4)
+function get_trainval_idx(simdata::SimData, t_training, n_training)
     train_idxs_full = findall(t -> t < t_training, simdata.time)
     trainval_idx = downsample_equal(train_idxs_full, n_training)
+    return trainval_idx
+end
+
+function get_idxs(simdata::SimData, t_training, n_training, n_test; split=0.2)
+    N = size(simdata.u, 4)
+    trainval_idx = get_trainval_idx(simdata, t_training, n_training)
     # Split into train / val by downsampling evenly from the combined pool
     n_val = clamp(round(Int, length(trainval_idx) * split), 0, length(trainval_idx))
     if n_val == 0
@@ -89,19 +96,20 @@ function get_idxs(simdata::SimData, t_training, n_training, n_test; split=0.2)
         train_idx = setdiff(trainval_idx, val_idx)
     end
     test_idx = downsample_equal(collect(last(trainval_idx)+1:N), n_test)
-    return train_idx, val_idx, test_idx
+    return (train_idx=train_idx, val_idx=val_idx, test_idx=test_idx)
 end
 
-function get_data(batch_size, path; t_training=10, n_training=500, n_test=500, split=0.2, verbose=true, showplot=false, plotpath=nothing)
-    simdata = load_simdata(path)
+function get_data(batch_size::Int64, path::String; t_training=10, n_training=500, n_test=500, split=0.2, verbose=true, showplot=false, plotpath=nothing, simdata_ram=nothing)
+    simdata = !isnothing(simdata_ram) ? simdata_ram : load_simdata(path)
     preprocess_data!(simdata; verbose=verbose)
 
     N = size(simdata.u, 4)
     N < 2 && error("get_data: need at least 2 samples to create train/validation split (got $N)")
 
-    train_idx, val_idx, test_idx = get_idxs(simdata, t_training, n_training, n_test; split=split)
+    # train_idx, val_idx, test_idx = get_idxs(simdata, t_training, n_training, n_test; split=split)
+    idxs = get_idxs(simdata, t_training, n_training, n_test; split=split)
 
-    plt = train_force_plot(simdata; train_idx=train_idx, val_idx=val_idx, test_idx=test_idx)
+    plt = train_force_plot(simdata; train_idx=idxs.train_idx, val_idx=idxs.val_idx, test_idx=idxs.test_idx)
     showplot && display(plt)
     if !isnothing(plotpath)
         savefig(plt, plotpath)
@@ -109,20 +117,19 @@ function get_data(batch_size, path; t_training=10, n_training=500, n_test=500, s
     end
 
     # compute normaliser on training data only and then normalise each batch
-    _, normalizer = normalize_batch(simdata.u[:, :, :, train_idx]; normalizer=nothing)
+    _, normalizer = normalize_batch(simdata.u[:, :, :, idxs.train_idx]; normalizer=nothing)
 
     data = (
-        TrainData=EpochData(get_data_in(simdata.u, simdata.μ₀; idx=train_idx)...),
-        ValData=EpochData(get_data_in(simdata.u, simdata.μ₀; idx=val_idx)...),
-        TestData=EpochData(get_data_in(simdata.u, simdata.μ₀; idx=test_idx)...)
+        TrainData=EpochData(get_data_in(simdata.u, simdata.μ₀; idx=idxs.train_idx)...),
+        ValData=EpochData(get_data_in(simdata.u, simdata.μ₀; idx=idxs.val_idx)...),
+        TestData=EpochData(get_data_in(simdata.u, simdata.μ₀; idx=idxs.test_idx)...)
     )
-
     simdata = nothing
     # DataLoaders over indices only (lightweight)
     loaders = (
-        train_loader=DataLoader(collect(1:length(train_idx)); batchsize=batch_size, shuffle=true),
-        val_loader=DataLoader(collect(1:length(val_idx)); batchsize=batch_size, shuffle=false),
-        test_loader=DataLoader(collect(1:length(test_idx)); batchsize=batch_size, shuffle=false)
+        train_loader=DataLoader(collect(1:length(idxs.train_idx)); batchsize=batch_size, shuffle=true),
+        val_loader=DataLoader(collect(1:length(idxs.val_idx)); batchsize=batch_size, shuffle=false),
+        test_loader=DataLoader(collect(1:length(idxs.test_idx)); batchsize=batch_size, shuffle=false)
     )
     return data, loaders, normalizer
 end
@@ -401,12 +408,12 @@ function (m::AE)(x, ps, st)
 end
 
 # losses
-div_loss(u::AbstractArray) = mean(abs, div_vectorized(u; buff=1))     # L2 of divergence field
+div_loss(u::AbstractArray) = mean(abs2, div_vectorized(u; buff=1))     # L2 of divergence field
 
 function curl_loss(x::AbstractArray, x̂::AbstractArray)
     x_curl = curl_vectorized(x)
     x̂_curl = curl_vectorized(x̂)
-    return mean(abs, x_curl .- x̂_curl)
+    return mean(abs2, x_curl .- x̂_curl)
 end
 
 function recon_loss(x, x̂; loss=:L2)
@@ -466,12 +473,12 @@ function total_loss(m::AE, ps, st, normalizer::Normalizer,
     μ₀::AbstractArray;          # (H,W,1,B)  1 outside / 0 inside
     loss=:L1,
     λdiv=0f0,
-    λstrain=0f0, 
+    λstrain=0f0,
     λcurl=0f0)
 
     # 1) Forward pass through AE (Lux-style)
     x̂, st2 = m(x_in, ps, st)
-    
+
     # 2) denormalize reconstruction
     x̂ = denormalize_batch(x̂, normalizer)
 
@@ -482,12 +489,12 @@ function total_loss(m::AE, ps, st, normalizer::Normalizer,
     corrs = batch_corrs(x_target, x̂)
 
     # 5) Reconstruction + optional extra losses
-    Lrec    = recon_loss(x_target, x̂; loss=loss)
-    Ldiv    = λdiv    != 0f0 ? div_loss(x̂)            : 0f0 # divergence loss
-    Lcurl   = λcurl   != 0f0 ? curl_loss(x_target, x̂) : 0f0 # curl loss
-    Lstrain = λstrain != 0f0 ? strain_loss(x_target, x̂)  : 0f0 # strain loss
+    Lrec = recon_loss(x_target, x̂; loss=loss)
+    Ldiv = λdiv != 0f0 ? div_loss(x̂) : 0f0 # divergence loss
+    Lcurl = λcurl != 0f0 ? curl_loss(x_target, x̂) : 0f0 # curl loss
+    Lstrain = λstrain != 0f0 ? strain_loss(x_target, x̂) : 0f0 # strain loss
 
-    L = Lrec + λdiv*Ldiv + λcurl*Lcurl + λstrain*Lstrain
+    L = Lrec + λdiv * Ldiv + λcurl * Lcurl + λstrain * Lstrain
 
     return L, st2, (Lrec, Ldiv, Lcurl, Lstrain, corrs)
 end
@@ -525,6 +532,9 @@ function load_trained_AE(checkpoint_path::String; device=cpu_device(), return_pa
         st = device(st)
     end
     testmode ? st = LuxCore.testmode(st) : st = st
+    if !is_hpc()
+        args.full_data_path = "data/datasets/RE2500/2e8/U_128_full.jld2"
+    end
     return return_params ? (enc, dec, ae, ps, st, args) : (enc, dec, ae, args)
 end
 

@@ -1,8 +1,18 @@
 # using Thesis
 
-function train_AE(args::LuxArgs)
+function train_AE(args::LuxArgs; return_path=false)
     args.seed > 0 && Random.seed!(args.seed)
 
+    # creating saving paths
+    timestamp = Dates.format(now(), "udd-HHMM")
+    tag = run_tag(args)
+
+    save_folder = joinpath(args.save_path, "$(timestamp)__$(tag)")
+    !ispath(save_folder) && mkpath(save_folder)
+
+    filepath = joinpath(save_folder, "checkpoint.jld2")
+    loss_trajectory_path = joinpath(save_folder, "loss_trajectory.jld2")
+    trainig_force_path = joinpath(save_folder, "training_force.png")
     # load data and normalizer
     data, loaders, normalizer = @timeit to "get_data" get_data(
             args.batch_size,
@@ -11,11 +21,20 @@ function train_AE(args::LuxArgs)
             n_test = args.test_downsample,
             split = args.split,
             t_training = args.t_training,
+            plotpath = trainig_force_path,
+            simdata_ram=args.simdata_ram
         )
+
     TrainData, ValData, TestData = data
     train_loader, validation_loader, test_loader = loaders
 
+    
     device = get_device()
+    
+    # move data to gpu
+    TrainData = EpochData(device(TrainData.Xin), device(TrainData.Xout), device(TrainData.μ₀))
+    ValData = EpochData(device(ValData.Xin), device(ValData.Xout), device(ValData.μ₀))
+    TestData = EpochData(device(TestData.Xin), device(TestData.Xout), device(TestData.μ₀))
 
     normalizer = Normalizer(device(Float32.(normalizer.μ)), device(Float32.(normalizer.σ)), normalizer.method)
 
@@ -23,7 +42,9 @@ function train_AE(args::LuxArgs)
 
     # initialize encoder and decoder
     if args.retrain 
-        (enc, dec, ae, ps, st) = load_trained_AE(args.checkpoint_path; return_params=true, testmode=false)
+        (enc, dec, ae, ps, st, _) = load_trained_AE(args.checkpoint_path; device=device, return_params=true, testmode=false)
+        ps = device(ps)
+        st = device(st)
         @info "Retraining model saved at $(args.checkpoint_path)"
     else
         enc = Encoder(args, verbose=true)
@@ -69,7 +90,8 @@ function train_AE(args::LuxArgs)
     # training
     @info "Start Training, total $(args.epochs) epochs"
     val_mean = 1
-    
+    test_corr_mean = (0.0, 0.0)
+    test_mean = 0.0
     for epoch = 1:args.epochs
         epoch_start = time()
         @timeit to "epoch" begin
@@ -148,6 +170,7 @@ function train_AE(args::LuxArgs)
         end
         # ---- epoch end: print concise summary ----
         epoch_time = time() - epoch_start
+
         test_corr_str = "($(round(test_corr_mean[1]; digits=3)), $(round(test_corr_mean[2]; digits=3)))"
 
         println(join([
@@ -163,14 +186,6 @@ function train_AE(args::LuxArgs)
     end
 
     # save model
-    timestamp = Dates.format(now(), "udd-HHMM")
-    tag = run_tag(args; test_Lrec=test_Lrecs[end])
-    save_folder = joinpath(args.save_path, "$(timestamp)__$(tag)")
-    !ispath(save_folder) && mkpath(save_folder)
-    filepath = joinpath(save_folder, "checkpoint.jld2")
-    loss_trajectory_path = joinpath(save_folder, "loss_trajectory.jld2")
-
-
     let cpu = cpu_device()
         # Always save on CPU for portability
         ps_cpu = cpu(train_state.parameters)
@@ -181,7 +196,9 @@ function train_AE(args::LuxArgs)
         Array(normalizer.σ),
         normalizer.method
     )
-        args = struct2dict(args)
+        args_to_save = deepcopy(args)
+        args_to_save.simdata_ram = nothing
+        args = struct2dict(args_to_save)
         JLD2.save(filepath,
             "ps", ps_cpu,
             "st", st_cpu,
@@ -228,6 +245,8 @@ function train_AE(args::LuxArgs)
         @warn "Failed to save loss plot: $e"
     end
     show(to)
+
+    return_path ? (return ae, ps, st, filepath) : (return ae, ps, st)
 end
 
 
@@ -284,7 +303,6 @@ function make_loss_function(args, device, normalizer)
         )
     end
     return loss_function
-
 end
 
 

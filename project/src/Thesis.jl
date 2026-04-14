@@ -138,6 +138,9 @@ include("AENODE.jl")
 include("utils/AE_reconstructer.jl")
 include("utils/AE_loss_plot.jl")
 
+# Acceleration benchmarking
+include("utils/acceleration.jl")
+
 
 
 # Data getters
@@ -176,8 +179,8 @@ export NODE, setup_lux!
 export L2_loss, loss_multiple_shoot
 export plot_node_trajectory, plot_multiple_shoot
 export save_node, load_node
-export node_loss
-export extrapolate_node, load_datasets, make_nodes
+export node_loss, eval_node_loss
+export extrapolate_node, load_datasets, encode_datasets, make_nodes
 export predictions_and_losses, plot_trajectories, plot_losses
 export region_spans!
 
@@ -198,7 +201,7 @@ export compute_normalizer
 # ═══════════════════════════════════════════════════════════════════════════════
 # Exports - Simulation Functions
 # ═══════════════════════════════════════════════════════════════════════════════
-export circle_shedding_biot
+export circle_shedding_biot, run_sim
 export sim_time
 export impose_biot_bc_on_snapshot
 export flood
@@ -226,6 +229,14 @@ export build_batch
 export get_latent_data
 export get_NODE_data
 export get_idxs
+
+# Acceleration benchmarking
+export AccelResults
+export force_stats, record_waterlily_step!, record_prediction!, step_reference!
+export compute_metrics, print_metrics
+export plot_forces_comparison, plot_timing_bars, plot_accel_combined
+export rst_plot, plot_rst_comparison, plot_meanflow_comparison
+export save_velocity_frame!, create_velocity_gif, save_accel_plots
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Exports - Utilities
