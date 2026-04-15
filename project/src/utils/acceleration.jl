@@ -161,7 +161,8 @@ function plot_forces_comparison(res::AccelResults, t_train, t_test, t_end)
     annotate!(plt, 0, -2.5,
         text("Rel. error:\nMean Drag: $rel_drag %\nRMS Lift: $rel_lift %", :black, 10, :left))
 
-    region_spans!(plt, t_train, t_test)
+    # region_spans!(plt, t_train, t_test)
+    # @show t_train, t_test
     return plt
 end
 
