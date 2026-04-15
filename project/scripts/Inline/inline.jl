@@ -1,14 +1,9 @@
-# Make plotting/headless execution work both locally and on HPC.
-ENV["GKSwstype"] = get(ENV, "GKSwstype", "100")
-ENV["THESIS_USE_CUDA"] = get(ENV, "THESIS_USE_CUDA", "true")
-
 using Thesis
 using WaterLily
 using WaterLily: MeanFlow
 using Statistics
 using Dates
 using Plots
-
 
 
 # Small container for the main timing/training knobs of the experiment.
