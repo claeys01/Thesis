@@ -516,7 +516,7 @@ Load a saved Lux checkpoint (expects keys "ps","st","args", "normalizer" optiona
 Returns (encoder, decoder, ae) by default. If `return_params=true` returns
 (encoder, decoder, ae, ps, st) where `ps` and `st` have been moved to `device`.
 """
-function load_trained_AE(checkpoint_path::String; device=cpu_device(), return_params::Bool=false, testmode::Bool=true)
+function load_trained_AE(checkpoint_path::String; device=cpu_device(), return_params::Bool=true, testmode::Bool=true)
     checkpoint = JLD2.load(checkpoint_path)
 
     ps = get(checkpoint, "ps", nothing)

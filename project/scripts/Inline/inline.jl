@@ -13,9 +13,10 @@ Base.@kwdef struct InlineParams
     t_accel_end = 50        # when to stop hybrid simulation
     ae_epochs = 1
     node_iters = 250        
-    n_switch = 150
-    pred_Δt = 0.035
-    save_interval = 1
+    n_switch = 100
+    pred_Δt = 0.35
+    save_interval = 2
+    max_retrain_flags = 3
 end
 
 params = InlineParams()
@@ -30,7 +31,7 @@ u₀ = load_u0("data/datasets/RE2500/2e8/U_128_full_u0.jld2")
 
 # Generate a short inline trajectory that will be used to train AE + NODE.
 sim = circle_shedding_biot(; mem=Array, perturb=false)
-sim, simdata = run_sim(sim; t_end=params.t_run, u₀=u₀, save_path=simdata_path, verbose=false)
+sim, simdata = run_sim(sim; t_end=params.t_run, u₀=u₀, save_path=simdata_path, verbose=true)
 
 # Train the autoencoder directly on the freshly generated inline data.
 # ae_args = LuxArgs(
@@ -70,11 +71,11 @@ ae_bundle, ae_args = load_trained_AE(AE_path)
 node_path = "data/saved_models/NODE/16/RE2500/TL1_E500_curldiv_MS_Adam_250/node_params.jld2"
 node, node_args = load_node(node_path)
 
-ae = nothing
-normalizer = nothing
-ae_ps = nothing
-ae_st = nothing
-GC.gc()
+# ae = nothing
+# normalizer = nothing
+# ae_ps = nothing
+# ae_st = nothing
+# GC.gc()
 
 # Reload the trained pipeline and recover the train/test split for plotting.
 # aenode = AENODE(AE_path, node_path)
@@ -87,11 +88,11 @@ plotdata = nothing
 GC.gc()
 
 # Start both the accelerated and reference simulations from the same state.
-sim = circle_shedding_biot(; mem=Array, Re=Re, n=n, m=m, perturb=false)
-if !isnothing(u₀)
-    sim.flow.u .= u₀
-end
-sim_step!(sim)
+# sim = circle_shedding_biot(; mem=Array, Re=Re, n=n, m=m, perturb=false)
+# if !isnothing(u₀)
+#     sim.flow.u .= u₀
+# end
+# sim_step!(sim)
 ref_sim = deepcopy(sim)
 sim_meanflow = MeanFlow(sim.flow; uu_stats=true)
 ref_meanflow = MeanFlow(ref_sim.flow; uu_stats=true)
@@ -103,14 +104,21 @@ next_save = params.save_interval
 step = 1
 
 # Warm up the predictor once, then alternate between ML prediction and CFD stepping.
-predict_flex(aenode, deepcopy(sim); Δt=params.pred_Δt, impose_biot=true)
+predict_flex(aenode, deepcopy(sim); Δt=Float32(params.pred_Δt), impose_biot=true)
 
+retrain_req_counter = 0
 while sim_time(sim) < params.t_accel_end
     if step % params.n_switch == 0 && sim_time(sim) > aenode.ae_args.t_training
+        if retrain_req_counter ≥ params.max_retrain_flags
+            @warn "Latent trajectory exceeded limit too many times, AE and NODE retraining started"
+            break
+        end
+
         sim_time_before = sim_time(sim)
         predict_wall_time = @elapsed begin
-            sim, n_integr = predict_flex(aenode, sim; Δt=params.pred_Δt, impose_biot=true, next_save=next_save)
+            sim, n_integr, retrain_required = predict_flex(aenode, sim; Δt=Float32(params.pred_Δt), impose_biot=true, next_save=next_save)
         end
+        retrain_required && (retrain_req_counter +=1)
         sim_dt = sim_time(sim) - sim_time_before
 
         if n_integr != 0
@@ -143,6 +151,7 @@ end
 print_metrics(res; pred_label="(flexible OOD)", avg_steps_per_pred=isempty(n_integrs) ? nothing : mean(n_integrs))
 
 plt_combined = plot_accel_combined(res, t_train_plot, t_test_plot, params.t_accel_end)
+display(plt_combined)
 rst_comp_plot = plot_rst_comparison(sim_meanflow, ref_meanflow)
 plt_meanflow = plot_meanflow_comparison(sim_meanflow, ref_meanflow)
 save_accel_plots(savedir, plt_combined, rst_comp_plot, plt_meanflow)

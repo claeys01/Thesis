@@ -27,8 +27,8 @@ function AENODE(ae_bundle, node::NODE, ae_args::LuxArgs, node_args::NodeArgs, no
     knnood = fit_knn_ood(get_latent_vectors(ae_bundle, normalizer, ae_args; downsample=node_args.downsample)[1])
     verbose && @info "AENODE Initialized"
     return AENODE(ae_bundle.ae.encoder, ae_bundle.ae.decoder, normalizer, ae_args, node, node_args, knnood,
-        ps,  # concrete NamedTuple type inferred
-        st   # concrete NamedTuple type inferred
+        ae_bundle.ps,  # concrete NamedTuple type inferred
+        ae_bundle.st   # concrete NamedTuple type inferred
     )
 end
 
@@ -87,19 +87,28 @@ function predict_n!(sim::BiotSimulation, aenode::AENODE, nₜ::Int64;
 end
 
 function predict_flex(aenode::AENODE, sim::BiotSimulation; Δt::Float32=0.35f0, impose_biot=false, next_save=0.25)
-    û, n_integr = predict_flex(aenode, sim.flow.u, sim.flow.μ₀, Float32(sim_time(sim)); Δt=Δt, next_save=next_save)
+    û, n_integr, retrain_required = predict_flex(
+        aenode,
+        sim.flow.u,
+        sim.flow.μ₀,
+        Float32(sim_time(sim));
+        Δt=Δt,
+        next_save=next_save,
+    )
     if isnothing(û)
-        return sim, n_integr
+        return sim, n_integr, retrain_required
     end
-    apply_prediction!(sim, û, Δt, n_integr; impose_biot=impose_biot)
-    return sim, n_integr
+    apply_prediction!(sim, û, Δt, n_integr; impose_biot=impose_biot)
+    return sim, n_integr, retrain_required
 end
 
 function predict_flex(aenode::AENODE, u::AbstractArray, μ₀::AbstractArray, t₀::Float32; Δt::Float32=0.35f0, next_save=0.25)
     z, μ₀ = encode_flow(aenode, u, μ₀)
-    if KNN_score(aenode.knn_ood, z) > aenode.knn_ood.threshold
-        @warn "Encodeded flow not similar to training data, NODE integration can be wrong"
-        return nothing, 0
+    retrain_required = false
+    z_score = KNN_score(aenode.knn_ood, z)
+    if z_score > aenode.knn_ood.threshold
+        @warn "Encoded flow not similar to training data, AE and NODE should be retrained" z_score threshold=aenode.knn_ood.threshold
+        return nothing, 0, true
     end
 
     # NODE integration untill cutoff criteria is met.
@@ -109,7 +118,8 @@ function predict_flex(aenode::AENODE, u::AbstractArray, μ₀::AbstractArray, t�
     while true 
         knn_score = KNN_score(aenode.knn_ood, ẑ)
         if knn_score > aenode.knn_ood.threshold
-            @warn "NODE integration too far outside of training distances, cutting of integration after $n_integr steps"
+            @warn "NODE integration too far outside of training distances, cutting of integration after $n_integr steps" z_score threshold=aenode.knn_ood.threshold
+            retrain_required = true
             break
         elseif tₙ ≥ next_save
             @warn "NODE integration exceeds time for saving mean flow statistics, cutting of integration at $tₙ "
@@ -121,6 +131,6 @@ function predict_flex(aenode::AENODE, u::AbstractArray, μ₀::AbstractArray, t�
         end
     end
     û = decode_flow(aenode, ẑ[:, end], μ₀)
-    return û, n_integr
+    return û, n_integr, retrain_required
 end
 
