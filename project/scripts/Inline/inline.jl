@@ -8,11 +8,11 @@ using Plots
 
 # Small container for the main timing/training knobs of the experiment.
 Base.@kwdef struct InlineParams
-    t_run = 10.0
-    t_train = 8.0
-    t_accel_end = 25
+    t_run = 20.0            # length to run simulation for
+    t_train = 16.3          # amount of time used for trainingn, rest is test data
+    t_accel_end = 50        # when to stop hybrid simulation
     ae_epochs = 1
-    node_iters = 250
+    node_iters = 250        
     n_switch = 150
     pred_Δt = 0.035
     save_interval = 1
@@ -22,54 +22,53 @@ params = InlineParams()
 
     
 # Create a timestamped output folder and seed the run from a saved flow field.
-savedir = joinpath("data", "inline_runs", Dates.format(now(), "yyyy-mm-dd_HH-MM-SS"))
+savedir = joinpath("data", "inline_runs", Dates.format(now(), "yyyy-mm-dd_HH-MM"))
 mkpath(savedir)
 simdata_path = joinpath(savedir, "U_inline.jld2")
 
-u₀ = nothing
-init_path = "data/datasets/RE2500/2e8/U_128_full.jld2"
-initdata = load_simdata(init_path)
-u₀ = copy(initdata.u[:, :, :, 1])
-initdata = nothing; GC.gc()
+u₀ = load_u0("data/datasets/RE2500/2e8/U_128_full_u0.jld2")
 
 # Generate a short inline trajectory that will be used to train AE + NODE.
 sim = circle_shedding_biot(; mem=Array, perturb=false)
 sim, simdata = run_sim(sim; t_end=params.t_run, u₀=u₀, save_path=simdata_path, verbose=false)
 
 # Train the autoencoder directly on the freshly generated inline data.
-ae_args = LuxArgs(
-    simdata_ram=simdata,
-    full_data_path=simdata_path,
-    data_path=simdata_path,
-    save_path=joinpath(savedir, "AE"),
-    epochs=params.ae_epochs,
-    t_training=params.t_train,
-    use_gpu=is_hpc(),
-)
+# ae_args = LuxArgs(
+#     simdata_ram=simdata,
+#     full_data_path=simdata_path,
+#     data_path=simdata_path,
+#     save_path=joinpath(savedir, "AE"),
+#     epochs=params.ae_epochs,
+#     t_training=params.t_train,
+#     use_gpu=is_hpc(),
+# )
 
-ae, ae_ps, ae_st, AE_path = train_AE(ae_args; return_path=true)
+# ae, ae_ps, ae_st, AE_path = train_AE(ae_args; return_path=true)
+# ae_args.simdata_ram = nothing
+
+AE_path = "data/saved_models/u/Lux/256h_16l/RE2500/2e8/TL1_E500_HW256x256_C4to2_nc6_nd2_z16_C8_lr0p001_wd0p0009_bs16_NY_LL1_Tl0p0/checkpoint.jld2"
 normalizer = load_normalizer(AE_path)
-ae_args.simdata_ram = nothing
-# simdata = nothing; GC.gc()
+ae_bundle, ae_args = load_trained_AE(AE_path)
 
 # Fit a latent-space NODE on the AE representation.
-node_args = NodeArgs(
-    use_gpu=false,
-    latent_dim=ae_args.latent_dim,
-    maxiters=params.node_iters,
-    downsample=ae_args.train_downsample,
-    test_downsample=ae_args.test_downsample,
-    extrapolate=false,
-    save_path=joinpath(savedir, "NODE"),
-)
+# node_args = NodeArgs(
+#     use_gpu=false,
+#     latent_dim=ae_args.latent_dim,
+#     maxiters=params.node_iters,
+#     downsample=ae_args.train_downsample,
+#     test_downsample=ae_args.test_downsample,
+#     extrapolate=false,
+#     save_path=joinpath(savedir, "NODE"),
+# )
 
-node_path = train_NODE(node_args;
-    ae=ae,
-    ae_ps=ae_ps,
-    ae_st=ae_st,
-    normalizer=normalizer,
-    ae_args=ae_args,
-)
+# node, node_path = train_NODE(node_args;
+#     ae_bundle=ae_bundle,
+#     normalizer=normalizer,
+#     ae_args=ae_args,
+# )
+
+node_path = "data/saved_models/NODE/16/RE2500/TL1_E500_curldiv_MS_Adam_250/node_params.jld2"
+node, node_args = load_node(node_path)
 
 ae = nothing
 normalizer = nothing
@@ -78,7 +77,8 @@ ae_st = nothing
 GC.gc()
 
 # Reload the trained pipeline and recover the train/test split for plotting.
-aenode = AENODE(AE_path, node_path)
+# aenode = AENODE(AE_path, node_path)
+aenode = AENODE(ae_bundle, node, ae_args, node_args, normalizer; verbose=true)
 plotdata = load_simdata(simdata_path)
 train_idx, val_idx, test_idx = Thesis.get_idxs(plotdata, aenode.ae_args)
 t_train_plot = plotdata.time[train_idx]

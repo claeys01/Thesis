@@ -246,7 +246,7 @@ function train_AE(args::LuxArgs; return_path=false)
     end
     show(to)
 
-    return_path ? (return ae, ps, st, filepath) : (return ae, ps, st)
+    return_path ? (return (ae=ae, ps=ps, st=ps), filepath) : (return (ae=ae, ps=ps, st=st))
 end
 
 

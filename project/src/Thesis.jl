@@ -167,6 +167,7 @@ export load_trained_AE
 export visualize_reconstructions
 export total_loss, recon_loss, div_loss_L2, masked_loss
 export load_simdata
+export save_u0, load_u0
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Exports - NODE Functions

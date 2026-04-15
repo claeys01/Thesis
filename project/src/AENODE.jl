@@ -11,16 +11,27 @@ mutable struct AENODE{P,S}
 end
 
 function AENODE(AE_path::String, NODE_path::String; verbose=false, k=5, q=0.99)
-    enc, dec, ae, ps, st, ae_args = load_trained_AE(AE_path; return_params=true)
+    ae_bundle, ae_args = load_trained_AE(AE_path; return_params=true)
     normalizer = load_normalizer(AE_path)
     node, node_args = load_node(NODE_path; verbose=verbose)
     # knnood = fit_knn_ood(get_NODE_data(node_args.train_latent_path; downsample=node_args.downsample, verbose=verbose)[1], k=k, q=q)
-    knnood = fit_knn_ood(get_latent_vectors(ae, ps, st, normalizer, ae_args; downsample=node_args.downsample)[1])
-    return AENODE(enc, dec, normalizer, ae_args, node, node_args, knnood,
+    # knnood = fit_knn_ood(get_latent_vectors(ae, ps, st, normalizer, ae_args; downsample=node_args.downsample)[1])
+    # return AENODE(ae.encoder, ae.decoder, normalizer, ae_args, node, node_args, knnood,
+        # ps,  # concrete NamedTuple type inferred
+        # st   # concrete NamedTuple type inferred
+    # )
+    return AENODE(ae_bundle, node, ae_args, node_args, normalizer; verbose=verbose, k=k, q=q)
+end
+
+function AENODE(ae_bundle, node::NODE, ae_args::LuxArgs, node_args::NodeArgs, normalizer::Normalizer; verbose=false, k=5, q=0.99)
+    knnood = fit_knn_ood(get_latent_vectors(ae_bundle, normalizer, ae_args; downsample=node_args.downsample)[1])
+    verbose && @info "AENODE Initialized"
+    return AENODE(ae_bundle.ae.encoder, ae_bundle.ae.decoder, normalizer, ae_args, node, node_args, knnood,
         ps,  # concrete NamedTuple type inferred
         st   # concrete NamedTuple type inferred
     )
 end
+
 
 function encode_flow(aenode::AENODE, u::AbstractArray, μ₀::AbstractArray)
     @assert size(u) == size(μ₀) "u and μ₀ must be the same size"

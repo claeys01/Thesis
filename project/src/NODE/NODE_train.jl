@@ -3,17 +3,18 @@ make_optimiser(opt, η) = hasmethod(opt, Tuple{Float64}) ? opt(η) :
                          error("Unsupported optimiser constructor: $(opt)")
 
 function train_NODE(args::NodeArgs; 
-    ae=nothing, ae_ps=nothing, ae_st=nothing, 
+    ae_bundle=nothing,
     normalizer=nothing, ae_args=nothing, kws...)
-    
+
     device = args.use_gpu ? get_device() : cpu_device()
 
-    if isnothing(ae)
+    if isnothing(ae_bundle)
         # Original path: load pre-saved latent data from disk
         z, t, tspan, z0 = get_NODE_data(args.train_latent_path; downsample=args.downsample)
     else
         # New path: encode on-the-fly using the trained AE already in memory
         @info "Encoding latent vectors from AE in memory (no disk I/O)"
+        ae, ae_ps, ae_st = ae_bundle.ae, ae_bundle.ps, ae_bundle.st
         z, t, tspan, z0 = get_latent_vectors(ae, ae_ps, ae_st, normalizer, ae_args; device=device, downsample=args.downsample)
         # Optionally downsample
         if args.downsample > 0 && args.downsample < size(z, 2)
@@ -205,7 +206,7 @@ function train_NODE(args::NodeArgs;
         @info "  Saved extrapolation plot to $extrapolation_path"
     end
 
-    return node_path
+    return node, node_path
 end
 
 # if abspath(PROGRAM_FILE) == @__FILE__
