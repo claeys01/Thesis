@@ -86,14 +86,15 @@ function predict_n!(sim::BiotSimulation, aenode::AENODE, nₜ::Int64;
     apply_prediction!(sim, û, Δt, nₜ; impose_biot=impose_biot)
 end
 
-function predict_flex(aenode::AENODE, sim::BiotSimulation; Δt::Float32=0.35f0, impose_biot=false, next_save=0.25)
-    û, n_integr, retrain_required = predict_flex(
+function predict_flex(aenode::AENODE, sim::BiotSimulation; Δt::Float32=0.35f0, impose_biot=false, next_save=0.25, verbose=true)
+    û, n_integr, retrain_required = predict_flex(
         aenode,
         sim.flow.u,
         sim.flow.μ₀,
         Float32(sim_time(sim));
         Δt=Δt,
         next_save=next_save,
+        verbose=verbose,
     )
     if isnothing(û)
         return sim, n_integr, retrain_required

@@ -1,10 +1,20 @@
 avg_loss_over_latent(loss::AbstractMatrix) = vec(dropdims(mean(loss, dims=1), dims=1))
 
-function region_spans!(plt, t_train, t_test)
-    vspan!(plt, [first(t_test), last(t_test)];  fillcolor=:purple, alpha=0.1, label="test region")
-    vspan!(plt, [first(t_train), last(t_train)]; fillcolor=:green,  alpha=0.1, label="train region")
+
+
+#     vspan!(plt, [first(t_test), last(t_test)];  fillcolor=:purple, alpha=0.1, label="test region")
+#     vspan!(plt, [first(t_train), last(t_train)]; fillcolor=:green,  alpha=0.1, label="train region")
+#     return plt
+# end
+
+function region_spans!(plt, t_train::Float32, t_test::Float32)
+    vspan!(plt, [t_train, t_test];  fillcolor=:purple, alpha=0.1, label="test region")
+    vspan!(plt, [0, t_train]; fillcolor=:green,  alpha=0.1, label="train region")
     return plt
 end
+
+region_spans!(plt, t_train::AbstractArray, t_test::AbstractArray) = region_spans!(plt, Float32(last(t_train)), Float32(last(t_test)))
+
 
 function load_datasets(args; total_downsample::Int = -1, verbose::Bool = false)
     z_train, t_train, tspan_train, z0_train = get_NODE_data(args.train_latent_path; downsample=args.downsample, verbose=verbose)

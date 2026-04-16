@@ -129,13 +129,31 @@ function print_metrics(res::AccelResults; pred_label="", avg_steps_per_pred=noth
     println("\n" * "="^60)
 end
 
-function plot_forces_comparison(res::AccelResults, t_train, t_test, t_end)
+function plot_forces_comparison(res::AccelResults, t_end; t_train=nothing, t_test=nothing, mode_log=nothing)
     m = compute_metrics(res)
 
     plt = plot(framestyle=:box, size=(600, 400), dpi=500,
         xlabel="tU/L", ylabel="Force coefficient",
         xlims=(0, t_end), ylims=(-3, 2),
         title="Force Comparison")
+
+    if !isnothing(mode_log)
+        train_labeled = false
+        hybrid_labeled = false
+        for log in mode_log
+            if log.mode == "Training"
+                vspan!(plt, [log.t_start, log.t_end]; fillcolor=:green, alpha=0.1, label=train_labeled ? "" : "Train region")
+                train_labeled = true
+            elseif log.mode == "Hybrid"
+                vspan!(plt, [log.t_start, log.t_end]; fillcolor=:blue, alpha=0.1, label=hybrid_labeled ? "" : "Hybrid region")
+                hybrid_labeled = true
+            else
+                vspan!(plt, [log.t_start, log.t_end]; fillcolor=:black, alpha=0.1, label="Other")
+            end
+        end
+    elseif !isnothing(t_train) && !isnothing(t_test)
+        Thesis.region_spans!(plt, t_train, t_test)
+    end
 
     ref_drag, ref_lift = first.(res.forces_ref), last.(res.forces_ref)
     plot!(plt, res.time_ref, ref_drag, color=:red, ls=:dashdotdot, label="Reference drag", alpha=0.5)
@@ -161,8 +179,7 @@ function plot_forces_comparison(res::AccelResults, t_train, t_test, t_end)
     annotate!(plt, 0, -2.5,
         text("Rel. error:\nMean Drag: $rel_drag %\nRMS Lift: $rel_lift %", :black, 10, :left))
 
-    # region_spans!(plt, t_train, t_test)
-    # @show t_train, t_test
+    plot!(plt, legend=:topright, legendalpha=0.5)
     return plt
 end
 
@@ -188,8 +205,8 @@ function plot_timing_bars(res::AccelResults)
     return plt_timing, plt_total
 end
 
-function plot_accel_combined(res::AccelResults, t_train, t_test, t_end)
-    plt_forces = plot_forces_comparison(res, t_train, t_test, t_end)
+function plot_accel_combined(res::AccelResults, t_end; t_train=nothing, t_test=nothing, mode_log=nothing)
+    plt_forces = plot_forces_comparison(res, t_end; t_train=t_train, t_test=t_test, mode_log=mode_log)
     plt_timing, plt_total = plot_timing_bars(res)
     return plot(plt_forces, plt_timing, plt_total;
         layout=@layout([a; b c]), size=(800, 700))
@@ -258,7 +275,7 @@ function create_velocity_gif(gif_frames::Vector, savedir::String)
     for f in gif_frames
         frame(anim, f)
     end
-    gif(anim, gif_path; fps=5)
+    gif(anim, gif_path; fps=5, show_msg=false)
     println("GIF saved to: $gif_path")
     return gif_path
 end

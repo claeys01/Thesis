@@ -14,8 +14,9 @@ function train_NODE(args::NodeArgs;
     else
         # New path: encode on-the-fly using the trained AE already in memory
         @info "Encoding latent vectors from AE in memory (no disk I/O)"
+        z, t, tspan, z0 = get_latent_vectors(ae_bundle, normalizer, ae_args; device=device, downsample=args.downsample)
         ae, ae_ps, ae_st = ae_bundle.ae, ae_bundle.ps, ae_bundle.st
-        z, t, tspan, z0 = get_latent_vectors(ae, ae_ps, ae_st, normalizer, ae_args; device=device, downsample=args.downsample)
+
         # Optionally downsample
         if args.downsample > 0 && args.downsample < size(z, 2)
             idx = downsample_equal(collect(1:size(z, 2)), args.downsample)

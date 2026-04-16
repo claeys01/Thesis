@@ -139,8 +139,8 @@ include("utils/AE_reconstructer.jl")
 include("utils/AE_loss_plot.jl")
 
 # Acceleration benchmarking
-include("utils/acceleration.jl")
-
+include("hybrid/acceleration.jl")
+include("hybrid/HybdridState.jl")
 
 
 # Data getters
@@ -155,6 +155,7 @@ export Encoder, Decoder, AE
 export NODE, AENODE
 export Normalizer
 export BiotSimulation
+export InlineParams, HybridState
 
 # OOD Detection Types
 export KNNOOD
@@ -238,6 +239,9 @@ export compute_metrics, print_metrics
 export plot_forces_comparison, plot_timing_bars, plot_accel_combined
 export rst_plot, plot_rst_comparison, plot_meanflow_comparison
 export save_velocity_frame!, create_velocity_gif, save_accel_plots
+
+# Hybrid simulation
+export run_warmup!, run_hybrid!, save_results
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Exports - Utilities
