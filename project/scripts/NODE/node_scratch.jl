@@ -46,9 +46,9 @@ end
 
 function get_latent_vectors(checkpoint_path::String; device=cpu_device())
     # Load trained autoencoder
-    _, _, ae, ps, st, ae_args = load_trained_AE(checkpoint_path; device=device, return_params=true)
+    ae_bundle, ae_args = load_trained_AE(checkpoint_path; device=device, return_params=true)
     normalizer = load_normalizer(checkpoint_path)
-    get_latent_vectors(ae, ps, st, normalizer, ae_args; device=device)
+    get_latent_vectors(ae_bundle, normalizer, ae_args; device=device)
 end
 
 AE_path = "data/saved_models/u/Lux/256h_16l/RE2500/2e8/Feb12-1530__E1000_HW256x256_C4to2_nc6_nd2_z16_C8_lr0p001_wd0p0009_bs16_NY_LL1_Tl0p0471/checkpoint.jld2"

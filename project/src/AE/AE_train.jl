@@ -42,7 +42,8 @@ function train_AE(args::LuxArgs; return_path=false)
 
     # initialize encoder and decoder
     if args.retrain 
-        (enc, dec, ae, ps, st, _) = load_trained_AE(args.checkpoint_path; device=device, return_params=true, testmode=false)
+        ae_bundle, _ = load_trained_AE(args.checkpoint_path; device=device, return_params=true, testmode=false)
+        ae, ps, st = ae_bundle.ae, ae_bundle.ps, ae_bundle.st
         ps = device(ps)
         st = device(st)
         @info "Retraining model saved at $(args.checkpoint_path)"
@@ -246,7 +247,7 @@ function train_AE(args::LuxArgs; return_path=false)
     end
     show(to)
 
-    return_path ? (return (ae=ae, ps=ps, st=ps), filepath) : (return (ae=ae, ps=ps, st=st))
+    return_path ? (return (ae=ae, ps=ps, st=st), filepath) : (return (ae=ae, ps=ps, st=st))
 end
 
 

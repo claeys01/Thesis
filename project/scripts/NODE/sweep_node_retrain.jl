@@ -10,7 +10,7 @@ function main()
 
     # Load the initial NODE checkpoint (trained on TL1 AE)
     ae_checkpoint_tl1 = joinpath("", "data/saved_models/u/Lux/256h_16l/RE2500/2e8/TL1_E500_HW256x256_C4to2_nc6_nd2_z16_C8_lr0p001_wd0p0009_bs16_NY_LL1_Tl0p0/checkpoint.jld2")
-    _, _, ae_tl1, ae_ps_tl1, ae_st_tl1, ae_args_tl1 = load_trained_AE(ae_checkpoint_tl1; device=device, return_params=true)
+    ae_bundle_tl1, ae_args_tl1 = load_trained_AE(ae_checkpoint_tl1; device=device, return_params=true)
     ae_args_tl1.full_data_path = joinpath(root_path, ae_args_tl1.full_data_path)
     normalizer_tl1 = load_normalizer(ae_checkpoint_tl1)
 
@@ -19,14 +19,14 @@ function main()
             extrapolate=false, use_gpu=false,
             latent_dim=ae_args_tl1.latent_dim, retrain=false,
         );
-        ae=ae_tl1, ae_ps=ae_ps_tl1, ae_st=ae_st_tl1,
+        ae_bundle=ae_bundle_tl1,
         normalizer=normalizer_tl1, ae_args=ae_args_tl1,
     )
     @info "Initial NODE trained" node_path
 
     # Load the retrained AE (TL2)
     ae_checkpoint_tl2 = joinpath("", "data/saved_models/u/Lux/256h_16l/RE2500/2e8/TL2_E300_HW256x256_C4to2_nc6_nd2_z16_C8_lr0p0002_wd0p0009_bs16_NY_LL1_Tl0p0/checkpoint.jld2")
-    _, _, ae, ae_ps, ae_st, ae_args = load_trained_AE(ae_checkpoint_tl2; device=device, return_params=true)
+    ae_bundle, ae_args = load_trained_AE(ae_checkpoint_tl2; device=device, return_params=true)
     ae_args.full_data_path = joinpath(root_path, ae_args.full_data_path)
 
     normalizer = load_normalizer(ae_checkpoint_tl2)
@@ -64,13 +64,13 @@ function main()
                     use_gpu=false,
                     node_checkpoint=node_path,
                 );
-                ae=ae, ae_ps=ae_ps, ae_st=ae_st,
+                ae_bundle=ae_bundle,
                 normalizer=normalizer, ae_args=ae_args,
             )
             elapsed = time() - t_start
 
             node_retrained, _ = load_node(retrain_path; verbose=false)
-            z, t, _, z0 = Thesis.get_latent_vectors(ae, ae_ps, ae_st, normalizer, ae_args; device=cpu_device(), downsample=ds)
+            z, t, _, z0 = Thesis.get_latent_vectors(ae_bundle, normalizer, ae_args; device=cpu_device(), downsample=ds)
             eval = eval_node_loss(node_retrained, z, z0)
 
             entry = (;

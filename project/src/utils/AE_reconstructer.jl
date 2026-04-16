@@ -8,7 +8,8 @@ function visualize_reconstructions(checkpoint_path::Union{String,Nothing}=nothin
     """
 
     cpu = cpu_device()
-    _, _, ae, ps, st, args = load_trained_AE(checkpoint_path; return_params=true)
+    ae_bundle, args = load_trained_AE(checkpoint_path; return_params=true)
+    ae, ps, st = ae_bundle.ae, ae_bundle.ps, ae_bundle.st
     ps = cpu(ps)
     st = cpu(st)
 

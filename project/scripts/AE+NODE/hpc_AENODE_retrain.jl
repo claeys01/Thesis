@@ -35,7 +35,7 @@ ae_args = LuxArgs(
         full_data_path=tl_path
     )
 
-ae, ae_ps, ae_st, AE_path = train_AE(ae_args; return_path=true)
+ae_bundle, AE_path = train_AE(ae_args; return_path=true)
 ae_elapsed = round((time() - ae_start) / 60; digits=1)
 @info "AE initial training complete" elapsed_min=ae_elapsed checkpoint=AE_path
 
@@ -50,9 +50,7 @@ node_path = train_NODE(
         use_gpu = false,
         latent_dim = ae_args.latent_dim,
     );
-    ae = ae,
-    ae_ps = ae_ps,
-    ae_st = ae_st,
+    ae_bundle = ae_bundle,
     normalizer = normalizer,
     ae_args = ae_args,
 )
@@ -92,7 +90,7 @@ ae_args.t_training = retraindata.time[end] * 0.8
 ae_args.test_loss = true
 @info "AE retrain hyperparameters" η=ae_args.η epochs=ae_args.epochs t_training=ae_args.t_training
 
-ae, ae_ps, ae_st, AE_path = train_AE(ae_args; return_path=true)
+ae_bundle, AE_path = train_AE(ae_args; return_path=true)
 ae_retrain_elapsed = round((time() - ae_retrain_start) / 60; digits=1)
 @info "AE retraining complete" elapsed_min=ae_retrain_elapsed checkpoint=AE_path
 
@@ -117,7 +115,7 @@ node_retrain_path = train_NODE(
         use_gpu = false, 
         node_checkpoint = node_path,
     );
-    ae = ae, ae_ps = ae_ps, ae_st = ae_st,
+    ae_bundle = ae_bundle,
     normalizer = normalizer, ae_args = ae_args,
 )
 node_retrain_elapsed = round((time() - node_retrain_start) / 60; digits=1)

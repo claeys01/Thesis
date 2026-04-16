@@ -26,7 +26,8 @@ function AENodeAsses(AE_path::String, NODE_path::String; saveplot=false)
     # 3. 
 
     # load AE
-    (_, dec, _, ps, st, ae_args)  = load_trained_AE(AE_path; return_params=true)
+    ae_bundle, ae_args = load_trained_AE(AE_path; return_params=true)
+    dec, ps, st = ae_bundle.ae.decoder, ae_bundle.ps, ae_bundle.st
 
     normalizer = load_normalizer(AE_path)
 

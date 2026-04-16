@@ -35,7 +35,7 @@ function main()
     epochs = 1000
     println("\nTraining AE for $epochs epochs with λdiv=$(div), λcurl=$(curl))")
 
-    AE_path = train_AE(
+    _, AE_path = train_AE(
         LuxArgs(
             epochs=500, 
             λdiv=Float64(div), 

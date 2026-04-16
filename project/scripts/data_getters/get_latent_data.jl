@@ -2,7 +2,8 @@ using Thesis
 
 
 function get_latent_data(checkpoint_path::String; save_path::Union{String,Tuple{String,String},Nothing}=nothing, batch_size=1024)
-    enc, _, _, ps, st, args = load_trained_AE(checkpoint_path; return_params=true, testmode=true)
+    ae_bundle, args = load_trained_AE(checkpoint_path; return_params=true, testmode=true)
+    enc, ps, st = ae_bundle.ae.encoder, ae_bundle.ps, ae_bundle.st
 
     normalizer = load_normalizer(checkpoint_path)
 

@@ -8,7 +8,7 @@ function physical_ass(AE_path::String, NODE_path::String; saveplot=false)
     # ins = inside(sim.flow.u)
     # @show typeof(ins)
 
-    aenode = AENODE(AE_path, node_path)
+    aenode = AENODE(AE_path, NODE_path)
 
     _, t_train, _, _ = Thesis.get_NODE_data(aenode.node_args.train_latent_path; downsample=-1,  verbose=false)    
     _, t_test,  _, _ = Thesis.get_NODE_data(aenode.node_args.test_latent_path;  downsample=-1,  verbose=false)   
