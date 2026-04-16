@@ -1,7 +1,7 @@
 Base.@kwdef struct InlineParams
     t_run = 20.0
     t_train = 16.3
-    t_accel_end = 100
+    t_accel_end = 50
     ae_epochs = 1
     node_iters = 250
     n_switch = 100
@@ -25,7 +25,7 @@ Base.@kwdef mutable struct HybridState
     node_path::String
     simdata_path::String = ""
     step::Int = 1
-    next_save::Float32 = 2.0
+    next_save::Float32 = 0
     retrain_needed::Bool = false
     mode_log::Vector{@NamedTuple{t_start::Float32, t_end::Float32, mode::String}} = @NamedTuple{t_start::Float32, t_end::Float32, mode::String}[]
 end

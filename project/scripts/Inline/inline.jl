@@ -34,12 +34,10 @@ run_hybrid!(hs)
 
 if hs.retrain_needed
     @info "Retraining triggered at sim_time=$(sim_time(hs.sim)), step=$(hs.step)"
+    push!(hs.mode_log, (t_start=sim_time(hs.sim), t_end=sim_time(hs.sim), mode="Cutoff"))
 
-    @show size(simdata.time)
     println("continueing to run simulation without AENODE")
-    simdata = run_warmup!(hs, sim_time(hs.sim)+5; simdata=simdata, save_path=simdata_path)
-    @show size(simdata.time)
-    display(plot(simdata.time))
+    simdata = run_warmup!(hs, sim_time(hs.sim) + 5; simdata=simdata, save_path=simdata_path)
 
     AE_path_tl2 = "data/saved_models/u/Lux/256h_16l/RE2500/2e8/TL2_E300_HW256x256_C4to2_nc6_nd2_z16_C8_lr0p0002_wd0p0009_bs16_NY_LL1_Tl0p0/checkpoint.jld2"
     normalizer = load_normalizer(AE_path_tl2)
@@ -52,10 +50,12 @@ if hs.retrain_needed
     hs.AE_path = AE_path_tl2
     hs.node_path = node_path_tl2
     hs.retrain_needed = false
+    
+    push!(hs.mode_log, (t_start=sim_time(hs.sim), t_end=sim_time(hs.sim), mode="Restarted"))
     run_hybrid!(hs)
 end
 
-simdata = run_warmup!(hs, params.t_accel_end; simdata=simdata, save_path=simdata_path)
-
+# simdata = run_warmup!(hs, params.t_accel_end; simdata=simdata, save_path=simdata_path)
+@show hs.mode_log
 
 save_results(hs)

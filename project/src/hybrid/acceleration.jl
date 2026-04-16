@@ -140,13 +140,17 @@ function plot_forces_comparison(res::AccelResults, t_end; t_train=nothing, t_tes
     if !isnothing(mode_log)
         train_labeled = false
         hybrid_labeled = false
+        cutoff_labeled = false
+        restarted_labeled = false
         for log in mode_log
             if log.mode == "Training"
-                vspan!(plt, [log.t_start, log.t_end]; fillcolor=:green, alpha=0.1, label=train_labeled ? "" : "Train region")
-                train_labeled = true
+                vspan!(plt, [log.t_start, log.t_end]; fillcolor=:green, alpha=0.1, label=train_labeled ? "" : "Train region"); train_labeled = true
             elseif log.mode == "Hybrid"
-                vspan!(plt, [log.t_start, log.t_end]; fillcolor=:blue, alpha=0.1, label=hybrid_labeled ? "" : "Hybrid region")
-                hybrid_labeled = true
+                vspan!(plt, [log.t_start, log.t_end]; fillcolor=:blue, alpha=0.1, label=hybrid_labeled ? "" : "Hybrid region"); hybrid_labeled = true
+            elseif log.mode == "Cutoff"
+                vline!(plt, [log.t_start]; color=:red, lw=2, label=cutoff_labeled ? "" : "Hybrid Cutoff"); cutoff_labeled = true
+            elseif log.mode == "Restarted"
+                vline!(plt, [log.t_start]; color=:green, lw=2, label=cutoff_labeled ? "" : "Hybrid Restarted"); restarted_labeled = true
             else
                 vspan!(plt, [log.t_start, log.t_end]; fillcolor=:black, alpha=0.1, label="Other")
             end
@@ -176,10 +180,10 @@ function plot_forces_comparison(res::AccelResults, t_end; t_train=nothing, t_tes
 
     rel_drag = round(m.rel_err.drag_mean, digits=2)
     rel_lift = round(m.rel_err.lift_rms, digits=2)
-    annotate!(plt, 0, -2.5,
+    annotate!(plt, 1, 1.5,
         text("Rel. error:\nMean Drag: $rel_drag %\nRMS Lift: $rel_lift %", :black, 10, :left))
 
-    plot!(plt, legend=:topright, legendalpha=0.5)
+    plot!(plt, legend=:bottomleft, legendalpha=0.5)
     return plt
 end
 
