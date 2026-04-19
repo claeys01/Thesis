@@ -33,6 +33,7 @@ simdata = run_warmup!(hs, params.t_run; u₀=u₀, save_path=simdata_path)
 run_hybrid!(hs)
 
 if hs.retrain_needed
+    GC.gc()
     @info "Retraining triggered at sim_time=$(sim_time(hs.sim)), step=$(hs.step)"
     push!(hs.mode_log, (t_start=sim_time(hs.sim), t_end=sim_time(hs.sim), mode="Cutoff"))
 
@@ -50,6 +51,7 @@ if hs.retrain_needed
     hs.AE_path = AE_path_tl2
     hs.node_path = node_path_tl2
     hs.retrain_needed = false
+    hs.step = 0
     
     push!(hs.mode_log, (t_start=sim_time(hs.sim), t_end=sim_time(hs.sim), mode="Restarted"))
     run_hybrid!(hs)

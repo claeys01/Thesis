@@ -150,7 +150,7 @@ function plot_forces_comparison(res::AccelResults, t_end; t_train=nothing, t_tes
             elseif log.mode == "Cutoff"
                 vline!(plt, [log.t_start]; color=:red, lw=2, label=cutoff_labeled ? "" : "Hybrid Cutoff"); cutoff_labeled = true
             elseif log.mode == "Restarted"
-                vline!(plt, [log.t_start]; color=:green, lw=2, label=cutoff_labeled ? "" : "Hybrid Restarted"); restarted_labeled = true
+                vline!(plt, [log.t_start]; color=:green, lw=2, label=restarted_labeled ? "" : "Hybrid Restarted"); restarted_labeled = true
             else
                 vspan!(plt, [log.t_start, log.t_end]; fillcolor=:black, alpha=0.1, label="Other")
             end

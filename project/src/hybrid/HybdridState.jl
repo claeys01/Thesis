@@ -4,9 +4,9 @@ Base.@kwdef struct InlineParams
     t_accel_end = 50
     ae_epochs = 1
     node_iters = 250
-    n_switch = 100
+    n_switch = 150
     pred_Δt = 0.35
-    save_interval = 2
+    save_interval = 1
     max_retrain_flags = 3
 end
 
@@ -157,7 +157,11 @@ function run_hybrid!(hs::HybridState)
             predict_wall_time = @elapsed begin
                 sim, n_integr, retrain_required = predict_flex(aenode, sim; Δt=Float32(params.pred_Δt), impose_biot=true, next_save=hs.next_save)
             end
-            retrain_required && (retrain_req_counter += 1)
+            # retrain_required && (retrain_req_counter += 1)
+            if retrain_required
+                retrain_req_counter += 1
+                push!(mode_log, (t_start=sim_time(sim), t_end=sim_time(sim), mode="Retrain flag"))
+            end
             sim_dt = sim_time(sim) - sim_time_before
 
             if n_integr != 0
