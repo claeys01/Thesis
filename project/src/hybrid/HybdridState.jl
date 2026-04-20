@@ -1,14 +1,14 @@
 Base.@kwdef struct InlineParams
     t_run = 10
-    t_train = 8
-    t_accel_end = 25
+    t_train = 7.5
+    t_accel_end = 20
     ae_epochs = 1
     ae_retrain_epochs = 1
     node_iters = 50
     node_retrain_iters = 50
     n_switch = 150
     pred_Δt = 0.35
-    save_interval = 1
+    save_interval = 3
     max_retrain_flags = 3
 end
 
@@ -113,14 +113,21 @@ function run_warmup!(hs::HybridState, t_end; simdata::Union{SimData,Nothing}=not
             single_period_idx=1:0,
         )
     else
-        new_u = clip_time_series(new_u)
-        new_μ₀ = clip_time_series(new_μ₀)
+        # new_u = clip_time_series(new_u)
+        # new_μ₀ = clip_time_series(new_μ₀)
         append!(simdata.time, time_vec)
         append!(simdata.Δt, Δt_vec)
-        simdata.u = cat(simdata.u, new_u; dims=4)
+        try 
+            simdata.u = cat(simdata.u, new_u; dims=4)
+            simdata.μ₀ = cat(simdata.μ₀, new_μ₀; dims=4)
+        catch e 
+            new_u = clip_time_series(new_u)
+            new_μ₀ = clip_time_series(new_μ₀)
+            simdata.u = cat(simdata.u, new_u; dims=4)
+            simdata.μ₀ = cat(simdata.μ₀, new_μ₀; dims=4)
+        end
         simdata.p = cat(simdata.p, new_p; dims=3)
         simdata.f = cat(simdata.f, new_f; dims=4)
-        simdata.μ₀ = cat(simdata.μ₀, new_μ₀; dims=4)
         append!(simdata.force, force_list)
     end
 

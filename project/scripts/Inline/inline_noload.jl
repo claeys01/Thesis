@@ -8,7 +8,7 @@ using Plots
 
 
 params = InlineParams()
-
+root_path = ""
 if is_hpc()
     root_path = "/scratch/mfbclaeys"
     # Log job info

@@ -111,9 +111,9 @@ end
 function predict_flex(aenode::AENODE, u::AbstractArray, μ₀::AbstractArray, t₀::Float32; Δt::Float32=0.35f0, next_save=0.25, verbose=true)
     z, μ₀ = encode_flow(aenode, u, μ₀)
     retrain_required = false
-    z_score = KNN_score(aenode.knn_ood, z)
-    if z_score > aenode.knn_ood.threshold
-        verbose && @warn "Encoded flow not similar to training data, AE and NODE should be retrained" z_score threshold=aenode.knn_ood.threshold
+    enc_knn_score = KNN_score(aenode.knn_ood, z)
+    if enc_knn_score > aenode.knn_ood.threshold
+        verbose && @warn "Encoded flow not similar to training data, AE and NODE should be retrained" enc_knn_score threshold=aenode.knn_ood.threshold
         return nothing, 0, true
     end
 
@@ -124,7 +124,7 @@ function predict_flex(aenode::AENODE, u::AbstractArray, μ₀::AbstractArray, t�
     while true 
         knn_score = KNN_score(aenode.knn_ood, ẑ)
         if knn_score > aenode.knn_ood.threshold
-            verbose && @warn "NODE integration too far outside of training distances, cutting of integration after $n_integr steps" z_score threshold=aenode.knn_ood.threshold
+            verbose && @warn "NODE integration too far outside of training distances, cutting of integration after $n_integr steps" knn_score threshold=aenode.knn_ood.threshold
             retrain_required = true
             break
         elseif tₙ ≥ next_save
