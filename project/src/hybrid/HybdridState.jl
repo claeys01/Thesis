@@ -3,7 +3,9 @@ Base.@kwdef struct InlineParams
     t_train = 8
     t_accel_end = 25
     ae_epochs = 1
+    ae_retrain_epochs = 1
     node_iters = 50
+    node_retrain_iters = 50
     n_switch = 150
     pred_Δt = 0.35
     save_interval = 1

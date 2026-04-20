@@ -9,14 +9,36 @@ using Plots
 
 params = InlineParams()
 
+if is_hpc()
+    root_path = "/scratch/mfbclaeys"
+    # Log job info
+    @info "Starting HPC AE+NODE retrain pipeline"
+    @info "  SLURM_JOB_ID: $(get(ENV, "SLURM_JOB_ID", "N/A"))"
+    @info "  SLURM_NTASKS: $(get(ENV, "SLURM_NTASKS", "N/A"))"
+    @info "  SLURM_CPUS_PER_TASK: $(get(ENV, "SLURM_CPUS_PER_TASK", "N/A"))"
+    @info "  Hostname: $(gethostname())"
+    @info "  Julia threads: $(Threads.nthreads())"
+
+    params = InlineParams(
+        t_run = 20, 
+        t_train = 17.5,
+        t_accel_end = 50,
+        ae_epochs = 500,
+        ae_retrain_epochs = 200,
+        node_iters = 250,
+        node_retrain_iters = 300,
+        n_switch = 150,
+        save_interval = 1, # needs to be fixed still, 
+    )
+end
+
+
 savedir = joinpath("data", "inline_runs", Dates.format(now(), "yyyy-mm-dd_HH-MM"))
 mkpath(savedir)
 simdata_path = joinpath(savedir, "U_inline.jld2")
 
 u₀ = load_u0("data/datasets/RE2500/2e8/U_128_full_u0.jld2")
 sim = circle_shedding_biot(; mem=Array, perturb=false)
-
-root_path = is_hpc() ? "/scratch/mfbclaeys" : ""
 
 hs = HybridState(sim, nothing, params, savedir, nothing, nothing)
 
@@ -28,11 +50,10 @@ ae_start = time()
 
 div = 1000.0
 curl = 100.0
-epochs = 1
 @info "AE hyperparameters" epochs=epochs λdiv=div λcurl=curl
 
 ae_args = LuxArgs(
-        epochs=1, 
+        epochs=params.ae_epochs, 
         λdiv=Float64(div), 
         λcurl=Float64(curl),
         t_training=params.t_train,
@@ -74,6 +95,7 @@ aenode = AENODE(ae_bundle, node, ae_args, node_args, normalizer; verbose=true)
 hs.aenode = aenode
 hs.AE_path = AE_path
 hs.node_path = node_path
+
 run_hybrid!(hs)
 
 if hs.retrain_needed
@@ -89,10 +111,10 @@ if hs.retrain_needed
     ae_retrain_start = time()
     ae_args = LuxArgs(
         η = 2e-4,
-        epochs=1, 
+        epochs=params.ae_retrain_epochs, 
         λdiv=Float64(div), 
         λcurl=Float64(curl),
-        t_training=sim_time(sim) * 0.9 ,
+        t_training=sim_time(sim) * 0.75 ,
         retrain=true,
         checkpoint_path=AE_path,
         full_data_path=simdata_path, 
@@ -115,7 +137,7 @@ if hs.retrain_needed
             extrapolate = false,
             latent_dim = ae_args.latent_dim,
             η = 0.005,              # lower LR for fine-tuning
-            maxiters = 50,          # more iterations
+            maxiters = params.node_retrain_iters,          # more iterations
             group_size = 20,         # keep tighter segments
             continuity_term = 400,   # stronger continuity for stability
             downsample = 600,  
@@ -141,6 +163,4 @@ if hs.retrain_needed
     run_hybrid!(hs)
 end
 
-# simdata = run_warmup!(hs, params.t_accel_end; simdata=simdata, save_path=simdata_path)
-@show hs.mode_log
 save_results(hs)
