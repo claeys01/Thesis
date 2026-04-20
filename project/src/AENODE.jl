@@ -41,13 +41,18 @@ function encode_flow(aenode::AENODE, u::AbstractArray, μ₀::AbstractArray)
     u, _ = @timeit to "normalize batch" normalize_batch(u; normalizer=aenode.normalizer)
     tmp = cat(u, μ₀; dims=3)                      # (H, W, C)
     u_in = reshape(tmp, size(tmp,1), size(tmp,2), size(tmp,3), 1)  # (H, W, C, 1)
+    dev = get_device()
+    u_in = dev(u_in)
     z, _ = @timeit to "encode" aenode.encoder(u_in, aenode.ae_params.encoder, aenode.ae_state.encoder)
     return vec(z), μ₀
 end
 
 function decode_flow(aenode::AENODE, ẑ, μ₀)
     û, _ = @timeit to "decode" aenode.decoder(ẑ, aenode.ae_params.decoder, aenode.ae_state.decoder)
-    û = @timeit to "denormalize" denormalize_batch(û, aenode.normalizer) .* repeat(μ₀, 1, 1, 1, size(ẑ, 2))
+    dev = get_device()
+    μ₀_dev = dev(μ₀)
+    û = @timeit to "denormalize" denormalize_batch(û, aenode.normalizer) .* repeat(μ₀_dev, 1, 1, 1, size(ẑ, 2))
+    û = cpu_device()(û)
     return size(û, 4) == 1 ? dropdims(û; dims=4) : û[:,:,:,2:end]
 end
 
