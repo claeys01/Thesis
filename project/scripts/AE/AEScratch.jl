@@ -1,6 +1,8 @@
 using Thesis
 using Statistics
 using Plots
+using CUDA
+
 
 root_path = is_hpc() ? "/scratch/mfbclaeys" : ""
 AE_path_tl1 = "data/saved_models/u/Lux/256h_16l/RE2500/2e8/TL1_E500_HW256x256_C4to2_nc6_nd2_z16_C8_lr0p001_wd0p0009_bs16_NY_LL1_Tl0p0/checkpoint.jld2"
