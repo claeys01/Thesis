@@ -27,8 +27,8 @@ function AENODE(ae_bundle, node::NODE, ae_args::LuxArgs, node_args::NodeArgs, no
     knnood = fit_knn_ood(get_latent_vectors(ae_bundle, normalizer, ae_args; downsample=node_args.downsample)[1])
     verbose && @info "AENODE Initialized"
     return AENODE(ae_bundle.ae.encoder, ae_bundle.ae.decoder, normalizer, ae_args, node, node_args, knnood,
-        ae_bundle.ps,  # concrete NamedTuple type inferred
-        ae_bundle.st   # concrete NamedTuple type inferred
+        ae_bundle.ps,
+        Lux.testmode(ae_bundle.st),
     )
 end
 

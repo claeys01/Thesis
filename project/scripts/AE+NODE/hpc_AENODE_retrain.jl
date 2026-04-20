@@ -65,7 +65,6 @@ GC.gc()
 # ─── retrain criteria is triggered ───
 
 
-# ================================ Step 3: Retrain AE ================================
 @info "Transfer learning criterion triggered"
 @info "── Step 3/4: Retraining AE ──"
 ae_retrain_start = time()

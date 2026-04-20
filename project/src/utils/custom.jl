@@ -38,26 +38,25 @@ function get_forces(sim::AbstractSimulation)
     return scaled_force
 end
 
+function clip_time_series(ts)
+    H, W, C, T = size(ts)
+    temp = similar(ts, eltype(ts), H-2, W-2, C, T)
+    @inbounds for i in axes(ts, 4)
+        temp[:, :, :, i] = remove_ghosts(ts[:, :, :, i])
+    end
+    return temp
+end
+
 function preprocess_data!(data::SimData;
                           verbose::Bool = true)
-
-
-    # --- boundary clipping on u and μ₀ ---
-    @inline function clip_time_series(ts)
-        H, W, C, T = size(ts)
-        temp = similar(ts, eltype(ts), H-2, W-2, C, T)
-        @inbounds for i in axes(ts, 4)
-            temp[:, :, :, i] = remove_ghosts(ts[:, :, :, i])
-        end
-        return temp
+    try
+        data.u = clip_time_series(data.u)
+        data.μ₀ = clip_time_series(data.μ₀)
+    catch
+        @info "no ghost cells; input data size (u): $(size(data.u))"
     end
 
-    data.u = clip_time_series(data.u)
-    data.μ₀ = clip_time_series(data.μ₀)
-
-    if verbose
-        @info "removed ghost cells; input data size (u): $(size(data.u))"
-    end
+    verbose && @info "removed ghost cells; input data size (u): $(size(data.u))"
 
     return data
 end

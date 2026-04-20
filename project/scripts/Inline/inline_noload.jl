@@ -1,0 +1,146 @@
+using Thesis
+using WaterLily
+using WaterLily: MeanFlow
+using Statistics
+using Dates
+using JLD2
+using Plots
+
+
+params = InlineParams()
+
+savedir = joinpath("data", "inline_runs", Dates.format(now(), "yyyy-mm-dd_HH-MM"))
+mkpath(savedir)
+simdata_path = joinpath(savedir, "U_inline.jld2")
+
+u₀ = load_u0("data/datasets/RE2500/2e8/U_128_full_u0.jld2")
+sim = circle_shedding_biot(; mem=Array, perturb=false)
+
+root_path = is_hpc() ? "/scratch/mfbclaeys" : ""
+
+hs = HybridState(sim, nothing, params, savedir, nothing, nothing)
+
+simdata = run_warmup!(hs, params.t_run; u₀=u₀, save_path=simdata_path)
+
+# ================================ Step 1: Train Autoencoder ================================
+@info "── Step 1/4: Training Autoencoder ──"
+ae_start = time()
+
+div = 1000.0
+curl = 100.0
+epochs = 1
+@info "AE hyperparameters" epochs=epochs λdiv=div λcurl=curl
+
+ae_args = LuxArgs(
+        epochs=1, 
+        λdiv=Float64(div), 
+        λcurl=Float64(curl),
+        t_training=params.t_train,
+        full_data_path=simdata_path, 
+        simdata_ram=simdata,
+    )
+
+ae_bundle, AE_path = train_AE(ae_args; return_path=true)
+ae_elapsed = round((time() - ae_start) / 60; digits=1)
+@info "AE initial training complete" elapsed_min=ae_elapsed checkpoint=AE_path
+
+normalizer = load_normalizer(AE_path)
+
+# ================================ Step 2: Train NODE ================================
+@info "── Step 2/4: Training Neural ODE ──"
+node_args = NodeArgs(
+        maxiters = params.node_iters,
+        extrapolate = false,
+        use_gpu = false,
+        latent_dim = ae_args.latent_dim,
+    )
+node_start = time()
+node, node_path = train_NODE(
+    node_args;
+    ae_bundle = ae_bundle,
+    normalizer = normalizer,
+    ae_args = ae_args,
+)
+node_elapsed = round((time() - node_start) / 60; digits=1)
+@info "NODE training complete" elapsed_min=node_elapsed node_path=node_path
+
+# @info "Steps 1-2 complete" elapsed_min=round((time() - total_start) / 60; digits=1)
+GC.gc()
+
+
+aenode = AENODE(ae_bundle, node, ae_args, node_args, normalizer; verbose=true)
+
+# hs = HybridState(sim, aenode, params, savedir, AE_path_tl1, node_path)
+hs.aenode = aenode
+hs.AE_path = AE_path
+hs.node_path = node_path
+run_hybrid!(hs)
+
+if hs.retrain_needed
+    GC.gc()
+    @info "Retraining triggered at sim_time=$(sim_time(hs.sim)), step=$(hs.step)"
+    push!(hs.mode_log, (t_start=sim_time(hs.sim), t_end=sim_time(hs.sim), mode="Cutoff"))
+
+    println("continueing to run simulation without AENODE")
+
+    simdata = run_warmup!(hs, sim_time(hs.sim) + 5; simdata=simdata, save_path=simdata_path)
+
+    # ================================ Step 3: Retrain AE ================================
+    ae_retrain_start = time()
+    ae_args = LuxArgs(
+        η = 2e-4,
+        epochs=1, 
+        λdiv=Float64(div), 
+        λcurl=Float64(curl),
+        t_training=sim_time(sim) * 0.9 ,
+        retrain=true,
+        checkpoint_path=AE_path,
+        full_data_path=simdata_path, 
+        simdata_ram=simdata,
+    )
+    
+    ae_bundle, AE_path = train_AE(ae_args; return_path=true)
+    normalizer = load_normalizer(AE_path)
+    ae_retrain_elapsed = round((time() - ae_retrain_start) / 60; digits=1)
+    @info "AE retraining complete" elapsed_min=ae_retrain_elapsed checkpoint=AE_path
+
+    # ================================ Step 4: Retrain NODE ================================
+
+    @info "── Step 4/4: Retraining Neural ODE ──"
+    GC.gc()
+    node_retrain_start = time()
+
+    node_retrain_path = train_NODE(
+        NodeArgs(
+            extrapolate = false,
+            latent_dim = ae_args.latent_dim,
+            η = 0.005,              # lower LR for fine-tuning
+            maxiters = 50,          # more iterations
+            group_size = 20,         # keep tighter segments
+            continuity_term = 400,   # stronger continuity for stability
+            downsample = 600,  
+            retrain = true,
+            multiple_shooting = true,
+            use_gpu = false, 
+            node_checkpoint = node_path,
+        );
+        ae_bundle = ae_bundle,
+        normalizer = normalizer, ae_args = ae_args,
+    )
+    node_retrain_elapsed = round((time() - node_retrain_start) / 60; digits=1)
+    @info "NODE retraining complete" elapsed_min=node_retrain_elapsed node_path=node_retrain_path
+
+
+    hs.aenode = AENODE(ae_bundle, node, ae_args, node_args, normalizer; verbose=true)
+    hs.AE_path = AE_path
+    hs.node_path = node_path
+    hs.retrain_needed = false
+    hs.step = 0
+    
+    push!(hs.mode_log, (t_start=sim_time(hs.sim), t_end=sim_time(hs.sim), mode="Restarted"))
+    run_hybrid!(hs)
+end
+
+# simdata = run_warmup!(hs, params.t_accel_end; simdata=simdata, save_path=simdata_path)
+@show hs.mode_log
+save_results(hs)

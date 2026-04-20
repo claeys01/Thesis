@@ -59,7 +59,7 @@ function NODE(latent_dim, dense_mult; tspan=(0.0f0, 1.0f0), solver=Tsit5(), abst
         # Dense(hidden_nodes, 2*hidden_nodes, activation),
         # Dense(2*hidden_nodes, hidden_nodes, activation),
         Dense(hidden_nodes, latent_dim))
-    verbose && @info "NODE initialized" latent_dim = latent_dim dense_mult = dense_mult tspan = tspan solver = typeof(solver) reltol = reltol abstol = abstol t = t activation = activation
+    verbose && @info "NODE initialized" latent_dim = latent_dim dense_mult = dense_mult tspan = tspan solver = typeof(solver) reltol = reltol abstol = abstol t = typeof(t) activation = activation
     return NODE(nn, tspan, solver, abstol, reltol, t, nothing, nothing)
 end
 

@@ -222,7 +222,7 @@ export kinetic_energy_dissipation
 export scalar_grad, grad_p
 export RHS
 export remove_ghosts, remove_buff
-export preprocess_data!
+export preprocess_data!, clip_time_series
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Exports - Data Functions

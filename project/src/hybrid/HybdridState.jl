@@ -1,9 +1,9 @@
 Base.@kwdef struct InlineParams
-    t_run = 20.0
-    t_train = 16.3
-    t_accel_end = 50
+    t_run = 10
+    t_train = 8
+    t_accel_end = 25
     ae_epochs = 1
-    node_iters = 250
+    node_iters = 50
     n_switch = 150
     pred_Δt = 0.35
     save_interval = 1
@@ -13,7 +13,7 @@ end
 Base.@kwdef mutable struct HybridState
     sim::BiotSimulation
     ref_sim::BiotSimulation
-    aenode::AENODE
+    aenode::Union{AENODE, Nothing}
     params::InlineParams
     sim_meanflow::MeanFlow
     ref_meanflow::MeanFlow
@@ -21,8 +21,8 @@ Base.@kwdef mutable struct HybridState
     n_integrs::Vector{Int}
     gif_frames::Vector{Any}
     savedir::String
-    AE_path::String
-    node_path::String
+    AE_path::Union{String, Nothing}
+    node_path::Union{String, Nothing}
     simdata_path::String = ""
     step::Int = 1
     next_save::Float32 = 0
@@ -111,6 +111,8 @@ function run_warmup!(hs::HybridState, t_end; simdata::Union{SimData,Nothing}=not
             single_period_idx=1:0,
         )
     else
+        new_u = clip_time_series(new_u)
+        new_μ₀ = clip_time_series(new_μ₀)
         append!(simdata.time, time_vec)
         append!(simdata.Δt, Δt_vec)
         simdata.u = cat(simdata.u, new_u; dims=4)
@@ -136,7 +138,7 @@ function run_warmup!(hs::HybridState, t_end; simdata::Union{SimData,Nothing}=not
     return simdata
 end
 
-function run_hybrid!(hs::HybridState)
+function run_hybrid!(hs::HybridState; verbose=true)
     (; sim, ref_sim, aenode, params, sim_meanflow, ref_meanflow,
         res, n_integrs, gif_frames, mode_log) = hs
     retrain_req_counter = 0
@@ -145,7 +147,8 @@ function run_hybrid!(hs::HybridState)
     t_hybrid_start = sim_time(sim)
 
     while sim_time(sim) < params.t_accel_end
-        if hs.step % params.n_switch == 0 && sim_time(sim) > aenode.ae_args.t_training
+        # if hs.step % params.n_switch == 0 && sim_time(sim) > aenode.ae_args.t_training
+        if hs.step % params.n_switch == 0
             if retrain_req_counter ≥ params.max_retrain_flags
                 @info "Latent trajectory exceeded limit too many times, retraining AE and NODE at $(sim_time(sim))"
                 hs.retrain_needed = true
@@ -157,7 +160,6 @@ function run_hybrid!(hs::HybridState)
             predict_wall_time = @elapsed begin
                 sim, n_integr, retrain_required = predict_flex(aenode, sim; Δt=Float32(params.pred_Δt), impose_biot=true, next_save=hs.next_save)
             end
-            # retrain_required && (retrain_req_counter += 1)
             if retrain_required
                 retrain_req_counter += 1
                 push!(mode_log, (t_start=sim_time(sim), t_end=sim_time(sim), mode="Retrain flag"))
