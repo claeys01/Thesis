@@ -50,7 +50,7 @@ ae_start = time()
 
 div = 1000.0
 curl = 100.0
-@info "AE hyperparameters" epochs=epochs λdiv=div λcurl=curl
+@info "AE hyperparameters" epochs=params.ae_epochs λdiv=div λcurl=curl
 
 ae_args = LuxArgs(
         epochs=params.ae_epochs, 

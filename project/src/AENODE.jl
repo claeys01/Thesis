@@ -44,7 +44,7 @@ function encode_flow(aenode::AENODE, u::AbstractArray, μ₀::AbstractArray)
     dev = get_device()
     u_in = dev(u_in)
     z, _ = @timeit to "encode" aenode.encoder(u_in, aenode.ae_params.encoder, aenode.ae_state.encoder)
-    return vec(z), μ₀
+    return vec(cpu_device()(z)), μ₀
 end
 
 function decode_flow(aenode::AENODE, ẑ, μ₀)
