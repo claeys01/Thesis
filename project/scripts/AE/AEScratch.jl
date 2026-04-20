@@ -9,7 +9,7 @@ AE_path_tl1 = joinpath(root_path, AE_path_tl1)
 normalizer = load_normalizer(AE_path_tl1)
 ae_bundle, ae_args = load_trained_AE(AE_path_tl1)
 
-device = get_device()
+device = gpu_device()
 batch_sizes = [1, 5, 10, 20, 30, 50]
 H, W, C = ae_args.input_dim
 

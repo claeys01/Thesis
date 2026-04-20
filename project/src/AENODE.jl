@@ -25,10 +25,13 @@ end
 
 function AENODE(ae_bundle, node::NODE, ae_args::LuxArgs, node_args::NodeArgs, normalizer::Normalizer; verbose=false, k=5, q=0.99)
     knnood = fit_knn_ood(get_latent_vectors(ae_bundle, normalizer, ae_args; downsample=node_args.downsample)[1])
+    dev = get_device()
+    # node.p0 = cpu_device()(node.p0)
+    # node.st = cpu_device()(node.st)
     verbose && @info "AENODE Initialized"
     return AENODE(ae_bundle.ae.encoder, ae_bundle.ae.decoder, normalizer, ae_args, node, node_args, knnood,
-        ae_bundle.ps,
-        Lux.testmode(ae_bundle.st),
+        dev(ae_bundle.ps),
+        Lux.testmode(dev(ae_bundle.st)),
     )
 end
 
@@ -48,11 +51,11 @@ function encode_flow(aenode::AENODE, u::AbstractArray, μ₀::AbstractArray)
 end
 
 function decode_flow(aenode::AENODE, ẑ, μ₀)
-    û, _ = @timeit to "decode" aenode.decoder(ẑ, aenode.ae_params.decoder, aenode.ae_state.decoder)
     dev = get_device()
-    μ₀_dev = dev(μ₀)
-    û = @timeit to "denormalize" denormalize_batch(û, aenode.normalizer) .* repeat(μ₀_dev, 1, 1, 1, size(ẑ, 2))
-    û = cpu_device()(û)
+    ẑ_dev = dev(ẑ)  # CPU → GPU for decoder
+    û, _ = @timeit to "decode" aenode.decoder(ẑ_dev, aenode.ae_params.decoder, aenode.ae_state.decoder)
+    û = cpu_device()(û)  # GPU → CPU
+    û = @timeit to "denormalize" denormalize_batch(û, aenode.normalizer) .* repeat(μ₀, 1, 1, 1, size(ẑ, 2))
     return size(û, 4) == 1 ? dropdims(û; dims=4) : û[:,:,:,2:end]
 end
 
