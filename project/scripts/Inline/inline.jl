@@ -67,4 +67,6 @@ end
 # simdata = run_warmup!(hs, params.t_accel_end; simdata=simdata, save_path=simdata_path)
 @show hs.mode_log
 
+
+
 save_results(hs)
