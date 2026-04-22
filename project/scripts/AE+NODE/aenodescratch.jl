@@ -1,3 +1,6 @@
+using Thesis
+using Statistics
+
 u₀ = load_u0("data/datasets/RE2500/2e8/U_128_full_u0.jld2")
 sim = circle_shedding_biot(; mem=Array, perturb=false)
 sim.flow.u .= u₀
@@ -19,6 +22,8 @@ node, node_args = load_node(node_path)
 aenode = AENODE(ae_bundle, node, ae_args, node_args, normalizer; verbose=true)
 
 next_save = 0.25 # in ctu
+sim = circle_shedding_biot(; mem=Array, perturb=false)
+sim.flow.u .= u₀
 sim, n_integr, retrain_required = predict_flex(aenode, sim;  impose_biot=false, next_save=next_save)
 @show n_integr
 

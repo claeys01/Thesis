@@ -70,3 +70,5 @@ end
 
 
 save_results(hs)
+@show size(hs.sim_meanflow.t)
+@show size(hs.ref_meanflow.t)

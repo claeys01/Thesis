@@ -8,7 +8,7 @@ Base.@kwdef struct InlineParams
     node_retrain_iters = 50
     n_switch = 150
     pred_Δt = 0.35
-    save_interval = 3
+    save_interval = 0.25
     max_retrain_flags = 3
 end
 
@@ -137,14 +137,50 @@ function run_warmup!(hs::HybridState, t_end; simdata::Union{SimData,Nothing}=not
         @info "Saved simdata to $save_path"
     end
 
-    # train_idx, _, test_idx = Thesis.get_idxs(simdata, hs.aenode.ae_args)
-    # hs.t_train_plot = simdata.time[train_idx]
-    # hs.t_test_plot = simdata.time[test_idx]
-
-    # hs.sim_meanflow = MeanFlow(hs.sim.flow; uu_stats=true)
-    # hs.ref_meanflow = MeanFlow(hs.ref_sim.flow; uu_stats=true)
-
     return simdata
+end
+
+function update_meanflow_snapshot!(meanflow::MeanFlow, u, p, t)
+    T = eltype(meanflow.P)
+    t_snapshot = T(t)
+    dt = t_snapshot - meanflow.t[end]
+    dt <= zero(T) && return meanflow
+
+    ε = dt / (dt + WaterLily.time(meanflow) + eps(T))
+    length(meanflow.t) == 1 && (ε = one(T))
+
+    @loop meanflow.P[I] = ε * p[I] + (one(T) - ε) * meanflow.P[I] over I in CartesianIndices(meanflow.P)
+    @loop meanflow.U[Ii] = ε * u[Ii] + (one(T) - ε) * meanflow.U[Ii] over Ii in CartesianIndices(meanflow.U)
+
+    if meanflow.uu_stats
+        for i in 1:ndims(meanflow.P), j in 1:ndims(meanflow.P)
+            @loop meanflow.UU[I,i,j] = ε * (u[I,i] .* u[I,j]) + (one(T) - ε) * meanflow.UU[I,i,j] over I in CartesianIndices(meanflow.P)
+        end
+    end
+
+    push!(meanflow.t, t_snapshot)
+    return meanflow
+end
+
+function update_predicted_meanflow!(meanflow::MeanFlow, sim::BiotSimulation, û_meanflow, t_meanflow)
+    if isnothing(û_meanflow) || isnothing(t_meanflow) || isempty(t_meanflow)
+        return Vector{Vector{Float32}}(), Float32[]
+    end
+
+    scratch_sim = deepcopy(sim)
+    snapshots = ndims(û_meanflow) == 3 ? reshape(û_meanflow, size(û_meanflow)..., 1) : û_meanflow
+    pred_forces = Vector{Vector{Float32}}()
+    pred_times = Float32[]
+
+    for i in eachindex(t_meanflow)
+        insert_prediction!(scratch_sim, snapshots[:, :, :, i])
+        impose_biot_bc!(scratch_sim)
+        update_meanflow_snapshot!(meanflow, scratch_sim.flow.u, scratch_sim.flow.p, t_meanflow[i])
+        push!(pred_forces, get_forces(scratch_sim))
+        push!(pred_times, Float32(t_meanflow[i]))
+    end
+
+    return pred_forces, pred_times
 end
 
 function run_hybrid!(hs::HybridState; verbose=true)
@@ -167,7 +203,14 @@ function run_hybrid!(hs::HybridState; verbose=true)
 
             sim_time_before = sim_time(sim)
             predict_wall_time = @elapsed begin
-                sim, n_integr, retrain_required = predict_flex(aenode, sim; Δt=Float32(params.pred_Δt), impose_biot=true, next_save=hs.next_save)
+                sim, n_integr, retrain_required, û_meanflow, t_meanflow = predict_flex(
+                    aenode,
+                    sim;
+                    Δt=Float32(params.pred_Δt),
+                    impose_biot=true,
+                    next_save=hs.next_save,
+                    save_interval=params.save_interval,
+                )
             end
             if retrain_required
                 retrain_req_counter += 1
@@ -176,8 +219,17 @@ function run_hybrid!(hs::HybridState; verbose=true)
             sim_dt = sim_time(sim) - sim_time_before
 
             if n_integr != 0
+                # pred_forces, pred_times = update_predicted_meanflow!(sim_meanflow, sim, û_meanflow, t_meanflow)
                 push!(n_integrs, n_integr)
-                record_prediction!(res, sim, predict_wall_time, sim_dt, hs.step)
+                record_prediction!(
+                    res,
+                    sim,
+                    predict_wall_time,
+                    sim_dt,
+                    hs.step;
+                    pred_forces=pred_forces,
+                    pred_times=pred_times,
+                )
                 println(" Inserted prediction for $n_integr steps: tU/L=$(round(sim_time(sim), digits=4)), wall time: $(round(predict_wall_time*1000, digits=4)) ms, force: $(res.hybrid_forces_preds[end])")
             else
                 @info "nothing inserted: $(sim_time(sim))"

@@ -12,6 +12,7 @@ Base.@kwdef mutable struct AccelResults
     reference_wall_times::Vector{Float64} = Float64[]
     reference_sim_times::Vector{Float64} = Float64[]
     pred_idx::Vector{Int64} = Int64[]
+    pred_ranges::Vector{UnitRange{Int64}} = UnitRange{Int64}[]
 end
 
 function force_stats(forces::Vector{Vector{Float32}})
@@ -31,15 +32,26 @@ function record_waterlily_step!(res::AccelResults, sim, wall_time)
     push!(res.hybrid_waterlily_sim_times, sim_dt)
 end
 
-function record_prediction!(res::AccelResults, sim, wall_time, sim_dt, step)
+function record_prediction!(res::AccelResults, sim, wall_time, sim_dt, step;
+    pred_forces::Vector{Vector{Float32}}=Vector{Vector{Float32}}(),
+    pred_times::Vector{Float32}=Float32[])
     forces = get_forces(sim)
     push!(res.hybrid_predict_wall_times, wall_time)
     push!(res.hybrid_predict_sim_times, sim_dt)
+    pred_start = isempty(res.hybrid_time_wat) ? 1 : length(res.hybrid_time_wat)
+
+    append!(res.hybrid_forces_preds, pred_forces)
+    append!(res.hybrid_time_pred, pred_times)
     push!(res.hybrid_forces_preds, forces)
     push!(res.hybrid_time_pred, Float32(round(sim_time(sim), digits=4)))
+
+    append!(res.hybrid_forces_wat, pred_forces)
+    append!(res.hybrid_time_wat, pred_times)
     push!(res.hybrid_forces_wat, forces)
     push!(res.hybrid_time_wat, Float32(round(sim_time(sim), digits=4)))
+
     push!(res.pred_idx, length(res.hybrid_time_wat))
+    push!(res.pred_ranges, Int64(pred_start):Int64(length(res.hybrid_time_wat)))
     return forces
 end
 
@@ -168,13 +180,12 @@ function plot_forces_comparison(res::AccelResults, t_end; t_train=nothing, t_tes
     plot!(plt, res.hybrid_time_wat, wat_lift, label="Hybrid lift", color=:blue, linewidth=1)
 
     labeled = false
-    for i in res.pred_idx
-        rng = i-1:i
+    for rng in res.pred_ranges
         plot!(plt, res.hybrid_time_wat[rng], wat_lift[rng],
             label=labeled ? "" : "Prediction",
-            color=:black, lw=2, marker=:circle, markersize=2, markerstrokewidth=1)
+            color=:black, lw=2)
         plot!(plt, res.hybrid_time_wat[rng], wat_drag[rng],
-            label="", color=:black, lw=2, marker=:circle, markersize=2, markerstrokewidth=1)
+            label="", color=:black, lw=2)
         labeled = true
     end
 
