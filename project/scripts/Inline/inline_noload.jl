@@ -86,8 +86,7 @@ node_elapsed = round((time() - node_start) / 60; digits=1)
 @info "NODE training complete" elapsed_min=node_elapsed node_path=node_path
 
 # @info "Steps 1-2 complete" elapsed_min=round((time() - total_start) / 60; digits=1)
-ae_bundle = cpu_device()(ae_bundle)
-GC.gc()
+# ae_bundle = cpu_device()(ae_bundle)
 
 
 aenode = AENODE(ae_bundle, node, ae_args, node_args, normalizer; verbose=true)
