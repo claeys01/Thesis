@@ -86,6 +86,7 @@ node_elapsed = round((time() - node_start) / 60; digits=1)
 @info "NODE training complete" elapsed_min=node_elapsed node_path=node_path
 
 # @info "Steps 1-2 complete" elapsed_min=round((time() - total_start) / 60; digits=1)
+ae_bundle = cpu_device()(ae_bundle)
 GC.gc()
 
 
@@ -129,6 +130,7 @@ if hs.retrain_needed
     # ================================ Step 4: Retrain NODE ================================
 
     @info "── Step 4/4: Retraining Neural ODE ──"
+    ae_bundle = cpu_device()(ae_bundle)
     GC.gc()
     node_retrain_start = time()
 
