@@ -23,7 +23,7 @@ if is_hpc()
         t_run = 20, 
         t_train = 17.5,
         t_accel_end = 100,
-        ae_epochs = 500,
+        ae_epochs = 1000,
         ae_retrain_epochs = 500,
         node_iters = 500,
         node_retrain_iters = 500,
