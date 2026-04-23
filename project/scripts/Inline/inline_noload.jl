@@ -106,6 +106,7 @@ if hs.retrain_needed
     println("continueing to run simulation without AENODE")
 
     simdata = run_warmup!(hs, sim_time(hs.sim) + 20; simdata=simdata, save_path=simdata_path)
+    simdata = run_warmup!(hs, sim_time(hs.sim) + 20; simdata=simdata, save_path=simdata_path)
 
     # ================================ Step 3: Retrain AE ================================
     ae_retrain_start = time()
@@ -114,6 +115,7 @@ if hs.retrain_needed
         epochs=params.ae_retrain_epochs, 
         λdiv=Float64(div), 
         λcurl=Float64(curl),
+        t_training=simdata.time[end] * 0.8 ,
         t_training=simdata.time[end] * 0.8 ,
         retrain=true,
         checkpoint_path=AE_path,

@@ -12,6 +12,7 @@ Base.@kwdef mutable struct AccelResults
     reference_wall_times::Vector{Float64} = Float64[]
     reference_sim_times::Vector{Float64} = Float64[]
     pred_idx::Vector{Int64} = Int64[]
+    pred_ranges::Vector{UnitRange{Int64}} = UnitRange{Int64}[]
 end
 
 function force_stats(forces::Vector{Vector{Float32}})
@@ -31,15 +32,28 @@ function record_waterlily_step!(res::AccelResults, sim, wall_time)
     push!(res.hybrid_waterlily_sim_times, sim_dt)
 end
 
-function record_prediction!(res::AccelResults, sim, wall_time, sim_dt, step)
+
+
+function record_prediction!(res::AccelResults, sim, wall_time, sim_dt, step;
+    pred_forces::Vector{Vector{Float32}}=Vector{Vector{Float32}}(),
+    pred_times::Vector{Float32}=Float32[])
     forces = get_forces(sim)
     push!(res.hybrid_predict_wall_times, wall_time)
     push!(res.hybrid_predict_sim_times, sim_dt)
+    pred_start = isempty(res.hybrid_time_wat) ? 1 : length(res.hybrid_time_wat)
+
+    append!(res.hybrid_forces_preds, pred_forces)
+    append!(res.hybrid_time_pred, pred_times)
     push!(res.hybrid_forces_preds, forces)
     push!(res.hybrid_time_pred, Float32(round(sim_time(sim), digits=4)))
+
+    append!(res.hybrid_forces_wat, pred_forces)
+    append!(res.hybrid_time_wat, pred_times)
     push!(res.hybrid_forces_wat, forces)
     push!(res.hybrid_time_wat, Float32(round(sim_time(sim), digits=4)))
+
     push!(res.pred_idx, length(res.hybrid_time_wat))
+    push!(res.pred_ranges, Int64(pred_start):Int64(length(res.hybrid_time_wat)))
     return forces
 end
 
@@ -131,6 +145,8 @@ end
 
 function plot_forces_comparison(res::AccelResults, t_end; t_train=nothing, t_test=nothing, mode_log=nothing)
     m = compute_metrics(res)
+    rel_drag = round(m.rel_err.drag_mean, digits=2)
+    rel_lift = round(m.rel_err.lift_rms, digits=2)
 
     plt = plot(framestyle=:box, size=(600, 400), dpi=500,
         xlabel="tU/L", ylabel="Force coefficient",
@@ -140,19 +156,11 @@ function plot_forces_comparison(res::AccelResults, t_end; t_train=nothing, t_tes
     if !isnothing(mode_log)
         train_labeled = false
         hybrid_labeled = false
-        cutoff_labeled = false
-        restarted_labeled = false
         for log in mode_log
             if log.mode == "Training"
                 vspan!(plt, [log.t_start, log.t_end]; fillcolor=:green, alpha=0.1, label=train_labeled ? "" : "Train region"); train_labeled = true
             elseif log.mode == "Hybrid"
                 vspan!(plt, [log.t_start, log.t_end]; fillcolor=:blue, alpha=0.1, label=hybrid_labeled ? "" : "Hybrid region"); hybrid_labeled = true
-            elseif log.mode == "Cutoff"
-                vline!(plt, [log.t_start]; color=:red, lw=2, label=cutoff_labeled ? "" : "Hybrid Cutoff"); cutoff_labeled = true
-            elseif log.mode == "Restarted"
-                vline!(plt, [log.t_start]; color=:green, lw=2, label=restarted_labeled ? "" : "Hybrid Restarted"); restarted_labeled = true
-            # else
-                # vspan!(plt, [log.t_start, log.t_end]; fillcolor=:black, alpha=0.1, label="Other")
             end
         end
     elseif !isnothing(t_train) && !isnothing(t_test)
@@ -160,30 +168,24 @@ function plot_forces_comparison(res::AccelResults, t_end; t_train=nothing, t_tes
     end
 
     ref_drag, ref_lift = first.(res.forces_ref), last.(res.forces_ref)
-    plot!(plt, res.time_ref, ref_drag, color=:red, ls=:dashdotdot, label="Reference drag", alpha=0.5)
-    plot!(plt, res.time_ref, ref_lift, color=:blue, ls=:dashdotdot, label="Reference lift", alpha=0.5)
+    plot!(plt, res.time_ref, ref_drag, color=:red, alpha=0.5, ls=:dashdot, label="Reference")
+    plot!(plt, res.time_ref, ref_lift, color=:blue, alpha=0.5, ls=:dashdot, label="")
 
     wat_drag, wat_lift = first.(res.hybrid_forces_wat), last.(res.hybrid_forces_wat)
-    plot!(plt, res.hybrid_time_wat, wat_drag, label="Hybrid drag", color=:red, linewidth=1)
-    plot!(plt, res.hybrid_time_wat, wat_lift, label="Hybrid lift", color=:blue, linewidth=1)
+    plot!(plt, res.hybrid_time_wat, wat_drag, label="Hybrid", color=:red, linewidth=1)
+    plot!(plt, res.hybrid_time_wat, wat_lift, label="", color=:blue, linewidth=1)
 
     labeled = false
-    for i in res.pred_idx
-        rng = i-1:i
+    for rng in res.pred_ranges
         plot!(plt, res.hybrid_time_wat[rng], wat_lift[rng],
             label=labeled ? "" : "Prediction",
-            color=:black, lw=2, marker=:circle, markersize=2, markerstrokewidth=1)
+            color=:black, lw=2.2)
         plot!(plt, res.hybrid_time_wat[rng], wat_drag[rng],
-            label="", color=:black, lw=2, marker=:circle, markersize=2, markerstrokewidth=1)
+            label="", color=:black, lw=2.2)
         labeled = true
     end
 
-    rel_drag = round(m.rel_err.drag_mean, digits=2)
-    rel_lift = round(m.rel_err.lift_rms, digits=2)
-    annotate!(plt, 1, 1.5,
-        text("Rel. error:\nMean Drag: $rel_drag %\nRMS Lift: $rel_lift %", :black, 10, :left))
-
-    plot!(plt, legend=:bottomleft, legendalpha=0.5)
+    plot!(plt, legend=:topleft, legendcolumns=1)
     return plt
 end
 
@@ -194,17 +196,20 @@ function plot_timing_bars(res::AccelResults)
         ["WaterLily\n(per step)", "Prediction\n(per call)"],
         [m.average_reference_wall, m.avg_hybrid_predict_wall],
         ylabel="Wall time (ms)", title="Average Computation Time",
-        legend=false, color=[:royalblue, :orange],
+        legend=false, color=[:steelblue, :darkorange],
         framestyle=:box, size=(400, 350), dpi=500,
         ylim=(0, m.avg_hybrid_predict_wall + 10))
 
+    y_max = max(m.total_reference_wall, m.total_hybrid_wall)
     plt_total = bar(
         ["WaterLily", "Hybrid"],
         [m.total_reference_wall, m.total_hybrid_wall],
         ylabel="Wall time (s)", title="Total Simulation Time",
-        legend=false, color=[:royalblue, :orange],
+        legend=false, color=[:steelblue, :darkorange],
         framestyle=:box, size=(400, 350), dpi=500,
-        ylim=(0, max(m.total_reference_wall, m.total_hybrid_wall) + 10))
+        ylim=(0, y_max + 10))
+    # annotate!(plt_total, 2, m.total_hybrid_wall + 0.05 * y_max,
+        # text("$(round(m.overall_speedup, digits=2))× faster", :black, 10, :center))
 
     return plt_timing, plt_total
 end
@@ -213,7 +218,7 @@ function plot_accel_combined(res::AccelResults, t_end; t_train=nothing, t_test=n
     plt_forces = plot_forces_comparison(res, t_end; t_train=t_train, t_test=t_test, mode_log=mode_log)
     plt_timing, plt_total = plot_timing_bars(res)
     return plot(plt_forces, plt_timing, plt_total;
-        layout=@layout([a; b c]), size=(800, 700))
+        layout=@layout([a{0.6h}; b c]), size=(800, 700))
 end
 
 function rst_plot(rst_term, clims)
