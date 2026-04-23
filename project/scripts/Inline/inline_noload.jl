@@ -68,6 +68,8 @@ ae_elapsed = round((time() - ae_start) / 60; digits=1)
 ae_args.simdata_ram = nothing   # release the simdata ref
 normalizer = load_normalizer(AE_path)
 
+ae_bundle = cpu_device()(ae_bundle)
+
 # ================================ Step 2: Train NODE ================================
 @info "── Step 2/4: Training Neural ODE ──"
 node_args = NodeArgs(
