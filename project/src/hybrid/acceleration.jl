@@ -151,19 +151,16 @@ function plot_forces_comparison(res::AccelResults, t_end; t_train=nothing, t_tes
     plt = plot(framestyle=:box, size=(600, 400), dpi=500,
         xlabel="tU/L", ylabel="Force coefficient",
         xlims=(0, t_end), ylims=(-3, 2),
-        title="Force Comparison  (ΔC_D = $(rel_drag)%, ΔC_L,rms = $(rel_lift)%)",
-        thickness_scaling=1.15, guidefontsize=11, tickfontsize=9,
-        legendfontsize=9, titlefontsize=12,
-        grid=:y, gridalpha=0.25)
+        title="Force Comparison")
 
     if !isnothing(mode_log)
         train_labeled = false
         hybrid_labeled = false
         for log in mode_log
             if log.mode == "Training"
-                vspan!(plt, [log.t_start, log.t_end]; fillcolor=:green, alpha=0.18, label=train_labeled ? "" : "Train region"); train_labeled = true
+                vspan!(plt, [log.t_start, log.t_end]; fillcolor=:green, alpha=0.1, label=train_labeled ? "" : "Train region"); train_labeled = true
             elseif log.mode == "Hybrid"
-                vspan!(plt, [log.t_start, log.t_end]; fillcolor=:blue, alpha=0.18, label=hybrid_labeled ? "" : "Hybrid region"); hybrid_labeled = true
+                vspan!(plt, [log.t_start, log.t_end]; fillcolor=:blue, alpha=0.1, label=hybrid_labeled ? "" : "Hybrid region"); hybrid_labeled = true
             end
         end
     elseif !isnothing(t_train) && !isnothing(t_test)
@@ -171,12 +168,12 @@ function plot_forces_comparison(res::AccelResults, t_end; t_train=nothing, t_tes
     end
 
     ref_drag, ref_lift = first.(res.forces_ref), last.(res.forces_ref)
-    plot!(plt, res.time_ref, ref_drag, color=:gray40, ls=:dash, label="Reference")
-    plot!(plt, res.time_ref, ref_lift, color=:gray40, ls=:dash, label="")
+    plot!(plt, res.time_ref, ref_drag, color=:red, alpha=0.5, ls=:dashdot, label="Reference")
+    plot!(plt, res.time_ref, ref_lift, color=:blue, alpha=0.5, ls=:dashdot, label="")
 
     wat_drag, wat_lift = first.(res.hybrid_forces_wat), last.(res.hybrid_forces_wat)
-    plot!(plt, res.hybrid_time_wat, wat_drag, label="Hybrid", color=:red, linewidth=1.3)
-    plot!(plt, res.hybrid_time_wat, wat_lift, label="", color=:blue, linewidth=1.3)
+    plot!(plt, res.hybrid_time_wat, wat_drag, label="Hybrid", color=:red, linewidth=1)
+    plot!(plt, res.hybrid_time_wat, wat_lift, label="", color=:blue, linewidth=1)
 
     labeled = false
     for rng in res.pred_ranges
@@ -201,7 +198,6 @@ function plot_timing_bars(res::AccelResults)
         ylabel="Wall time (ms)", title="Average Computation Time",
         legend=false, color=[:steelblue, :darkorange],
         framestyle=:box, size=(400, 350), dpi=500,
-        thickness_scaling=1.15, guidefontsize=11, tickfontsize=9, titlefontsize=12,
         ylim=(0, m.avg_hybrid_predict_wall + 10))
 
     y_max = max(m.total_reference_wall, m.total_hybrid_wall)
@@ -211,10 +207,9 @@ function plot_timing_bars(res::AccelResults)
         ylabel="Wall time (s)", title="Total Simulation Time",
         legend=false, color=[:steelblue, :darkorange],
         framestyle=:box, size=(400, 350), dpi=500,
-        thickness_scaling=1.15, guidefontsize=11, tickfontsize=9, titlefontsize=12,
         ylim=(0, y_max + 10))
-    annotate!(plt_total, 2, m.total_hybrid_wall + 0.05 * y_max,
-        text("$(round(m.overall_speedup, digits=2))× faster", :black, 10, :center))
+    # annotate!(plt_total, 2, m.total_hybrid_wall + 0.05 * y_max,
+        # text("$(round(m.overall_speedup, digits=2))× faster", :black, 10, :center))
 
     return plt_timing, plt_total
 end
@@ -223,7 +218,7 @@ function plot_accel_combined(res::AccelResults, t_end; t_train=nothing, t_test=n
     plt_forces = plot_forces_comparison(res, t_end; t_train=t_train, t_test=t_test, mode_log=mode_log)
     plt_timing, plt_total = plot_timing_bars(res)
     return plot(plt_forces, plt_timing, plt_total;
-        layout=@layout([a{0.6h}; b c]), size=(800, 800))
+        layout=@layout([a{0.6h}; b c]), size=(800, 700))
 end
 
 function rst_plot(rst_term, clims)

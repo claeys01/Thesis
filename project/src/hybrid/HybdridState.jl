@@ -194,13 +194,6 @@ function run_hybrid!(hs::HybridState; verbose=true)
     while sim_time(sim) < params.t_accel_end
         # if hs.step % params.n_switch == 0 && sim_time(sim) > aenode.ae_args.t_training
         if hs.step % params.n_switch == 0
-            if retrain_req_counter ≥ params.max_retrain_flags
-                @info "Latent trajectory exceeded limit too many times, retraining AE and NODE at $(sim_time(sim))"
-                hs.retrain_needed = true
-                push!(mode_log, (t_start=t_hybrid_start, t_end=sim_time(sim), mode="Hybrid"))
-                return hs
-            end
-
             sim_time_before = sim_time(sim)
             predict_wall_time = @elapsed begin
                 sim, n_integr, retrain_required, û_meanflow, t_meanflow = predict_flex(
@@ -254,6 +247,13 @@ function run_hybrid!(hs::HybridState; verbose=true)
         end
 
         hs.step += 1
+
+        if retrain_req_counter ≥ params.max_retrain_flags
+            @info "Latent trajectory exceeded limit too many times, retraining AE and NODE at $(sim_time(sim))"
+            hs.retrain_needed = true
+            push!(mode_log, (t_start=t_hybrid_start, t_end=sim_time(sim), mode="Hybrid"))
+            return hs
+        end
     end
 
     push!(mode_log, (t_start=t_hybrid_start, t_end=sim_time(sim), mode="Hybrid"))

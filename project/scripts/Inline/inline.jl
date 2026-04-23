@@ -74,8 +74,8 @@ if hs.retrain_needed
     
     push!(hs.mode_log, (t_start=sim_time(hs.sim), t_end=sim_time(hs.sim), mode="Restarted"))
     run_hybrid!(hs)
-    if sim_time(hs.sim) < params.t_end
-        simdata = run_warmup!(hs, params.t_end; simdata=simdata, save_path=simdata_path)
+    if sim_time(hs.sim) < params.t_accel_end
+        simdata = run_warmup!(hs, params.t_accel_end; simdata=simdata, save_path=simdata_path)
     end
 end
 
