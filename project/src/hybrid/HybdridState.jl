@@ -219,7 +219,7 @@ function run_hybrid!(hs::HybridState; verbose=true)
             sim_dt = sim_time(sim) - sim_time_before
 
             if n_integr != 0
-                # pred_forces, pred_times = update_predicted_meanflow!(sim_meanflow, sim, û_meanflow, t_meanflow)
+                pred_forces, pred_times = update_predicted_meanflow!(sim_meanflow, sim, û_meanflow, t_meanflow)
                 push!(n_integrs, n_integr)
                 record_prediction!(
                     res,

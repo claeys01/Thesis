@@ -7,7 +7,19 @@ using JLD2
 using Plots
 
 
-params = InlineParams()
+params = InlineParams(
+        t_run = 10, 
+        t_train = 7.5,
+        t_accel_end = 50,
+        ae_epochs = 500,
+        ae_retrain_epochs = 500,
+        node_iters = 500,
+        node_retrain_iters = 500,
+        n_switch = 150,
+        pred_Δt = 0.35,
+        save_interval = 0.25, # needs to be fixed still, 
+        max_retrain_flags = 3
+    )
 
 savedir = joinpath("data", "inline_runs", Dates.format(now(), "yyyy-mm-dd_HH-MM"))
 mkpath(savedir)
@@ -62,6 +74,9 @@ if hs.retrain_needed
     
     push!(hs.mode_log, (t_start=sim_time(hs.sim), t_end=sim_time(hs.sim), mode="Restarted"))
     run_hybrid!(hs)
+    if sim_time(hs.sim) < params.t_end
+        simdata = run_warmup!(hs, params.t_end; simdata=simdata, save_path=simdata_path)
+    end
 end
 
 # simdata = run_warmup!(hs, params.t_accel_end; simdata=simdata, save_path=simdata_path)
