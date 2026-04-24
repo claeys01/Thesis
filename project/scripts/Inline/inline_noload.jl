@@ -22,12 +22,13 @@ if is_hpc()
     params = InlineParams(
         t_run = 20, 
         t_train = 17.5,
-        t_accel_end = 100,
-        ae_epochs = 1000,
-        ae_retrain_epochs = 500,
-        node_iters = 500,
-        node_retrain_iters = 500,
+        t_accel_end = 50,
+        ae_epochs = 500,
+        ae_retrain_epochs = 250,
+        node_iters = 250,
+        node_retrain_iters = 250,
         n_switch = 150,
+        max_retrain_flags = 4,
         save_interval = 0.25, # needs to be fixed still, 
     )
 end
@@ -110,7 +111,7 @@ if hs.retrain_needed
 
     println("continueing to run simulation without AENODE")
 
-    simdata = run_warmup!(hs, sim_time(hs.sim) + 20; simdata=simdata, save_path=simdata_path)
+    simdata = run_warmup!(hs, sim_time(hs.sim) + 10; simdata=simdata, save_path=simdata_path)
 
     # ================================ Step 3: Retrain AE ================================
     ae_retrain_start = time()
