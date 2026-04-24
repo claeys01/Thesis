@@ -33,7 +33,7 @@ if is_hpc()
 end
 
 
-savedir = joinpath("data", "inline_runs", Dates.format(now(), "yyyy-mm-dd_HH-MM"))
+savedir = joinpath(root_path, "data", "inline_runs", Dates.format(now(), "yyyy-mm-dd_HH-MM"))
 mkpath(savedir)
 simdata_path = joinpath(savedir, "U_inline.jld2")
 
@@ -54,6 +54,7 @@ curl = 100.0
 
 ae_args = LuxArgs(
         epochs=params.ae_epochs, 
+        save_path=savedir,
         λdiv=Float64(div), 
         λcurl=Float64(curl),
         t_training=params.t_train,
@@ -73,6 +74,7 @@ ae_bundle = cpu_device()(ae_bundle)
 # ================================ Step 2: Train NODE ================================
 @info "── Step 2/4: Training Neural ODE ──"
 node_args = NodeArgs(
+        save_path=savedir,
         maxiters = params.node_iters,
         extrapolate = false,
         use_gpu = false,
@@ -120,6 +122,7 @@ if hs.retrain_needed
         t_training=simdata.time[end] * 0.8 ,
         retrain=true,
         checkpoint_path=AE_path,
+        save_path=savedir,
         full_data_path=simdata_path, 
         simdata_ram=simdata,
     )
@@ -136,6 +139,7 @@ if hs.retrain_needed
     GC.gc()
     node_retrain_start = time()
     node_retrain_args = NodeArgs(
+            save_path=savedir,
             extrapolate = false,
             latent_dim = ae_args.latent_dim,
             η = 0.005,              # lower LR for fine-tuning

@@ -7,7 +7,7 @@ function train_AE(args::LuxArgs; return_path=false)
     timestamp = Dates.format(now(), "udd-HHMM")
     tag = run_tag(args)
 
-    save_folder = joinpath(args.save_path, "$(timestamp)__$(tag)")
+    save_folder = joinpath(args.save_path, "AE_$(timestamp)__$(tag)")
     !ispath(save_folder) && mkpath(save_folder)
 
     filepath = joinpath(save_folder, "checkpoint.jld2")
