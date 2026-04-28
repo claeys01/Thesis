@@ -8,12 +8,13 @@ function make_sim_gif(; Re=2500, n=2^9, m=2^9, t_end=30.0, Δt=0.25,
                        gif_path="gifs/shedding_Re$(Re)_$(n)x$(m).gif")
 
     sim = circle_shedding_biot(; Re=Re, n=n, m=m, mem=Array, Δt=Δt)
-    @show sim.L
     mkpath(dirname(gif_path))
     anim = Plots.Animation()
 
     frame_count = 0
     step_count = 0
+    t_end += 50
+    sim_step!(sim, 50)
     while sim_time(sim) < t_end
         sim_step!(sim)
         sim_info(sim)
@@ -29,9 +30,9 @@ function make_sim_gif(; Re=2500, n=2^9, m=2^9, t_end=30.0, Δt=0.25,
             framestyle=:none,
             border=:none,
             colorbar=false,
-            title=@sprintf("t = %.2f  |  Re = %d", sim_time(sim), Re),
-            titlefontsize=10,
-            dpi=150,
+            # title=@sprintf("t = %.2f  |  Re = %d", sim_time(sim), Re),
+            # titlefontsize=10,
+            dpi=350,
             size=(800, 800))
 
         frame(anim, plt)
@@ -44,5 +45,5 @@ function make_sim_gif(; Re=2500, n=2^9, m=2^9, t_end=30.0, Δt=0.25,
 end
 
 if abspath(PROGRAM_FILE) == (@__FILE__) || isinteractive()
-    make_sim_gif(; Re=2500, n=2^9, m=2^9, sample_every=20, fps=30, t_end=30)
+    make_sim_gif(; Re=2500, n=2^8, m=2^8, sample_every=5, fps=45, t_end=50)
 end

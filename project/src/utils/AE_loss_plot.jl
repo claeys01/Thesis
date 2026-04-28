@@ -96,7 +96,7 @@ function plot_losses(loss_trajectory_path::AbstractString, checkpoint_path::Abst
     # optional extra loss terms if enabled
     if args.λdiv != 0 && !isempty(div_losses)
         plot!(p, iters, div_losses;
-            label = "divergence term",
+            label = "∇⋅u",
             lw = 0.8,
             ls = :dot,
             color = :purple,
@@ -106,7 +106,7 @@ function plot_losses(loss_trajectory_path::AbstractString, checkpoint_path::Abst
 
     if args.λcurl != 0 && !isempty(curl_losses)
         plot!(p, iters, curl_losses;
-            label = "curl term",
+            label = "ω loss",
             lw = 0.8,
             ls = :dashdot,
             color = :orange,
@@ -206,7 +206,7 @@ function plot_losses(loss_trajectory_path::AbstractString, checkpoint_path::Abst
     # shrink legend boxes (border thin)
     plot!(p; legend = (0.9,0.3), legendfontsize=8, foreground_color_legend=:black,
              background_color_legend=RGBA(1,1,1,0.7))
-    plot!(p2; legend = (0.9,0.9), legendfontsize=8, foreground_color_legend=:black,
+    plot!(p2; legend = (0.88,0.9), legendfontsize=8, foreground_color_legend=:black,
              background_color_legend=RGBA(1,1,1,0.7))
 
     
@@ -215,9 +215,10 @@ function plot_losses(loss_trajectory_path::AbstractString, checkpoint_path::Abst
 end
 
 
-# checkpoint = "data/Lux_models/2025-12-18_14-27-49/checkpoint.jld2"
-# losses = "data/Lux_models/2025-12-18_14-27-49/loss_trajectory.jld2"
+# checkpoint = "data/saved_models/u/Lux/256h_16l/RE2500/2e8/TL1_E500_HW256x256_C4to2_nc6_nd2_z16_C8_lr0p001_wd0p0009_bs16_NY_LL1_Tl0p0/checkpoint.jld2"
+# losses = "data/saved_models/u/Lux/256h_16l/RE2500/2e8/TL1_E500_HW256x256_C4to2_nc6_nd2_z16_C8_lr0p001_wd0p0009_bs16_NY_LL1_Tl0p0/loss_trajectory.jld2"
 
 # p = plot_losses(losses, checkpoint)
 # display(p)
-# savefig(p, "data/Lux_models/2025-12-01_17-16-32/loss_evolution.png")
+# savefig(
+# p, "data/Lux_models/2025-12-01_17-16-32/loss_evolution.png")

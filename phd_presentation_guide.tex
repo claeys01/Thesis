@@ -1,0 +1,248 @@
+\documentclass[11pt, a4paper]{article}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{parskip}
+
+\title{\textbf{PhD Presentation Guide}\\
+\large Hybrid AE-NODE Acceleration of CFD --- 15-Minute Talk}
+\author{Matthias Claeys}
+\date{}
+
+\begin{document}
+\maketitle
+
+% ─────────────────────────────────────────────────────────────
+\section*{What Your Thesis Is}
+
+You built a hybrid ML-CFD accelerator for 2D vortex shedding past a cylinder.
+The core idea: replace expensive WaterLily Navier-Stokes solver steps with a fast
+Autoencoder + Neural ODE surrogate, while using KNN-based out-of-distribution (OOD)
+detection to know when the ML model can no longer be trusted and the true solver
+must resume.
+
+\textbf{Key numbers to remember:}
+\begin{itemize}[noitemsep]
+  \item Flow field: $256\times256\times2 = 131{,}072$ floats compressed to \textbf{16 floats} (ratio 8192:1)
+  \item NODE network: only $\sim$1,536 parameters --- tiny and microsecond-fast
+  \item Physics loss weights: $\lambda_\text{div} = 1000$, $\lambda_\text{curl} = 100$
+  \item KNN threshold: 99th percentile of training distribution distances ($k=5$)
+  \item Hybrid switch: every 150 CFD steps, attempt an ML prediction
+  \item Warmup / training window: $t \in [0,\,17.5]$ tU/L; hybrid acceleration up to $t = 50$
+\end{itemize}
+
+% ─────────────────────────────────────────────────────────────
+\section*{Slide-by-Slide Breakdown}
+
+\subsection*{Slide 1 --- Title \hfill \normalfont\textit{0:00--0:30}}
+
+``Physics-Informed Latent Space Acceleration of Incompressible CFD\\
+via Hybrid AE-NODE with Adaptive OOD Control''
+
+Your name, supervisor, institution.
+
+% ─────────────────────────────────────────────────────────────
+\subsection*{Slide 2 --- Motivation \hfill \normalfont\textit{0:30--2:00}}
+
+\textbf{Hook:} Turbulence simulation is one of the most computationally expensive tasks in
+engineering. A single Re$=2500$ vortex shedding run on a $256\times256$ grid is far
+slower than the physical time being simulated.
+
+\begin{itemize}
+  \item Show a single vortex shedding frame (velocity flood plot or GIF frame)
+  \item \textbf{Problem:} Can we replace 90\%+ of CFD steps with fast ML without
+        sacrificing physical accuracy?
+  \item \textbf{Why it's hard:} High-dimensional fields, nonlinear chaotic dynamics,
+        hard physical constraints (mass conservation, vorticity transport)
+\end{itemize}
+
+% ─────────────────────────────────────────────────────────────
+\subsection*{Slide 3 --- System Overview \hfill \normalfont\textit{2:00--3:30}}
+
+A single pipeline diagram (keep it simple):
+
+\begin{center}
+CFD (WaterLily) $\to$ Snapshots $\to$ AE Encoder $\to$
+$z\in\mathbb{R}^{16}$ $\to$ NODE $\to$ $\hat{z}(t+\Delta t)$
+$\to$ AE Decoder $\to$ $\hat{u}$
+\end{center}
+\begin{center}
+$\downarrow$\\
+KNN OOD Check $\to$ fallback to CFD if out-of-distribution
+\end{center}
+
+Three components: \textbf{Autoencoder} (compression), \textbf{Neural ODE} (dynamics),
+\textbf{KNN OOD} (safety valve). Set the architecture; next slides unpack each piece.
+
+% ─────────────────────────────────────────────────────────────
+\subsection*{Slide 4 --- Autoencoder: Physics-Constrained Compression \hfill \normalfont\textit{3:30--5:30}}
+
+\textbf{Architecture:} 6-layer convolutional encoder $\to$ 16-dim latent $\to$ 6-layer
+bilinear-upsample decoder. Input is 4-channel: $(u, v, \mu_{0,x}, \mu_{0,y})$ ---
+the body mask is concatenated so the network knows where the cylinder is.
+
+\textbf{Key innovation --- physics losses:}
+
+\begin{center}
+\begin{tabular}{lrl}
+\toprule
+\textbf{Loss} & \textbf{Weight} & \textbf{Purpose} \\
+\midrule
+Reconstruction (L1) & $1\times$ & Field accuracy \\
+Divergence $\|\nabla\cdot\hat{u}\|_2$ & $\lambda = 1000$ & Mass conservation \\
+Curl MSE $\|\omega - \hat{\omega}\|_2$ & $\lambda = 100$ & Vorticity accuracy \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The finite-difference stencils for divergence and curl exactly replicate WaterLily's
+internal scheme --- the network is penalized for violating physics in the same
+numerical sense as the solver it replaces.
+
+Also mention: ghost-cell clipping (\texttt{clip\_bc}) so boundary halos don't pollute training.
+
+% ─────────────────────────────────────────────────────────────
+\subsection*{Slide 5 --- Neural ODE: Dynamics in Latent Space \hfill \normalfont\textit{5:30--7:30}}
+
+The NODE parameterizes $dz/dt = f_\theta(z)$ with a tiny MLP
+(Dense $16\to48\to16$, \texttt{tanhshrink} activation), integrated with \texttt{Tsit5()}.
+
+\textbf{Multiple shooting training:}
+\begin{itemize}
+  \item Split time series into windows of 20 points
+  \item Each window integrated independently from its own initial condition
+  \item Continuity penalty (weight $= 200$) enforces consistency at segment boundaries
+  \item Avoids gradient explosion over long chaotic trajectories
+\end{itemize}
+
+Show: Extrapolation plot --- train region vs.\ test region, predicted trajectory
+vs.\ ground truth per latent dimension. Point out how the 16 latent dims capture
+the shedding cycle periodicity.
+
+% ─────────────────────────────────────────────────────────────
+\subsection*{Slide 6 --- KNN OOD Detection \hfill \normalfont\textit{7:30--9:00}}
+
+\textbf{Problem:} A trained NODE will eventually drift outside its training distribution.
+Predicting there produces physically wrong results.
+
+\textbf{Solution:}
+\begin{enumerate}
+  \item Fit a KD-tree on training latent vectors (L2-normalised $\to$ scale-invariant metric)
+  \item For any new latent point: compute mean distance to $k=5$ nearest neighbours
+  \item If distance $>$ 99th percentile of training distances $\to$ OOD $\to$ stop
+\end{enumerate}
+
+\textbf{Adaptive rollout (\texttt{predict\_flex}):} Don't commit to $N$ steps upfront.
+Integrate one step at a time, check OOD after each. Stop when score exceeds threshold.
+This is the key safety mechanism that makes the hybrid approach \emph{reliable}, not just fast.
+
+% ─────────────────────────────────────────────────────────────
+\subsection*{Slide 7 --- Hybrid Runner \hfill \normalfont\textit{9:00--10:30}}
+
+Four phases:
+\begin{enumerate}
+  \item \textbf{Warmup} ($t = 0$--$17.5$ tU/L): Pure CFD, collect training snapshots
+  \item \textbf{Training}: Train AE $\to$ encode latents $\to$ train NODE (all in-memory)
+  \item \textbf{Hybrid loop} ($t = 17.5$--$50$ tU/L): Every 150 CFD steps, attempt ML
+        prediction. If OOD flags $\geq 3$, extend CFD and retrain
+  \item \textbf{Mean-flow maintenance}: Decode intermediate latent snapshots, enforce
+        Biot-Savart BCs, accumulate Reynolds-averaged statistics
+\end{enumerate}
+
+Show: The 3-panel \texttt{plt\_combined.png} --- force over time with
+train/hybrid/retrain regions colour-coded, wall-time bars.
+
+% ─────────────────────────────────────────────────────────────
+\subsection*{Slide 8 --- Results \hfill \normalfont\textit{10:30--13:00}}
+
+\begin{itemize}
+  \item \textbf{Speed:} Overall speedup = total reference wall time / hybrid wall time
+  \item \textbf{Force coefficients:} Drag $C_D$ mean error and Lift $C_L$ RMS error vs.\ reference
+  \item \textbf{Reynolds stress tensor:} $\langle u'u'\rangle$, $\langle v'v'\rangle$,
+        $\langle u'v'\rangle$ --- spatial comparison maps (\texttt{rst\_comp\_plot.png})
+  \item \textbf{Mean flow:} $\langle u\rangle$, $\langle v\rangle$ fields, hybrid vs.\ reference
+        (\texttt{plt\_meanflow.png})
+  \item \textbf{Divergence:} $\|\nabla\cdot\hat{u}\|$ near zero (physics constraint satisfied)
+\end{itemize}
+
+\textbf{Key message:} The hybrid system maintains turbulence statistics even during
+ML-accelerated periods, because mean-flow accumulation is preserved through
+\texttt{update\_predicted\_meanflow!}.
+
+% ─────────────────────────────────────────────────────────────
+\subsection*{Slide 9 --- Conclusions \& Future Work \hfill \normalfont\textit{13:00--15:00}}
+
+\textbf{What you showed:}
+\begin{itemize}[noitemsep]
+  \item Latent space dynamics of vortex shedding can be learned with a 16-dim NODE
+  \item Physics-informed losses enforce mass conservation and vorticity in the compressed space
+  \item KNN OOD detection provides a principled fallback --- the system knows when it doesn't know
+  \item Full pipeline runs online: warm up, train, accelerate, retrain if needed
+\end{itemize}
+
+\textbf{Honest limitations:}
+\begin{itemize}[noitemsep]
+  \item Trained on one Re; generalization requires transfer learning (TL1/TL2 already implemented)
+  \item Fixed cylinder geometry; extension to other shapes is non-trivial
+  \item Biot-Savart BCs must be re-imposed after each ML step --- overhead cost
+\end{itemize}
+
+\textbf{Future work:}
+\begin{itemize}[noitemsep]
+  \item Conditional NODEs parameterised by Re (generalise across flow regimes)
+  \item Uncertainty quantification beyond KNN (ensemble NODEs)
+  \item 3D extension: same architecture, massively higher compression ratio
+\end{itemize}
+
+% ─────────────────────────────────────────────────────────────
+\section*{Timing Summary}
+
+\begin{center}
+\begin{tabular}{clr}
+\toprule
+\textbf{Slide} & \textbf{Topic} & \textbf{Time} \\
+\midrule
+1 & Title & 0:30 \\
+2 & Motivation & 1:30 \\
+3 & System overview & 1:30 \\
+4 & Autoencoder & 2:00 \\
+5 & Neural ODE & 2:00 \\
+6 & KNN OOD & 1:30 \\
+7 & Hybrid runner & 1:30 \\
+8 & Results & 2:30 \\
+9 & Conclusions & 2:00 \\
+\midrule
+\textbf{Total} & & \textbf{15:00} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+% ─────────────────────────────────────────────────────────────
+\section*{Tips for the Committee}
+
+\begin{enumerate}
+  \item \textbf{Lead with physical intuition, not ML jargon.} Say ``we compress the flow
+        to a 16-number fingerprint and learn how those numbers evolve'' before saying
+        ``autoencoder + neural ODE.''
+
+  \item \textbf{The OOD detection is your strongest differentiator.} Most ML-CFD work
+        ignores when to trust the model. You do not. Emphasise this.
+
+  \item \textbf{Have \texttt{plt\_combined.png} ready} as the single most convincing slide.
+        Seeing the force coefficients track the reference during the hybrid phase is immediately
+        compelling.
+
+  \item \textbf{Be ready to explain the physics loss weights}
+        ($\lambda_\text{div}=1000$, $\lambda_\text{curl}=100$). Divergence violations are
+        physically catastrophic (mass non-conservation), justifying the heavy penalty.
+
+  \item \textbf{Multiple shooting question:} Why not train the NODE end-to-end?
+        Answer: gradient explosion over long chaotic trajectories makes direct rollout
+        training unstable; multiple shooting is standard in scientific ML.
+
+  \item \textbf{Why 16 latent dims?} Smallest dimension that keeps reconstruction error
+        below target (test loss $\approx 0.047$). The shedding cycle has low intrinsic
+        dimensionality.
+\end{enumerate}
+
+\end{document}

@@ -91,7 +91,7 @@ function train_NODE(args::NodeArgs;
     anim = Plots.Animation()
     iter_start_time = Ref(time())
 
-    callback = function (state, l; plotting=false, gif=false)
+    callback = function (state, l; plotting=false, gif=true)
         step = state.iter              # current iteration index
         if step % eval_every == 0
             push!(epochs, step)
