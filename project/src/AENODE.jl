@@ -117,7 +117,7 @@ function predict_flex(aenode::AENODE, u::AbstractArray, μ₀::AbstractArray, t�
     knn_score = KNN_score(aenode.knn_ood, z)
     if knn_score > aenode.knn_ood.threshold
         verbose && @warn "Encoded flow not similar to training data, AE and NODE should be retrained" knn_score threshold=aenode.knn_ood.threshold
-        return nothing, 0, true, nothing, nothing
+        # return nothing, 0, true, nothing, nothing
     end
 
     # NODE integration untill cutoff criteria is met.
