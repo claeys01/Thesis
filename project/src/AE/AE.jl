@@ -119,7 +119,7 @@ function get_data(batch_size::Int64, path::String; t_training=10, n_training=500
     # train_idx, val_idx, test_idx = get_idxs(simdata, t_training, n_training, n_test; split=split)
     idxs = get_idxs(simdata, t_training, n_training, n_test; split=split)
 
-    plt = train_force_plot(simdata; train_idx=idxs.train_idx, val_idx=idxs.val_idx, test_idx=idxs.test_idx)
+    plt = train_force_plot(simdata; train_idx=idxs.train_idx, val_idx=idxs.val_idx, test_idx=idxs.test_idx, show_zeros=false)
     showplot && display(plt)
     if !isnothing(plotpath)
         savefig(plt, plotpath)

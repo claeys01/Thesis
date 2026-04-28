@@ -24,6 +24,6 @@ end
 function KNN_score(model::KNNOOD, z::AbstractVector)
     znorm = z / norm(z)
     idxs, dists = knn(model.tree, znorm, model.k, true)
-    return mean(dists)
-    # return dists[end]
+    # return mean(dists)
+    return dists[end]
 end

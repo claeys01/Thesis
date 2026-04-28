@@ -33,6 +33,9 @@ using Random
 checkpoint = "data/saved_models/u/Lux/256h_16l/RE2500/2e8/TL1_E500_HW256x256_C4to2_nc6_nd2_z16_C8_lr0p001_wd0p0009_bs16_NY_LL1_Tl0p0/checkpoint.jld2"
 losses = "data/saved_models/u/Lux/256h_16l/RE2500/2e8/TL1_E500_HW256x256_C4to2_nc6_nd2_z16_C8_lr0p001_wd0p0009_bs16_NY_LL1_Tl0p0/loss_trajectory.jld2"
 
-p = plot_losses(losses, checkpoint)
-display(p)
-savefig(p, "data/saved_models/u/Lux/256h_16l/RE2500/2e8/TL1_E500_HW256x256_C4to2_nc6_nd2_z16_C8_lr0p001_wd0p0009_bs16_NY_LL1_Tl0p0/loss_evolution.png")
+# p = plot_losses(losses, checkpoint)
+# display(p)
+# savefig(p, "data/saved_models/u/Lux/256h_16l/RE2500/2e8/TL1_E500_HW256x256_C4to2_nc6_nd2_z16_C8_lr0p001_wd0p0009_bs16_NY_LL1_Tl0p0/loss_evolution.png")
+
+ae_bundle, args = load_trained_AE(checkpoint)
+@show dump(args)

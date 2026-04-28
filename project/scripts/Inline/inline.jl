@@ -8,7 +8,7 @@ using Plots
 
 
 params = InlineParams(
-        t_run = 10, 
+        t_run = 16.603, 
         t_train = 7.5,
         t_accel_end = 50,
         ae_epochs = 500,

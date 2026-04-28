@@ -8,7 +8,7 @@ Base.@kwdef mutable struct NodeArgs
     abstol = 1e-5
     seed = 42                   # random seed
     latent_dim = 16
-    dense_mult = 3
+    dense_mult = 2
     activation = tanhshrink
     n_reconstruct = 4
     downsample = 300

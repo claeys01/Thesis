@@ -21,12 +21,12 @@ if is_hpc()
 
     params = InlineParams(
         t_run = 20, 
-        t_train = 17.5,
+        t_train = 16.603,
         t_accel_end = 50,
         ae_epochs = 500,
         ae_retrain_epochs = 250,
-        node_iters = 250,
-        node_retrain_iters = 250,
+        node_iters = 500,
+        node_retrain_iters = 300,
         n_switch = 150,
         max_retrain_flags = 4,
         save_interval = 0.25, # needs to be fixed still, 
@@ -58,6 +58,7 @@ ae_args = LuxArgs(
         save_path=savedir,
         λdiv=Float64(div), 
         λcurl=Float64(curl),
+        train_downsample=500,
         t_training=params.t_train,
         full_data_path=simdata_path, 
         simdata_ram=simdata,
@@ -93,7 +94,6 @@ node_elapsed = round((time() - node_start) / 60; digits=1)
 
 # @info "Steps 1-2 complete" elapsed_min=round((time() - total_start) / 60; digits=1)
 # ae_bundle = cpu_device()(ae_bundle)
-
 
 aenode = AENODE(ae_bundle, node, ae_args, node_args, normalizer; verbose=true)
 
@@ -143,7 +143,7 @@ if hs.retrain_needed
             save_path=savedir,
             extrapolate = false,
             latent_dim = ae_args.latent_dim,
-            η = 0.005,              # lower LR for fine-tuning
+            η = 0.01,              # lower LR for fine-tuning
             maxiters = params.node_retrain_iters,          # more iterations
             group_size = 20,         # keep tighter segments
             continuity_term = 400,   # stronger continuity for stability
