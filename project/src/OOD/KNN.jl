@@ -17,7 +17,11 @@ function fit_knn_ood(Ztrain::AbstractMatrix; k=5, q=0.99)
         push!(train_scores, mean(dists[2:end]))
     end
     # display(plot(train_scores))
-    threshold = quantile(train_scores, q)
+    if q < 1
+        threshold = quantile(train_scores, q)
+    else
+        threshold = quantile(train_scores, 1) * q
+    end
     return KNNOOD(tree, k, threshold)
 end
 

@@ -33,7 +33,11 @@ checkpoint = JLD2.load(AE_path)
 args_dict = checkpoint["args"]
 ae_args = LuxArgs(; args_dict...)
 
-
+sim = circle_shedding_biot()
+p = Thesis.u_flood(sim.flow.μ₀[2:end-1, 2:end-1, 2])
+@show size(p)
+plot!(p, colorbar=true, clims=(0,1), title="")
+display(p)
 # retraindata = simdata = load_simdata(tl_path)
 # @show simdata.time[end] simdata.time[1]
 

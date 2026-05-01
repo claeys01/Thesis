@@ -8,7 +8,7 @@ using Plots
 
 
 params = InlineParams(
-        t_run = 1.603, 
+        t_run = 16.03, 
         t_train = 7.5,
         t_accel_end = 50,
         ae_epochs = 500,
@@ -17,7 +17,7 @@ params = InlineParams(
         node_retrain_iters = 500,
         n_switch = 150,
         pred_Δt = 0.35,
-        save_interval = 0.25, # needs to be fixed still, 
+        save_interval = 0.25/2, # needs to be fixed still, 
         max_retrain_flags = 3
     )
 
