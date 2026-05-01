@@ -14,7 +14,8 @@ function fit_knn_ood(Ztrain::AbstractMatrix; k=5, q=0.99)
     for i in axes(Ztrain, 2)
         # idxs, dists = knn(tree, Ztrain[:, i], k + 1, true)
         idxs, dists = knn(tree, Znorm[:, i], k + 1, true)
-        push!(train_scores, mean(dists[2:end]))
+        # push!(train_scores, mean(dists[2:end]))
+        push!(train_scores, dists[end])
     end
     # display(plot(train_scores))
     if q < 1
