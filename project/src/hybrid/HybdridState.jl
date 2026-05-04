@@ -183,6 +183,7 @@ function update_predicted_meanflow!(meanflow::MeanFlow, sim::BiotSimulation, û
     return pred_forces, pred_times
 end
 
+# function run_hybrid!(hs::HybridState; simdata::Union{SimData,Nothing}=nothing, save_path=nothing, verbose=true)
 function run_hybrid!(hs::HybridState; verbose=true)
     (; sim, ref_sim, aenode, params, sim_meanflow, ref_meanflow,
         res, n_integrs, gif_frames, mode_log) = hs
