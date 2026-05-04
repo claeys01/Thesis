@@ -49,8 +49,8 @@ simdata = run_warmup!(hs, params.t_run; u₀=u₀, save_path=simdata_path)
 @info "── Step 1/4: Training Autoencoder ──"
 ae_start = time()
 
-div = 1000.0
-curl = 100.0
+div = 100.0
+curl = 10.0
 @info "AE hyperparameters" epochs=params.ae_epochs λdiv=div λcurl=curl
 
 ae_args = LuxArgs(
