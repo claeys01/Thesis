@@ -25,7 +25,7 @@ if is_hpc()
         t_accel_end = 50,
         ae_epochs = 1000,
         ae_retrain_epochs = 300,
-        node_iters = 500,
+        node_iters = 250,
         node_retrain_iters = 300,
         n_switch = 150,
         max_retrain_flags = 3,
@@ -47,31 +47,14 @@ simdata = run_warmup!(hs, params.t_run; u₀=u₀, save_path=simdata_path)
 
 # ================================ Step 1: Train Autoencoder ================================
 @info "── Step 1/4: Training Autoencoder ──"
-ae_start = time()
 
-div = 100.0
-curl = 10.0
-@info "AE hyperparameters" epochs=params.ae_epochs λdiv=div λcurl=curl
+root_path = is_hpc() ? "/scratch/mfbclaeys" : ""
+AE_path = "data/saved_models/u/Lux/256h_16l/RE2500/2e8/TL1_E500_HW256x256_C4to2_nc6_nd2_z16_C8_lr0p001_wd0p0009_bs16_NY_LL1_Tl0p0/checkpoint.jld2"
+AE_path = joinpath(root_path, AE_path)
 
-ae_args = LuxArgs(
-        epochs=params.ae_epochs, 
-        save_path=savedir,
-        λdiv=Float64(div), 
-        λcurl=Float64(curl),
-        train_downsample=500,
-        t_training=params.t_train,
-        full_data_path=simdata_path, 
-        simdata_ram=simdata,
-    )
-
-ae_bundle, AE_path = train_AE(ae_args; return_path=true)
-ae_elapsed = round((time() - ae_start) / 60; digits=1)
-@info "AE initial training complete" elapsed_min=ae_elapsed checkpoint=AE_path
-
-ae_args.simdata_ram = nothing   # release the simdata ref
 normalizer = load_normalizer(AE_path)
-
-ae_bundle = cpu_device()(ae_bundle)
+ae_bundle, ae_args = load_trained_AE(AE_path)
+ae_args.full_data_path = simdata_path
 
 # ================================ Step 2: Train NODE ================================
 @info "── Step 2/4: Training Neural ODE ──"
@@ -114,24 +97,13 @@ if hs.retrain_needed
     simdata = run_warmup!(hs, sim_time(hs.sim) + 10; simdata=simdata, save_path=simdata_path)
 
     # ================================ Step 3: Retrain AE ================================
-    ae_retrain_start = time()
-    ae_retrain_args = LuxArgs(
-        η = 2e-4,
-        epochs=params.ae_retrain_epochs, 
-        λdiv=Float64(div), 
-        λcurl=Float64(curl),
-        t_training=simdata.time[end] * 0.8 ,
-        retrain=true,
-        checkpoint_path=AE_path,
-        save_path=savedir,
-        full_data_path=simdata_path, 
-        simdata_ram=simdata,
-    )
-    
-    ae_retrain_bundle, AE_retrain_path = train_AE(ae_retrain_args; return_path=true)
+    AE_retrain_path = "data/saved_models/u/Lux/256h_16l/RE2500/2e8/TL2_E300_HW256x256_C4to2_nc6_nd2_z16_C8_lr0p0002_wd0p0009_bs16_NY_LL1_Tl0p0/checkpoint.jld2"
+    AE_retrain_path = joinpath(root_path, AE_retrain_path)
+
     retrain_normalizer = load_normalizer(AE_retrain_path)
-    ae_retrain_elapsed = round((time() - ae_retrain_start) / 60; digits=1)
-    @info "AE retraining complete" elapsed_min=ae_retrain_elapsed checkpoint=AE_path
+    ae_retrain_bundle, ae_retrain_args = load_trained_AE(AE_retrain_path)
+    ae_args.full_data_path = simdata_path
+
 
     # ================================ Step 4: Retrain NODE ================================
 
