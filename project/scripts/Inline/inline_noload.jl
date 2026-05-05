@@ -142,10 +142,10 @@ if hs.retrain_needed
             save_path=savedir,
             extrapolate = false,
             latent_dim = ae_args.latent_dim,
-            η = 0.01,              # lower LR for fine-tuning
+            η = 0.005,              # lower LR for fine-tuning
             maxiters = params.node_retrain_iters,          # more iterations
             group_size = 20,         # keep tighter segments
-            continuity_term = 500,   # stronger continuity for stability
+            continuity_term = 600,   # stronger continuity for stability
             downsample = 400,  
             retrain = true,
             multiple_shooting = true,
