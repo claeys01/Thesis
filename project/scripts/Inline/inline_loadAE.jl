@@ -7,7 +7,6 @@ using JLD2
 using Plots
 
 
-params = InlineParams()
 root_path = ""
 if is_hpc()
     root_path = "/scratch/mfbclaeys"
@@ -18,21 +17,20 @@ if is_hpc()
     @info "  SLURM_CPUS_PER_TASK: $(get(ENV, "SLURM_CPUS_PER_TASK", "N/A"))"
     @info "  Hostname: $(gethostname())"
     @info "  Julia threads: $(Threads.nthreads())"
+end
 
-    params = InlineParams(
+params = params = InlineParams(
         t_run = 20, 
         t_train = 16.603,
         t_accel_end = 50,
         ae_epochs = 1000,
         ae_retrain_epochs = 300,
         node_iters = 250,
-        node_retrain_iters = 300,
+        node_retrain_iters = 100,
         n_switch = 150,
         max_retrain_flags = 3,
         save_interval = 0.25, # needs to be fixed still, 
     )
-end
-
 
 savedir = joinpath(root_path, "data", "inline_runs", Dates.format(now(), "yyyy-mm-dd_HH-MM"))
 mkpath(savedir)
@@ -102,7 +100,7 @@ if hs.retrain_needed
 
     retrain_normalizer = load_normalizer(AE_retrain_path)
     ae_retrain_bundle, ae_retrain_args = load_trained_AE(AE_retrain_path)
-    ae_args.full_data_path = simdata_path
+    ae_retrain_args.full_data_path = simdata_path
 
 
     # ================================ Step 4: Retrain NODE ================================
@@ -118,8 +116,8 @@ if hs.retrain_needed
             η = 0.01,              # lower LR for fine-tuning
             maxiters = params.node_retrain_iters,          # more iterations
             group_size = 20,         # keep tighter segments
-            continuity_term = 400,   # stronger continuity for stability
-            downsample = 600,  
+            continuity_term = 500,   # stronger continuity for stability
+            downsample = 400,  
             retrain = true,
             multiple_shooting = true,
             use_gpu = false, 

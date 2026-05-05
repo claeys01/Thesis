@@ -2,29 +2,56 @@ make_optimiser(opt, η) = hasmethod(opt, Tuple{Float64}) ? opt(η) :
                          hasmethod(opt, Tuple{}) ? opt() :
                          error("Unsupported optimiser constructor: $(opt)")
 
-function train_NODE(args::NodeArgs; 
+function train_NODE(args::NodeArgs;
     ae_bundle=nothing,
     normalizer=nothing, ae_args=nothing, kws...)
 
     device = args.use_gpu ? get_device() : cpu_device()
 
+    multi = false
+    zs = nothing; ts = nothing; tspans = nothing; z0s = nothing
+
     if isnothing(ae_bundle)
         # Original path: load pre-saved latent data from disk
         z, t, tspan, z0 = get_NODE_data(args.train_latent_path; downsample=args.downsample)
     else
-        # New path: encode on-the-fly using the trained AE already in memory
-        @info "Encoding latent vectors from AE in memory (no disk I/O)"
-        z, t, tspan, z0 = get_latent_vectors(ae_bundle, normalizer, ae_args; device=device, downsample=args.downsample)
-        # ae, ae_ps, ae_st = ae_bundle.ae, ae_bundle.ps, ae_bundle.st
-
-        # Optionally downsample
-        if args.downsample > 0 && args.downsample < size(z, 2)
-            idx = downsample_equal(collect(1:size(z, 2)), args.downsample)
-            z = z[:, idx]
-            t = t[idx]
-            tspan = (t[1], t[end])
-            z0 = z[:, 1]
+        # check simdata to see if it is split up in chunks
+        simdata_temp = !isnothing(ae_args.simdata_ram) ? ae_args.simdata_ram : load_simdata(ae_args.full_data_path)
+        n_chunks = isempty(simdata_temp.chunk_ranges) ? 1 : length(simdata_temp.chunk_ranges)
+        
+        if isnothing(ae_args.simdata_ram)
+            simdata_temp = nothing; GC.gc()
         end
+
+        if n_chunks > 1
+            multi = true
+            @info "Multi-chunk simdata detected, using disjoint-trajectory NODE training" n_chunks
+            zs, ts, tspans, z0s = get_latent_chunks(ae_bundle, normalizer, ae_args;
+                downsample=args.downsample, device=device,
+                min_chunk_size=max(args.group_size + 1, 21))
+            multi = length(zs) > 1  # in case some chunks were skipped
+        end
+
+        if !multi
+            @info "Encoding latent vectors from AE in memory (no disk I/O)"
+            z, t, tspan, z0 = get_latent_vectors(ae_bundle, normalizer, ae_args; device=device, downsample=args.downsample)
+            if args.downsample > 0 && args.downsample < size(z, 2)
+                idx = downsample_equal(collect(1:size(z, 2)), args.downsample)
+                z = z[:, idx]
+                t = t[idx]
+                tspan = (t[1], t[end])
+                z0 = z[:, 1]
+            end
+        end
+    end
+
+    if multi
+        # Metadata: union span and concatenated time vector. predict_flex always
+        # passes explicit `t`, so `node.tspan`/`node.t` are inference-irrelevant.
+        tspan = (minimum(first.(tspans)), maximum(last.(tspans)))
+        t = vcat(ts...)
+        z = hcat(zs...)
+        z0 = z0s[1]
     end
 
     # z_test, t_test, tspan_test, z0_test = get_NODE_data(args.test_latent_path; downsample=args.test_downsample)
@@ -40,7 +67,7 @@ function train_NODE(args::NodeArgs;
         node.abstol = args.abstol
         node.reltol = args.reltol
         @info "NODE reloaded" latent_dim = prev_args.latent_dim dense_mult = prev_args.dense_mult tspan = tspan solver = typeof(args.solver) reltol = args.reltol abstol = args.abstol t = t activation = args.activation
-        baseline_eval = eval_node_loss(node, z, z0)
+        baseline_eval = multi ? eval_node_loss_multi(node, zs, z0s; ts=ts) : eval_node_loss(node, z, z0)
         @info "Baseline eval before retraining" baseline_eval.mae baseline_eval.rmse baseline_eval.rel_l2
 
     else
@@ -57,9 +84,15 @@ function train_NODE(args::NodeArgs;
     # ---- Move to GPU if requested ----
     @info "NODE training on device: $device"
 
-    z    = device(z)
-    z0   = device(z0)
-    t    = device(t)
+    if multi
+        zs  = [device(z_i) for z_i in zs]
+        z0s = [device(z0_i) for z0_i in z0s]
+        ts  = [device(t_i) for t_i in ts]
+    else
+        z    = device(z)
+        z0   = device(z0)
+        t    = device(t)
+    end
     node.p0 = device(node.p0)
     node.st = device(node.st)
 
@@ -67,7 +100,11 @@ function train_NODE(args::NodeArgs;
     pinit = device(pinit)
 
     # unified loss callable used by optimization
-    @inline loss_function(x) = node_loss(args, node, z, z0; p=x)
+    loss_function = if multi
+        x -> node_loss(args, node, zs, z0s; p=x, ts=ts)
+    else
+        x -> node_loss(args, node, z, z0; p=x)
+    end
 
     adtype = Optimization.AutoZygote()
     optf = Optimization.OptimizationFunction((x, p) -> loss_function(x), adtype)
@@ -96,7 +133,7 @@ function train_NODE(args::NodeArgs;
         if step % eval_every == 0
             push!(epochs, step)
             push!(train_losses, l)
-            rmse_eval = eval_node_loss(node, z, z0; p=state.u)
+            rmse_eval = multi ? eval_node_loss_multi(node, zs, z0s; p=state.u, ts=ts) : eval_node_loss(node, z, z0; p=state.u)
             push!(rmse_errors, rmse_eval.rmse)
             # Evaluate test loss with current params
             # test_l = L2_loss(node, z_test, z0_test; p=state.u, t=t_test)
@@ -117,7 +154,12 @@ function train_NODE(args::NodeArgs;
         end
 
         if gif
-            if args.multiple_shooting
+            if multi
+                _, predss = loss_multiple_shoot_multi(node, zs, z0s; p=ComponentArray(state.u),
+                    ts=ts, group_size=args.group_size, continuity_term=args.continuity_term)
+                plt = plot_multiple_shoot_multi(node, predss, zs;
+                    group_size=args.group_size, ts=ts, title_loss=l, n_reconstruct=args.n_reconstruct)
+            elseif args.multiple_shooting
                 _, preds = loss_multiple_shoot(node, z, z0; p=ComponentArray(state.u),
                                                t=node.t, group_size=args.group_size,
                                                continuity_term=args.continuity_term)
@@ -139,7 +181,7 @@ function train_NODE(args::NodeArgs;
     total_time = time() - iter_start_time[]
     @info "Optimization finished" total_time=round(total_time; digits=1) final_loss=round(train_losses[end]; digits=6)
 
-    final_eval = eval_node_loss(node, z, z0; p=result.u)
+    final_eval = multi ? eval_node_loss_multi(node, zs, z0s; p=result.u, ts=ts) : eval_node_loss(node, z, z0; p=result.u)
     @info "Eval loss (comparable across runs)" final_eval.mae final_eval.rmse final_eval.rel_l2
 
     # Ensure final point is present in training curves when eval cadence skips it.
@@ -167,7 +209,12 @@ function train_NODE(args::NodeArgs;
 
     # final plot: match mode used during training
     final_loss = loss_function(node.p0)
-    if args.multiple_shooting
+    if multi
+        _, predss = loss_multiple_shoot_multi(node, zs, z0s; p=node.p0, ts=ts,
+            group_size=args.group_size, continuity_term=args.continuity_term)
+        plt = plot_multiple_shoot_multi(node, predss, zs;
+            group_size=args.group_size, ts=ts, title_loss=final_loss)
+    elseif args.multiple_shooting
         _, preds = loss_multiple_shoot(node, z, z0; p=node.p0, t=node.t,
                                        group_size=args.group_size, continuity_term=args.continuity_term)
         plt = plot_multiple_shoot(node, preds, z; group_size=args.group_size, title_loss=final_loss)
@@ -200,7 +247,7 @@ function train_NODE(args::NodeArgs;
         @warn "plotting turned off in callback, no gif saved"
     end
     
-    if args.extrapolate
+    if args.extrapolate && !multi
         extrapolation_plot, (ẑ_train, ẑ_test) = extrapolate_node(node_path)
         display(extrapolation_plot)
         extrapolation_path = joinpath(out_dir, "extrapolation_plot_loss.png")

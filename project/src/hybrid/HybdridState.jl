@@ -111,16 +111,18 @@ function run_warmup!(hs::HybridState, t_end; simdata::Union{SimData,Nothing}=not
             period_ranges=UnitRange{Int}[],
             reordered_ranges=UnitRange{Int}[],
             single_period_idx=1:0,
+            chunk_ranges=[1:length(time_vec)],
         )
     else
         # new_u = clip_time_series(new_u)
         # new_μ₀ = clip_time_series(new_μ₀)
+        prev_end = length(simdata.time)
         append!(simdata.time, time_vec)
         append!(simdata.Δt, Δt_vec)
-        try 
+        try
             simdata.u = cat(simdata.u, new_u; dims=4)
             simdata.μ₀ = cat(simdata.μ₀, new_μ₀; dims=4)
-        catch e 
+        catch e
             new_u = clip_time_series(new_u)
             new_μ₀ = clip_time_series(new_μ₀)
             simdata.u = cat(simdata.u, new_u; dims=4)
@@ -129,6 +131,10 @@ function run_warmup!(hs::HybridState, t_end; simdata::Union{SimData,Nothing}=not
         simdata.p = cat(simdata.p, new_p; dims=3)
         simdata.f = cat(simdata.f, new_f; dims=4)
         append!(simdata.force, force_list)
+        if !isdefined(simdata, :chunk_ranges) || isempty(simdata.chunk_ranges)
+            simdata.chunk_ranges = [1:prev_end]
+        end
+        push!(simdata.chunk_ranges, (prev_end+1):length(simdata.time))
     end
 
     if !isnothing(save_path)

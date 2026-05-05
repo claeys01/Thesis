@@ -178,10 +178,11 @@ export predict_array, predict
 export predict_n, predict_n!
 export predict_flex, predict_flex!
 export NODE, setup_lux!
-export L2_loss, loss_multiple_shoot
-export plot_node_trajectory, plot_multiple_shoot
+export L2_loss, loss_multiple_shoot, loss_multiple_shoot_multi
+export plot_node_trajectory, plot_multiple_shoot, plot_multiple_shoot_multi
 export save_node, load_node
-export node_loss, eval_node_loss
+export node_loss, eval_node_loss, eval_node_loss_multi
+export get_latent_trajectories
 export extrapolate_node, load_datasets, encode_datasets, make_nodes
 export predictions_and_losses, plot_trajectories, plot_losses
 export region_spans!

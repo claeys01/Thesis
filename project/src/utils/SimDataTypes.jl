@@ -16,6 +16,7 @@ Base.@kwdef mutable struct SimData
     period_ranges::Vector{UnitRange{Int}}
     reordered_ranges::Vector{UnitRange{Int}}
     single_period_idx::UnitRange{Int}
+    chunk_ranges::Vector{UnitRange{Int}} = UnitRange{Int}[]
 end
 
 Base.@kwdef struct EpochData

@@ -7,7 +7,6 @@ using JLD2
 using Plots
 
 
-params = InlineParams()
 root_path = ""
 if is_hpc()
     root_path = "/scratch/mfbclaeys"
@@ -18,20 +17,20 @@ if is_hpc()
     @info "  SLURM_CPUS_PER_TASK: $(get(ENV, "SLURM_CPUS_PER_TASK", "N/A"))"
     @info "  Hostname: $(gethostname())"
     @info "  Julia threads: $(Threads.nthreads())"
+end
 
-    params = InlineParams(
+params = params = InlineParams(
         t_run = 20, 
         t_train = 16.603,
         t_accel_end = 50,
         ae_epochs = 1000,
         ae_retrain_epochs = 300,
-        node_iters = 500,
-        node_retrain_iters = 300,
+        node_iters = 250,
+        node_retrain_iters = 100,
         n_switch = 150,
-        max_retrain_flags = 4,
+        max_retrain_flags = 3,
         save_interval = 0.25, # needs to be fixed still, 
     )
-end
 
 
 savedir = joinpath(root_path, "data", "inline_runs", Dates.format(now(), "yyyy-mm-dd_HH-MM"))
