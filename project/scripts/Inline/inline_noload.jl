@@ -67,7 +67,7 @@ ae_bundle, AE_path = train_AE(ae_args; return_path=true)
 ae_elapsed = round((time() - ae_start) / 60; digits=1)
 @info "AE initial training complete" elapsed_min=ae_elapsed checkpoint=AE_path
 
-ae_args.simdata_ram = nothing   # release the simdata ref
+# ae_args.simdata_ram = nothing   # release the simdata ref
 normalizer = load_normalizer(AE_path)
 
 ae_bundle = cpu_device()(ae_bundle)
@@ -145,8 +145,8 @@ if hs.retrain_needed
             η = 0.01,              # lower LR for fine-tuning
             maxiters = params.node_retrain_iters,          # more iterations
             group_size = 20,         # keep tighter segments
-            continuity_term = 400,   # stronger continuity for stability
-            downsample = 600,  
+            continuity_term = 500,   # stronger continuity for stability
+            downsample = 400,  
             retrain = true,
             multiple_shooting = true,
             use_gpu = false, 
