@@ -13,6 +13,8 @@
 
 export JULIA_NUM_THREADS=$SLURM_CPUS_PER_TASK
 export JULIA_CUDA_USE_BINARYBUILDER=false
+export THESIS_HPC="true"
+export THESIS_USE_CUDA="true"
 
 echo "Running on host $(hostname)"
 echo "Using $JULIA_NUM_THREADS Julia threads"
@@ -28,7 +30,7 @@ module load slurm
 
 echo "Finished Loading Modules"
 
-echo "Running Lux_AE_train.jl"
+echo "Running hpc_tune.jl"
 
 srun julia --project=project project/scripts/AE/hpc_tune.jl
 
