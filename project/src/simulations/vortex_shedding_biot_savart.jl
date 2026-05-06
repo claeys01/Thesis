@@ -1,6 +1,6 @@
 function circle_shedding_biot(; Re=2500, U=1, n=2^8, m=2^8, mem=Array, perturb=true, Δt=0.25)
 
-    radius = Float32(m / 16) # radius of the circle relative to the height of the domain
+    radius = Float32(m / 16)                  # radius of the circle relative to the height of the domain
     center = (Float32(n / 4), Float32(m / 2)) # location of the circle relative to the height of the domain
 
 
