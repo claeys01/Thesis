@@ -61,7 +61,6 @@ function run_warmup!(hs::HybridState, t_end; simdata::Union{SimData,Nothing}=not
     u_list = Vector{Array{Float32,3}}()
     p_list = Vector{Array{Float32,2}}()
     μ₀_list = Vector{Array{Float32,3}}()
-    f_list = Vector{Array{Float32,3}}()
     force_list = Vector{Vector{Float32}}()
 
     t_sim_start = sim_time(sim)
@@ -86,7 +85,6 @@ function run_warmup!(hs::HybridState, t_end; simdata::Union{SimData,Nothing}=not
         push!(u_list, copy(sim.flow.u))
         push!(p_list, copy(sim.flow.p))
         push!(μ₀_list, copy(sim.flow.μ₀))
-        push!(f_list, copy(sim.flow.f))
         push!(force_list, copy(res.hybrid_forces_wat[end]))
         push!(time_vec, res.hybrid_time_wat[end])
         push!(Δt_vec, Float32(round(sim.flow.Δt[end], digits=3)))
@@ -99,18 +97,13 @@ function run_warmup!(hs::HybridState, t_end; simdata::Union{SimData,Nothing}=not
 
     new_u = cat(u_list...; dims=4)
     new_p = cat(p_list...; dims=3)
-    new_f = cat(f_list...; dims=4)
     new_μ₀ = cat(μ₀_list...; dims=4)
 
     if isnothing(simdata)
         simdata = SimData(
             time=time_vec, Δt=Δt_vec,
-            u=new_u, p=new_p, f=new_f, μ₀=new_μ₀,
+            u=new_u, p=new_p, μ₀=new_μ₀,
             force=force_list,
-            ε=Float32[],
-            period_ranges=UnitRange{Int}[],
-            reordered_ranges=UnitRange{Int}[],
-            single_period_idx=1:0,
             chunk_ranges=[1:length(time_vec)],
         )
     else
@@ -129,7 +122,6 @@ function run_warmup!(hs::HybridState, t_end; simdata::Union{SimData,Nothing}=not
             simdata.μ₀ = cat(simdata.μ₀, new_μ₀; dims=4)
         end
         simdata.p = cat(simdata.p, new_p; dims=3)
-        simdata.f = cat(simdata.f, new_f; dims=4)
         append!(simdata.force, force_list)
         if !isdefined(simdata, :chunk_ranges) || isempty(simdata.chunk_ranges)
             simdata.chunk_ranges = [1:prev_end]

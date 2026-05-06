@@ -9,13 +9,8 @@ Base.@kwdef mutable struct SimData
     Δt::Vector{Float32}
     u::Array{Float32,4}
     p::Array{Float32,3}
-    f::Array{Float32,4}
     μ₀::Array{Float32,4}
     force::Vector{Vector{Float32}}
-    ε::Vector{Float32}
-    period_ranges::Vector{UnitRange{Int}}
-    reordered_ranges::Vector{UnitRange{Int}}
-    single_period_idx::UnitRange{Int}
     chunk_ranges::Vector{UnitRange{Int}} = UnitRange{Int}[]
 end
 

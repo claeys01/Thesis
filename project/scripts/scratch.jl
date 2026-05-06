@@ -2,36 +2,59 @@ using Thesis
 using WaterLily
 using Plots
 using WaterLily: flood, body_plot!
+using JLD2
 
-n = 2^8
-sim = circle_shedding_biot(;n=n, m=n)
+# ---- One-off: migrate old simdata to trimmed SimData with chunk_ranges ----
+# let src = "data/datasets/RE2500/2e8/U_128_full.jld2"
+#     @load src simdata  # JLD2 reconstructs the old type; access via getfield
+#     N = length(simdata.time)
+#     new_simdata = SimData(
+#         time         = simdata.time,
+#         Δt           = simdata.Δt,
+#         u            = simdata.u,
+#         p            = simdata.p,
+#         μ₀           = simdata.μ₀,
+#         force        = simdata.force,
+#         chunk_ranges = [1:N],
+#     )
+#     mv(src, src * ".bak"; force=true)
+#     simdata = new_simdata
+#     @save src simdata
+#     @info "Rewrote $src; backup at $(src).bak"
+# end
 
-u₀ = load_u0("data/datasets/RE2500/2e8/U_128_full_u0.jld2")
-sim.flow.u .= u₀
+simdata = load_simdata("data/datasets/RE2500/2e8/U_128_full.jld2")
+@show size(simdata.u)
+
+# n = 2^8
+# sim = circle_shedding_biot(;n=n, m=n)
+
+# u₀ = load_u0("data/datasets/RE2500/2e8/U_128_full_u0.jld2")
+# sim.flow.u .= u₀
 
 
-next_delta = 0.5
-next_plot = copy(sim_time(sim)) + next_delta
-counter = 1
-t_end=10
-while sim_time(sim) < t_end
-    sim_step!(sim)
-    if next_plot < sim_time(sim)
-        sim_info(sim)
-        @inside sim.flow.σ[I] = WaterLily.curl(3,I,sim.flow.u)*sim.L/sim.U
-        @inside sim.flow.σ[I] = ifelse(abs(sim.flow.σ[I])<0.001,0.0,sim.flow.σ[I])
+# next_delta = 0.5
+# next_plot = copy(sim_time(sim)) + next_delta
+# counter = 1
+# t_end=10
+# while sim_time(sim) < t_end
+#     sim_step!(sim)
+#     if next_plot < sim_time(sim)
+#         sim_info(sim)
+#         @inside sim.flow.σ[I] = WaterLily.curl(3,I,sim.flow.u)*sim.L/sim.U
+#         @inside sim.flow.σ[I] = ifelse(abs(sim.flow.σ[I])<0.001,0.0,sim.flow.σ[I])
 
-        plt = flood(sim.flow.σ,shift=(-2,-1.5),clims=(-8,8), axis=([], false),  
-        background=:gray,
-        cfill=:seismic,legend=false,border=:none,dpi=350, size=(800, 800))
-        bod = body_plot!(sim)
-        timestep = counter * next_delta
-        display(plt)
-        savefig(plt, "figs/biot_shedding_plots/shedding_t$timestep.png")
-        next_plot += next_delta
-        counter +=1
-    end
-end
+#         plt = flood(sim.flow.σ,shift=(-2,-1.5),clims=(-8,8), axis=([], false),  
+#         background=:gray,
+#         cfill=:seismic,legend=false,border=:none,dpi=350, size=(800, 800))
+#         bod = body_plot!(sim)
+#         timestep = counter * next_delta
+#         display(plt)
+#         savefig(plt, "figs/biot_shedding_plots/shedding_t$timestep.png")
+#         next_plot += next_delta
+#         counter +=1
+#     end
+# end
 
 # function run_oscillating_flow(n=2^8, stop=20)
 #     sim = circle_shedding_biot(;n=n,m=n)
