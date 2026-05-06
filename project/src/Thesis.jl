@@ -121,7 +121,6 @@ include("simulations/vortex_shedding.jl")
 
 # Core model definitions
 include("AE/AE.jl")
-include("AE/AE_metrics.jl")
 include("AE/AE_train.jl")
 
 # OOD detection
@@ -168,11 +167,10 @@ export train_AE
 export load_trained_AE
 export visualize_reconstructions
 export total_loss, recon_loss, div_loss_L2, masked_loss
-export divergence_field, vorticity_field
-export relative_l2, divergence_stats, vorticity_relative_l2
-export wake_mask, latent_smoothness, latent_pca_energy
-export pass_fail, compute_baseline_divergence, evaluate_checkpoint, build_eval_row
-export HPARAM_COLS, METRIC_COLS, STATUS_COLS
+# export divergence_field, vorticity_field
+# export wake_mask, latent_smoothness, latent_pca_energy
+# export pass_fail, compute_baseline_divergence, evaluate_checkpoint, build_eval_row
+# export HPARAM_COLS, METRIC_COLS, STATUS_COLS
 export load_simdata
 export save_u0, load_u0
 
