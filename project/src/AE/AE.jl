@@ -418,7 +418,7 @@ function (m::AE)(x, ps, st)
 end
 
 # losses
-div_loss(u::AbstractArray) = mean(abs2, divergence_field(u; buff=1))
+div_loss(u::AbstractArray) = mean(abs2, div_vectorized(u; buff=1))
 
 function curl_loss(x::AbstractArray, x̂::AbstractArray)
     return mean(abs2, vorticity_field(x) .- vorticity_field(x̂))
