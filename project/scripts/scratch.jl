@@ -25,6 +25,7 @@ using JLD2
 
 simdata = load_simdata("data/datasets/RE2500/2e8/U_128_full.jld2")
 @show size(simdata.u)
+println(dump(simdata))
 
 # n = 2^8
 # sim = circle_shedding_biot(;n=n, m=n)

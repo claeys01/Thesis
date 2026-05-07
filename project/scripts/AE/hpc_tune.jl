@@ -32,7 +32,7 @@ function evaluate_checkpoint(ckpt_path::String; simdata_ram=nothing)
     normalizer = load_normalizer(ckpt_path)
 
     args.simdata_ram = simdata_ram
-    data, loaders, _ = get_data(args.batch_size, args.full_data_path;
+    data, loaders, _ = Thesis.get_data(args.batch_size, args.full_data_path;
         n_training=args.train_downsample, n_test=args.test_downsample,
         split=args.split, t_training=args.t_training,
         verbose=false, simdata_ram=simdata_ram)
