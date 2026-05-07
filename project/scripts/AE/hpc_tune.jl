@@ -129,7 +129,8 @@ function main()
     @info "Grid search over $(length(grid)) configurations"
 
     timestamp = Dates.format(now(), "udd-HHMM")
-    out_dir = joinpath("data/Lux_models", "tune_$(timestamp)")
+    save_root = joinpath(root_path, "data/Lux_models")
+    out_dir = joinpath(save_root, "tune_$(timestamp)")
     !ispath(out_dir) && mkpath(out_dir)
     csv_path = joinpath(out_dir, "tune_summary.csv")
 
@@ -151,6 +152,7 @@ function main()
                     t_training=25,
                     full_data_path=data_path,
                     simdata_ram=simdata,
+                    save_path=save_root,
                 ); return_path=true
             )
             metrics = evaluate_checkpoint(ckpt_path; simdata_ram=simdata)
