@@ -40,7 +40,7 @@ function evaluate_checkpoint(ckpt_path::String; simdata_ram=nothing)
 
     rec_sum = 0.0; div_sum = 0.0; curl_sum = 0.0; tke_sum = 0.0; n = 0
     for idx in loaders.test_loader
-        x_in, x_target, μ₀ = build_batch(TestData, idx)
+        x_in, x_target, μ₀ = Thesis.build_batch(TestData, idx)
         x_in_f = Float32.(x_in)
         if args.normalize
             uvc = x_in_f[:, :, 1:2, :]
