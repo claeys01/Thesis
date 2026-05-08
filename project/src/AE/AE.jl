@@ -281,7 +281,7 @@ function dec_layer(k, p, Cin, Cout, stride)
     return Chain(
         x -> upsample2(x, p),
         Conv((k, k), Cin => Cout; pad=SamePad(), stride=stride),
-        BatchNorm(Cout),
+        # BatchNorm(Cout),
         gelu
     )
 end

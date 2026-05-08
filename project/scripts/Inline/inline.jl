@@ -44,9 +44,6 @@ aenode = AENODE(ae_bundle, node, ae_args, node_args, normalizer; verbose=true)
 hs = HybridState(sim, aenode, params, savedir, AE_path_tl1, node_path)
 
 simdata = run_warmup!(hs, params.t_run; u₀=u₀, save_path=simdata_path)
-# display(plot_meanflow_comparison(hs.sim_meanflow, hs.ref_meanflow))
-
-# run_hybrid!(hs; simdata=simdata, save_path=simdata_path)
 
 run_hybrid!(hs)
 
@@ -82,13 +79,6 @@ if hs.retrain_needed
 end
 
 # simdata = run_warmup!(hs, params.t_accel_end; simdata=simdata, save_path=simdata_path)
-@show hs.mode_log
-
-
-
-save_results(hs)
-@show size(hs.sim_meanflow.t)
-@show size(hs.ref_meanflow.t)
 
 # @show size(hs.sim_meanflow.t)
 # @show size(hs.ref_meanflow.t)
