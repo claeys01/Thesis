@@ -5,6 +5,7 @@ using Statistics
 using Dates
 using JLD2
 using Plots
+using Printf
 
 
 root_path = ""
@@ -42,7 +43,10 @@ sim = circle_shedding_biot(; mem=Array, perturb=false)
 
 hs = HybridState(sim, nothing, params, savedir, nothing, nothing)
 
+wl_warmup_start = time()
 simdata = run_warmup!(hs, params.t_run; u₀=u₀, save_path=simdata_path)
+wl_warmup_elapsed = round((time() - wl_warmup_start) / 60; digits=2)
+@info "WaterLily warmup complete" elapsed_min=wl_warmup_elapsed t_simulated=params.t_run
 
 # ================================ Step 1: Train Autoencoder ================================
 @info "── Step 1/4: Training Autoencoder ──"
@@ -110,7 +114,11 @@ if hs.retrain_needed
 
     println("continueing to run simulation without AENODE")
 
+    wl_cutoff_start = time()
+    t_before = sim_time(hs.sim)
     simdata = run_warmup!(hs, sim_time(hs.sim) + 10; simdata=simdata, save_path=simdata_path)
+    wl_cutoff_elapsed = round((time() - wl_cutoff_start) / 60; digits=2)
+    @info "WaterLily cutoff run complete" elapsed_min=wl_cutoff_elapsed t_simulated=(sim_time(hs.sim) - t_before)
 
     # ================================ Step 3: Retrain AE ================================
     ae_retrain_start = time()
@@ -171,8 +179,58 @@ if hs.retrain_needed
     run_hybrid!(hs)
 
     if sim_time(hs.sim) < params.t_accel_end
+        wl_tail_start = time()
+        t_before_tail = sim_time(hs.sim)
         simdata = run_warmup!(hs, params.t_accel_end; simdata=simdata, save_path=simdata_path)
+        wl_tail_elapsed = round((time() - wl_tail_start) / 60; digits=2)
+        @info "WaterLily tail run complete" elapsed_min=wl_tail_elapsed t_simulated=(sim_time(hs.sim) - t_before_tail)
     end
 end
 
 save_results(hs)
+
+# ================================ Timing Summary ================================
+ae_retrain_elapsed_total  = @isdefined(ae_retrain_elapsed)   ? ae_retrain_elapsed   : 0.0
+node_retrain_elapsed_total = @isdefined(node_retrain_elapsed) ? node_retrain_elapsed : 0.0
+wl_cutoff_elapsed_total   = @isdefined(wl_cutoff_elapsed)    ? wl_cutoff_elapsed    : 0.0
+wl_tail_elapsed_total     = @isdefined(wl_tail_elapsed)      ? wl_tail_elapsed      : 0.0
+
+ml_total = ae_elapsed + node_elapsed + ae_retrain_elapsed_total + node_retrain_elapsed_total
+wl_total = wl_warmup_elapsed + wl_cutoff_elapsed_total + wl_tail_elapsed_total
+grand_total = ml_total + wl_total
+
+println("\n" * "="^60)
+println("              TRAINING vs WATERLILY TIMING SUMMARY")
+println("="^60)
+@printf("ML training\n")
+@printf("  AE initial train     : %7.2f min\n", ae_elapsed)
+@printf("  NODE initial train   : %7.2f min\n", node_elapsed)
+@printf("  AE retrain           : %7.2f min\n", ae_retrain_elapsed_total)
+@printf("  NODE retrain         : %7.2f min\n", node_retrain_elapsed_total)
+@printf("  ML subtotal          : %7.2f min\n", ml_total)
+println("-"^60)
+@printf("WaterLily simulation\n")
+@printf("  Warmup run           : %7.2f min\n", wl_warmup_elapsed)
+@printf("  Cutoff run           : %7.2f min\n", wl_cutoff_elapsed_total)
+@printf("  Tail run             : %7.2f min\n", wl_tail_elapsed_total)
+@printf("  WaterLily subtotal   : %7.2f min\n", wl_total)
+println("-"^60)
+@printf("Grand total            : %7.2f min\n", grand_total)
+if wl_total > 0
+    @printf("ML / WaterLily ratio   : %7.2fx\n", ml_total / wl_total)
+end
+println("="^60)
+
+jldsave(joinpath(savedir, "timing_summary.jld2");
+    ae_elapsed_min          = ae_elapsed,
+    node_elapsed_min        = node_elapsed,
+    ae_retrain_elapsed_min  = ae_retrain_elapsed_total,
+    node_retrain_elapsed_min = node_retrain_elapsed_total,
+    wl_warmup_elapsed_min   = wl_warmup_elapsed,
+    wl_cutoff_elapsed_min   = wl_cutoff_elapsed_total,
+    wl_tail_elapsed_min     = wl_tail_elapsed_total,
+    ml_total_min            = ml_total,
+    wl_total_min            = wl_total,
+    grand_total_min         = grand_total,
+)
+@info "Timing summary saved" path=joinpath(savedir, "timing_summary.jld2")
