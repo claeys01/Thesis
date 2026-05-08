@@ -152,7 +152,7 @@ function main()
                     t_training=25,
                     full_data_path=data_path,
                     simdata_ram=simdata,
-                    save_path=save_root,
+                    save_path=out_dir,
                 ); return_path=true
             )
             metrics = evaluate_checkpoint(ckpt_path; simdata_ram=simdata)

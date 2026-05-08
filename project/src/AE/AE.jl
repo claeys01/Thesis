@@ -421,7 +421,7 @@ end
 div_loss(u::AbstractArray) = mean(abs2, div_vectorized(u; buff=1))
 
 function curl_loss(x::AbstractArray, x̂::AbstractArray)
-    return mean(abs2, vorticity_field(x) .- vorticity_field(x̂))
+    return mean(abs2, curl_vectorized(x) .- curl_vectorized(x̂))
 end
 
 function recon_loss(x, x̂; loss=:L2)

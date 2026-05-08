@@ -1,8 +1,8 @@
 #!/usr/bin/env julia
 
 # Set HPC-specific environment variables BEFORE loading packages
-ENV["THESIS_HPC"] = "true"         # Mark as HPC environment
-ENV["THESIS_USE_CUDA"] = "true"  # Uncomment if using GPU nodes
+# ENV["THESIS_HPC"] = "true"         # Mark as HPC environment
+# ENV["THESIS_USE_CUDA"] = "true"  # Uncomment if using GPU nodes
 
 # Activate the project
 # using Pkg
@@ -36,7 +36,7 @@ function main()
 
     AE_path = train_AE(
         LuxArgs(
-            epochs=500, 
+            epochs=1, 
             λdiv=Float64(div), 
             λcurl=Float64(curl), 
             train_downsample = 500,
