@@ -233,10 +233,10 @@ function plot_multiple_shoot(node::NODE, preds::Vector{<:AbstractMatrix}, z::Abs
             pred_start, pred_end = preds[j][lat_idx, 1], preds[j][lat_idx, end]
 
             # prediction markers (open circle at start, square at end)
-            scatter!(p, [t_start], [pred_start]; color=c, marker=:x, markersize=6, markerstrokecolor=c,
+            scatter!(p, [t_start], [pred_start]; color=c, marker=:vline, markersize=6, markerstrokecolor=c,
                      markerstrokewidth=1.5, fillalpha=0.0,
                      label=sidx == 1 && j == 1 ? "pred start/end" : nothing)
-            scatter!(p, [t_end], [pred_end]; color=c, marker=:x, markersize=6, markerstrokecolor=c,
+            scatter!(p, [t_end], [pred_end]; color=c, marker=:vline, markersize=6, markerstrokecolor=c,
                      markerstrokewidth=1.5, fillalpha=0.0,
                      label=nothing)
         end
@@ -244,20 +244,53 @@ function plot_multiple_shoot(node::NODE, preds::Vector{<:AbstractMatrix}, z::Abs
     return p
 end
 
-# Stack per-trajectory subplots for the multi-trajectory case.
+# Overlay all trajectories on a single plot so chunks visibly extend the same data.
 function plot_multiple_shoot_multi(node::NODE, predss::Vector, zs::Vector{<:AbstractMatrix};
         group_size::Int, ts::Vector, title_loss=nothing, n_reconstruct=4)
     n = length(zs)
-    subplots = []
-    for i in 1:n
-        sub = plot_multiple_shoot(node, predss[i], zs[i];
-            group_size=group_size, title_loss=nothing,
-            n_reconstruct=n_reconstruct, t=ts[i])
-        title_i = (i == 1 && title_loss !== nothing) ? "chunk 1 (total loss = $(title_loss))" : "chunk $i"
-        title!(sub, title_i)
-        push!(subplots, sub)
+    p = plot(; size=(1100, 500))
+    if title_loss !== nothing
+        title!(p, "$n chunks (total loss = $(title_loss))")
     end
-    return plot(subplots...; layout=(n, 1), size=(900, 250*n))
+
+    latent_dim = size(zs[1], 1)
+    idx_samples = round.(Int, range(1, stop=latent_dim, length=n_reconstruct))
+    palette = [:black, :red, :blue, :green, :purple, :orange, :yellow]
+    ncolors = length(palette)
+
+    for i in 1:n
+        z = zs[i]
+        preds = predss[i]
+        t = ts[i]
+        ranges = DiffEqFlux.group_ranges(size(z, 2), group_size)
+
+        for (sidx, lat_idx) in enumerate(idx_samples)
+            c = palette[(sidx - 1) % ncolors + 1]
+            for (j, rg) in enumerate(ranges)
+                first_chunk = (i == 1 && j == 1 && sidx == 1)
+                plot!(p, t[rg], z[lat_idx, rg];
+                      color=c, linestyle=:solid, alpha=0.9,
+                      label=first_chunk ? "z (truth)" : "")
+                plot!(p, t[rg], preds[j][lat_idx, :];
+                      color=c, linestyle=:dash, alpha=0.9,
+                      label=first_chunk ? "ẑ (pred)" : "")
+
+                t_start, t_end = t[rg][1], t[rg][end]
+                pred_start, pred_end = preds[j][lat_idx, 1], preds[j][lat_idx, end]
+                scatter!(p, [t_start, t_end], [pred_start, pred_end];
+                         color=c, marker=:vline, markersize=5, markerstrokecolor=c,
+                         markerstrokewidth=1.5, fillalpha=0.0,
+                         label=first_chunk ? "pred start/end" : nothing)
+            end
+
+            # mark chunk boundary on the time axis (once per chunk, on first latent comp)
+            if sidx == 1
+                vline!(p, [t[1]]; color=:gray, linestyle=:dot, alpha=0.4,
+                       label=(i == 1 ? "chunk start" : ""))
+            end
+        end
+    end
+    return p
 end
 
 function plot_node_trajectory(node::NODE, z::AbstractMatrix, z0; p=nothing, t=nothing, n_reconstruct=4, loss=nothing, plt=nothing, labels=true)
