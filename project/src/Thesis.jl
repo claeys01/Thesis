@@ -256,6 +256,7 @@ export @with_plots, load_plots
 export is_hpc, get_device
 export cpu_device, gpu_device
 export set_seed!
+export clear_memory!
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Environment & Device Utilities
@@ -297,6 +298,33 @@ function set_seed!(seed::Int)
     if USE_CUDA[]
         Base.invokelatest(CUDA.seed!, seed)
     end
+end
+
+"""
+    clear_memory!(; verbose=false)
+
+Force a full GC pass and (if CUDA is loaded) release cached GPU blocks back to
+the driver. Use between independent runs in a grid/sweep so VRAM and host RAM
+don't accumulate across iterations.
+"""
+function clear_memory!(; verbose::Bool=false)
+    GC.gc(true); GC.gc(true)
+    if USE_CUDA[]
+        Base.invokelatest(CUDA.reclaim)
+    end
+    if verbose
+        host_free_gb = Sys.free_memory() / 2^30
+        host_total_gb = Sys.total_memory() / 2^30
+        if USE_CUDA[]
+            gpu_free, gpu_total = Base.invokelatest(CUDA.memory_info)
+            @info @sprintf("memory: host %.1f/%.1f GB free, gpu %.1f/%.1f GB free",
+                host_free_gb, host_total_gb,
+                gpu_free / 2^30, gpu_total / 2^30)
+        else
+            @info @sprintf("memory: host %.1f/%.1f GB free", host_free_gb, host_total_gb)
+        end
+    end
+    return nothing
 end
 
 # ═══════════════════════════════════════════════════════════════════════════════

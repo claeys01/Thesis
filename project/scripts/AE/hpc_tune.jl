@@ -138,6 +138,7 @@ function main()
     for (i, cfg) in enumerate(grid)
         tag = tag_for(cfg)
         @info "[$i/$(length(grid))] training: $tag"
+        clear_memory!(; verbose=true)
         try
             _, ckpt_path = train_AE(
                 LuxArgs(
@@ -162,9 +163,11 @@ function main()
             @info "  → recon=$(metrics.recon_mae) div=$(metrics.divergence) curl=$(metrics.curl_err) tke=$(metrics.tke_err)"
         catch e
             @error "Run $tag failed" exception=(e, catch_backtrace())
+            clear_memory!()
         end
         # incremental save in case the job dies mid-grid
         !isempty(results) && summarize_and_rank(results, csv_path)
+        clear_memory!()
     end
 
     @info "Tuning complete. $(length(results))/$(length(grid)) runs succeeded."
