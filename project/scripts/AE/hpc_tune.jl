@@ -77,7 +77,7 @@ end
 
 function write_summary_csv(rows::Vector{<:NamedTuple}, csv_path::String)
     cols = [:tag, :λdiv, :λcurl, :latent_dim, :n_conv, :n_dense,
-            :recon_mae, :divergence, :curl_err, :tke_err, :score, :rank]
+            :recon_mae, :divergence, :curl_err, :tke_err, :score, :rank, :path]
     open(csv_path, "w") do io
         println(io, join(string.(cols), ","))
         for r in rows
@@ -158,7 +158,7 @@ function main()
             )
             metrics = evaluate_checkpoint(ckpt_path; simdata_ram=simdata)
             push!(results, (tag=tag, λdiv=cfg.λdiv, λcurl=cfg.λcurl,
-                            latent_dim=cfg.latent_dim, n_conv=cfg.n_conv, n_dense=cfg.n_dense,
+                            latent_dim=cfg.latent_dim, n_conv=cfg.n_conv, n_dense=cfg.n_dense, path=ckpt_path,
                             metrics...))
             @info "  → recon=$(metrics.recon_mae) div=$(metrics.divergence) curl=$(metrics.curl_err) tke=$(metrics.tke_err)"
         catch e
