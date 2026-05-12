@@ -29,8 +29,8 @@ function main()
     @info "Loading training data from: $tl_path"
 
     # node_path = joinpath(root_path, "data/saved_models/NODE/16/RE2500/E1000_curldiv_MS_Adam_250/node_params.jld2")div = 1000.0
-    div = 1000.0
-    curl = 100.0
+    div = 100.0
+    curl = 10.0
     epochs = 1000
     println("\nTraining AE for $epochs epochs with λdiv=$(div), λcurl=$(curl))")
 
@@ -40,7 +40,7 @@ function main()
             λdiv=Float64(div), 
             λcurl=Float64(curl), 
             train_downsample = 500,
-            t_training = 48,
+            t_training = 25,
             full_data_path=tl_path
         ); return_path=true
     )
