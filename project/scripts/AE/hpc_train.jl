@@ -36,7 +36,7 @@ function main()
 
     AE_path = train_AE(
         LuxArgs(
-            epochs=1, 
+            epochs=epochs, 
             λdiv=Float64(div), 
             λcurl=Float64(curl), 
             train_downsample = 500,
