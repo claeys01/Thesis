@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-#SBATCH --job-name="Lux_AE_gpu"
+#SBATCH --job-name="Lux_AE_gpu_train"
 #SBATCH --partition=gpu-a100
 #SBATCH --output=logs/%x_%j.out
 #SBATCH --error=logs/%x_%j.err
