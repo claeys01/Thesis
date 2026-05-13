@@ -16,5 +16,6 @@ simdata_path = "data/inline_runs/hpc_inline/U_inline.jld2"
 # ae_bundle, args = load_trained_AE(checkpoint)
 # get_latent_vectors
 args=LuxArgs(;)
-# enc = Encoder(args)
+enc = Encoder(args)
 dec=Decoder(args)
+ae=AE(enc, dec)

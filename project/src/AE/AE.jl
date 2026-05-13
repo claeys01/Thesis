@@ -371,7 +371,7 @@ function Decoder_parametric(output_size::Tuple{Int,Int,Int}, latent_dim::Int;
 
     # Smoothing layer
     push!(dec_channels, (C_out, C_out))
-    push!(dec_layers, Conv((conv_kernel, conv_kernel), C_out => C_out; pad=SamePad(), stride=stride))
+    # push!(dec_layers, Conv((conv_kernel, conv_kernel), C_out => C_out; pad=SamePad(), stride=stride))
     if verbose
         dec_channel_str = join(["$(c[1])→$(c[2])" for c in dec_channels], " -> ")
         dense_str = join(["$(c[1])→$(c[2])" for c in dense_nodes], " -> ")

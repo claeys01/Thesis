@@ -1,7 +1,7 @@
 #!/usr/bin/env julia
 
 # Set HPC-specific environment variables BEFORE loading packages
-# ENV["THESIS_HPC"] = "true"         # Mark as HPC environment
+ENV["THESIS_HPC"] = "true"         # Mark as HPC environment
 # ENV["THESIS_USE_CUDA"] = "true"  # Uncomment if using GPU nodes
 
 # Activate the project
