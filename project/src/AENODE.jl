@@ -71,11 +71,12 @@ end
 # a function that predicts the new flow field of a simulation for a selected amount of timesteps, 
 function predict_n(aenode::AENODE, u::AbstractArray, μ₀::AbstractArray, nₜ::Int64, t₀::Float32; 
                 Δt::Float32=0.35f0, 
-                return_traj::Bool=false)
+                return_traj::Bool=false,
+                L=32.0f0)
     z, μ₀ = encode_flow(aenode, u, μ₀)
 
     # predict in latent space using node
-    t = return_traj ? range(t₀, step=Δt/32.0f0, length=nₜ+1) : range(t₀, step=nₜ * Δt/32.0f0, length=2)
+    t = return_traj ? range(t₀, step=Δt/L, length=nₜ+1) : range(t₀, step=nₜ * Δt/L, length=2)
     # 32 is the characteristic length of the simulation, need to take out hard coding later and pass it to ae or node args
     ẑ = @timeit to "NODE integrate" predict_array(aenode.NODE, z; t=t)
     # decompress latent prediction
@@ -87,7 +88,7 @@ end
 function predict_n!(sim::BiotSimulation, aenode::AENODE, nₜ::Int64; 
     Δt::Float32=0.35f0, impose_biot=false)
     û = predict_n(aenode, sim.flow.u, sim.flow.μ₀, nₜ, Float32(sim_time(sim));
-        Δt=Δt, return_traj=false)
+        Δt=Δt, return_traj=false, L=sim.L)
     apply_prediction!(sim, û, Δt, nₜ; impose_biot=impose_biot)
 end
 
@@ -102,6 +103,7 @@ function predict_flex(aenode::AENODE, sim::BiotSimulation;
         next_save=next_save,
         save_interval=save_interval,
         verbose=verbose,
+        L=sim.L
     )
     if isnothing(û)
         return sim, n_integr, retrain_required, nothing, nothing
@@ -111,7 +113,7 @@ function predict_flex(aenode::AENODE, sim::BiotSimulation;
 end
 
 function predict_flex(aenode::AENODE, u::AbstractArray, μ₀::AbstractArray, t₀::Float32; 
-    Δt::Float32=0.35f0, next_save=0.25, save_interval=0.25, verbose=true)
+    Δt::Float32=0.35f0, next_save=0.25, save_interval=0.25, verbose=true, L=32.0f0)
     z, μ₀ = encode_flow(aenode, u, μ₀)
     retrain_required = false
     knn_score = KNN_score(aenode.knn_ood, z)
@@ -121,7 +123,7 @@ function predict_flex(aenode::AENODE, u::AbstractArray, μ₀::AbstractArray, t�
     end
 
     # NODE integration untill cutoff criteria is met.
-    tₙ = t₀ + Δt/32.0f0
+    tₙ = t₀ + Δt/L
     n_integr = 1
     ẑ = predict_array(aenode.NODE,  z; t=[t₀, tₙ], onlysol=true)[:, end]
 
@@ -142,7 +144,7 @@ function predict_flex(aenode::AENODE, u::AbstractArray, μ₀::AbstractArray, t�
             next_save = tₙ + save_interval
         end
 
-        tₙ += Δt/32.0f0
+        tₙ += Δt/L
         ẑ = predict_array(aenode.NODE,  z; t=[t₀, tₙ], onlysol=true)[:, end]
         n_integr += 1
     end

@@ -17,6 +17,7 @@ deps/src/
 /home/matth/Thesis/deps/AutoEncoderToolkit
 gifs/
 figs/biot_shedding_plots
+figs/biot*
 data/
 logs/
 docs/
