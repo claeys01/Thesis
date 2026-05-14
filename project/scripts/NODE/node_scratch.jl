@@ -1,92 +1,53 @@
 using Thesis
-using Thesis: get_NODE_data, load_node, predict_array, region_spans!
-using Plots
+using WaterLily
+using WaterLily: MeanFlow
+using Statistics
+using Dates
 using JLD2
-using Printf
+using Plots
 
-# params_path = "data/saved_models/NODE/16/RE2500/multiple_shoot_adam_250/node_params.jld2"
-params_path = "data/saved_models/NODE/16/RE2500/E1000_curldiv_MS_Adam_250/node_params.jld2"
 
-# latent_idx     = [1, 10]                 # which latent components to show
-# total_downsample = -1                            # -1 = no downsampling
-# out_path       = "data/figures/node_rollout.png"
+root_path = is_hpc() ? "/scratch/mfbclaeys" : ""
 
-train_node, args = load_node(params_path; verbose=true)
-@show dump(args)
+AE_path_tl1 = "data/saved_models/u/Lux/256h_16l/RE2500/2e8/TL1_E500_HW256x256_C4to2_nc6_nd2_z16_C8_lr0p001_wd0p0009_bs16_NY_LL1_Tl0p0/checkpoint.jld2"
+AE_path_tl1 = joinpath(root_path, AE_path_tl1)
 
-# z_total, t_total, tspan_total, z0_total =
-#     get_NODE_data(args.total_latent_path; downsample=total_downsample, verbose=true)
-# _, t_train, _, _ =
-#     get_NODE_data(args.train_latent_path; downsample=args.downsample, verbose=false)
-# _, t_test,  _, _ =
-#     get_NODE_data(args.test_latent_path;  downsample=args.test_downsample,  verbose=false)
+normalizer = load_normalizer(AE_path_tl1)
+ae_bundle, ae_args = load_trained_AE(AE_path_tl1)
 
-# rollout_node = deepcopy(train_node)
-# rollout_node.t     = t_total
-# rollout_node.tspan = tspan_total
-# ẑ_total = predict_array(rollout_node, z0_total)
+node_path = "data/saved_models/NODE/16/RE2500/TL1_E500_curldiv_MS_Adam_250/node_params.jld2"
+node_path = joinpath(root_path, node_path)
+node, node_args = load_node(node_path)
 
-# mae = mean(abs.(z_total .- ẑ_total))
-# @info "Rollout finished" size(ẑ_total) MAE=mae
+z, t, tspan = Thesis.get_latent_vectors(ae_bundle, normalizer, ae_args; downsample=node_args.downsample)
 
-# palette  = [:steelblue, :crimson, :seagreen, :darkorange, :purple, :goldenrod]
-# lw_truth = 2.4
-# lw_pred  = 1.7
-# α_truth  = 0.95
-# α_pred   = 0.9
 
-# n = length(latent_idx)
-# ncols = 1
-# nrows = length(latent_idx)
-# legend_bool = true
-# subplots = map(enumerate(latent_idx)) do (k, i)
-#     c = palette[(k - 1) % length(palette) + 1]
-#     sp = plot(
-#         framestyle = :box,
-#         grid       = true,
-#         ylims = (-0.75, 0.75),
-#         xlims=(0, 50),
-#         minorgrid  = true,
-#         gridalpha  = 0.25,
-#         guidefont  = font(11),
-#         tickfont   = font(9),
-#         titlefont  = font(12),
-#         legendfontsize = 8,
-#         legend     = :topright,
-#         foreground_color_legend = :black,
-#         background_color_legend = RGBA(1, 1, 1, 0.85),
-#         title      = "z$(i)",
-#         xlabel     = k > (nrows - 1) * ncols ? "time" : "",
-#         ylabel     = ((k - 1) % ncols == 0) ? "latent value" : "",
-#     )
-#     region_spans!(sp, t_train, t_test)
-#     plot!(sp, t_total, z_total[i, :];
-#         color = c, lw = lw_truth, alpha = α_truth, label = "truth")
-#     plot!(sp, t_total, ẑ_total[i, :];
-#         color = c, lw = lw_pred, alpha = α_pred, linestyle = :dash, label = "NODE")
-#     plot!(sp, legend= k == 1 ? :topright : nothing)
-#     # if legend_bool
-#     #     plot!(sp, legend=:topright)
-#     #     legend_bool = false
-#     # else
-#     #     plot!(sp, legend=nothing)
-#     # end
+dims = (1, 4, 8, 12)
+ylims = (-1, 1)
+n = length(dims)
+default(fontfamily="Computer Modern", titlefontsize=11,
+        guidefontsize=10, tickfontsize=8, legendfontsize=9)
 
-#     sp
-# end
+plt = plot(layout=(n, 1), size=(700, 750), legend=false,
+           link=:x, framestyle=:box,
+           grid=true, gridalpha=0.18, gridlinewidth=0.6,
+           foreground_color_axis=:black, foreground_color_text=:black,
+           left_margin=8Plots.mm, right_margin=6Plots.mm,
+           top_margin=2Plots.mm, bottom_margin=2Plots.mm)
 
-# plt = plot(subplots...;
-#     layout        = (nrows, ncols),
-#     size          = (1200, 320 * nrows),
-#     # plot_title    = @sprintf("NODE rollout vs ground truth   (MAE = %.3g)", mae),
-#     # plot_titlefont = font(14),
-#     left_margin   = 6Plots.mm,
-#     bottom_margin = 5Plots.mm,
-#     top_margin    = 4Plots.mm,
-#     dpi=350,
-# )
+for (i, d) in enumerate(dims)
+    plot!(plt[i], t, z[d, :];
+          lw=1.4, color=:steelblue,
+          xlims=(minimum(t), maximum(t)),
+          ylims=ylims,
+          ylabel="\$z_{$(d)}\$",
+          yguidefontsize=14,
+          xlabel=i == n ? "\$t^*\$" : "",
+          xformatter=i == n ? :auto : _ -> "",
+          widen=false)
+    hline!(plt[i], [0]; lw=0.6, color=:gray60, ls=:dash, label="")
+end
 
-# display(plt)
-# mkpath(dirname(out_path))
-# savefig(plt, out_path)
-# @info "Saved figure" out_path
+display(plt)
+
+# savefig(plt, "latent_trajectories.pdf")
