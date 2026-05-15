@@ -39,11 +39,11 @@ function make_test_gif(AE_path::String, NODE_path::String)
     # _, t_test, _, z0_test = get_NODE_data(node_args.test_latent_path; downsample=-1, verbose=false)
     _, t_total, _, z0_total = get_NODE_data(node_args.total_latent_path; downsample=-1, verbose=false)
 
-    # ẑ_train, ẑ_test = predict_array(node, z0_train; t=t_train), predict_array(node, z0_test; t=t_test)
-    ẑ_total = predict_array(node, z0_total; t=t_total)
+    # z̃_train, z̃_test = predict_array(node, z0_train; t=t_train), predict_array(node, z0_test; t=t_test)
+    z̃_total = predict_array(node, z0_total; t=t_total)
 
-    û_total, _ = dec(ẑ_total, ps.decoder, st.decoder)
-    ẑ_total = nothing
+    û_total, _ = dec(z̃_total, ps.decoder, st.decoder)
+    z̃_total = nothing
     û_total = denormalize_batch(û_total, normalizer)
 
     # create plots starting from the same z0, so the neural ode predicts the whole simulation

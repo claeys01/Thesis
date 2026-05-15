@@ -13,7 +13,7 @@ Compute the single-step prediction error L_SS as defined in Eq. (11):
     L_SS = ⟨ || ψ(ŵ(t+Δt)) − u(t+Δt) ||₂² ⟩
 
 """
-function L_ss(dec, ẑ_next, u_next)
+function L_ss(dec, z̃_next, u_next)
     per_snapshot_error = sum(abs2, û .- u)
     return mean(per_snapshot_error)
 end
@@ -21,7 +21,7 @@ end
 
 function AENodeAsses(AE_path::String, NODE_path::String; saveplot=false)
     # 1. load the trained AE and NODE
-    # 2. reconstruct the ẑ with the decoder ψ(ẑ(t+Δt)) of train and test range
+    # 2. reconstruct the z̃ with the decoder ψ(z̃(t+Δt)) of train and test range
     #   2.1 first with the downsamples data and then later check with full dataset
     # 3. 
 
@@ -50,7 +50,7 @@ function AENodeAsses(AE_path::String, NODE_path::String; saveplot=false)
     _, t_test,  _, z0_test  = Thesis.get_NODE_data(node_args.test_latent_path;  downsample=-1,  verbose=false)    
     z_total, t_total, tspan_total, z0_total = Thesis.get_NODE_data(node_args.total_latent_path; downsample=-1, verbose=false)
 
-    # ẑ_train, ẑ_test = predict_array(node, z0_train; t=t_train), predict_array(node, z0_test; t=t_test)
+    # z̃_train, z̃_test = predict_array(node, z0_train; t=t_train), predict_array(node, z0_test; t=t_test)
     @show size(z_total)
     # reconstruct latent prediction
     combi_per_snapshot_error_arr = []
@@ -71,8 +71,8 @@ function AENodeAsses(AE_path::String, NODE_path::String; saveplot=false)
         # single step prediction
         i_pred = i+Δt_pred
         push!(t_down, t_total[i_pred])
-        ẑ_next = predict_array(node, z_total[:, i]; t=t_total[i:i_pred])
-        û_next, _ = dec(ẑ_next[:,end], ps.decoder, st.decoder)
+        z̃_next = predict_array(node, z_total[:, i]; t=t_total[i:i_pred])
+        û_next, _ = dec(z̃_next[:,end], ps.decoder, st.decoder)
         û_next = dropdims(û_next, dims=4) .* simdata.μ₀[:, :, :, i_pred]
         u_next, _ = normalize_batch(simdata.u[:, :, :, i_pred]; normalizer = normalizer)
         combi_per_snapshot_error = mean(abs, (u_next .- û_next))

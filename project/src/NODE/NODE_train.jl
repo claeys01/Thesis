@@ -221,21 +221,64 @@ function train_NODE(args::NodeArgs;
     else
         plt = plot_node_trajectory(node, z, z0; loss=final_loss)
     end
-    png_path = joinpath(out_dir, "trajectories.png")
+    png_path = joinpath(out_dir, "trajectories.pdf")
     @info "  Saved trajectory plot to $png_path"
     savefig(plt, png_path)
 
-    metrics_path = joinpath(out_dir, "training_loss_rmse.png")
+    metrics_path = joinpath(out_dir, "training_loss_rmse.pdf")
     if !isempty(epochs) && !isempty(train_losses) && !isempty(rmse_errors)
         loss_for_plot = max.(train_losses, eps(Float64))
         rmse_for_plot = max.(rmse_errors, eps(Float64))
-        metrics_plot = plot(layout=(2, 1), size=(900, 700))
+        metrics_plot = plot(layout=grid(2, 1, heights=[0.5, 0.5]),
+            size=(1000, 450),
+            dpi=400,
+            framestyle    = :box,
+            gridalpha     = 0.20,
+            gridlinewidth = 0.5,
+            link          = :x,
+            foreground_color_axis = :black,
+            foreground_color_text = :black,
+            left_margin   = 8Plots.mm,
+            right_margin  = 6Plots.mm,
+            top_margin    = 2Plots.mm,
+            bottom_margin = 6Plots.mm,
+        )
+
+        log_decade_ticks(v) = begin
+            lo, hi = floor(Int, log10(minimum(v))), ceil(Int, log10(maximum(v)))
+            10.0 .^ (lo:hi)
+        end
+
         plot!(metrics_plot[1], epochs, loss_for_plot;
-            xlabel="Iteration", ylabel="Loss", title="Training Loss", legend=false, yscale=:log10)
+            ylabel=L"\mathcal{L}", legend=false, yscale=:log10,
+            yticks=log_decade_ticks(loss_for_plot),
+            yminorticks=10, yminorgrid=true, minorgridalpha=0.05,
+            linewidth=1.4, color=:steelblue,
+            xformatter=_->"", xlabel="",
+            bottom_margin=-2Plots.mm)
         plot!(metrics_plot[2], epochs, rmse_for_plot;
-            xlabel="Iteration", ylabel="RMSE", title="Training RMSE", legend=false, color=:red, yscale=:log10)
+            xlabel="Iteration", ylabel="RMSE", legend=false, yscale=:log10,
+            yticks=log_decade_ticks(rmse_for_plot),
+            yminorticks=10, yminorgrid=true, minorgridalpha=0.10,
+            linewidth=1.4, color=:firebrick,
+            top_margin=-2Plots.mm)
+
+        # final_loss = loss_for_plot[end]
+        # final_rmse = rmse_for_plot[end]
+        # last_epoch = epochs[end]
+        # hline!(metrics_plot[1], [final_loss]; color=:steelblue, linestyle=:dot, alpha=0.6, label="")
+        # hline!(metrics_plot[2], [final_rmse]; color=:firebrick, linestyle=:dot, alpha=0.6, label="")
+        # annotate!(metrics_plot[1], last_epoch, final_loss,
+        #     text(@sprintf("  final = %.3g", final_loss), :steelblue, :left, 10))
+        # annotate!(metrics_plot[2], last_epoch, final_rmse,
+        #     text(@sprintf("  final = %.3g", final_rmse), :firebrick, :left, 10))
+
         savefig(metrics_plot, metrics_path)
         @info "  Saved training metrics plot to $metrics_path"
+
+        metrics_jld_path = joinpath(out_dir, "training_metrics.jld2")
+        @save metrics_jld_path epochs train_losses rmse_errors
+        @info "  Saved training metrics arrays to $metrics_jld_path"
     else
         @warn "Training metrics arrays are empty; skipping loss/RMSE plot"
     end
@@ -248,7 +291,7 @@ function train_NODE(args::NodeArgs;
     end
     
     if args.extrapolate && !multi
-        extrapolation_plot, (ẑ_train, ẑ_test) = extrapolate_node(node_path)
+        extrapolation_plot, (z̃_train, z̃_test) = extrapolate_node(node_path)
         display(extrapolation_plot)
         extrapolation_path = joinpath(out_dir, "extrapolation_plot_loss.png")
         savefig(extrapolation_plot, extrapolation_path)

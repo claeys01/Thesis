@@ -21,7 +21,7 @@ Base.@kwdef mutable struct NodeArgs
     extrapolate = true
     group_size = 20
     continuity_term = 200
-    save_path = "data/models/NODE_models"   # results dir
+    save_path = "data/NODE_models"   # results dir
     train_latent_path = "data/latent_data/16/RE2500/2e8/U_128_latent_curldiv_E1000_train.jld2"
     test_latent_path =  "data/latent_data/16/RE2500/2e8/U_128_latent_curldiv_E1000_test.jld2"
     total_latent_path = "data/latent_data/16/RE2500/2e8/U_128_latent_curldiv_E1000.jld2"
@@ -207,10 +207,28 @@ function plot_multiple_shoot(node::NODE, preds::Vector{<:AbstractMatrix}, z::Abs
     group_size::Int, title_loss=nothing, n_reconstruct=4, t=nothing)
     ts = t === nothing ? node.t : t
     ranges = DiffEqFlux.group_ranges(size(z, 2), group_size)
-    p = plot()
-    if !isnothing(title_loss)
-        title!(p, "loss = $(title_loss)")
-    end
+    p = plot(
+        ylims=(minimum(z), maximum(z)),
+        dpi=400,
+        size=(1000,350),
+        xlabel=L"t^*",
+        ylabel=L"\mathbf{z}",
+        legendfontsize = 8,
+        framestyle   = :box,
+        gridalpha    = 0.20,
+        gridlinewidth = 0.5,
+        foreground_color_axis  = :black,
+        foreground_color_text  = :black,
+        left_margin   = 6Plots.mm,
+        right_margin  = 3Plots.mm,
+        top_margin    = 1Plots.mm,
+        bottom_margin = 8Plots.mm,
+        xguide_position = :bottom,   # default, but explicit
+        )
+
+    # if !isnothing(title_loss)
+    #     title!(p, "loss = $(title_loss)")
+    # end
 
     idx_samples = round.(Int, range(1, stop=size(z, 1), length=n_reconstruct))
 
@@ -225,7 +243,7 @@ function plot_multiple_shoot(node::NODE, preds::Vector{<:AbstractMatrix}, z::Abs
             plot!(p, ts[rg], z[lat_idx, rg];
                   color=c, linestyle=:solid, label=sidx == 1 && j == 1 ? "z (truth)" : "")
             plot!(p, ts[rg], preds[j][lat_idx, :];
-                  color=c, linestyle=:dash, label=sidx == 1 && j == 1 ? "ẑ (pred)" : "")
+                  color=c, linestyle=:dash, label=sidx == 1 && j == 1 ? "z̃ (pred)" : "")
 
             # start/end markers for the segment to visualize overlaps
             t_start, t_end = ts[rg][1], ts[rg][end]
@@ -248,10 +266,28 @@ end
 function plot_multiple_shoot_multi(node::NODE, predss::Vector, zs::Vector{<:AbstractMatrix};
         group_size::Int, ts::Vector, title_loss=nothing, n_reconstruct=4)
     n = length(zs)
-    p = plot(; size=(1100, 500))
-    if title_loss !== nothing
-        title!(p, "$n chunks (total loss = $(title_loss))")
-    end
+    p = plot(size=(1100, 450),
+        ylims=(minimum(zs), maximum(zs)),
+        dpi=400,
+        xlabel=L"t^*",
+        ylabel=L"\mathbf{z}", 
+        legendfontsize=7, 
+        framestyle   = :box,
+        gridalpha    = 0.20,
+        gridlinewidth = 0.5,
+        foreground_color_axis  = :black,
+        foreground_color_text  = :black,
+        left_margin   = 6Plots.mm,
+        right_margin  = 3Plots.mm,
+        top_margin    = 1Plots.mm,
+        bottom_margin = 8Plots.mm,
+        xguide_position = :bottom,   # default, but explicit
+        )
+
+
+    # if title_loss !== nothing
+    #     title!(p, "$n chunks (total loss = $(title_loss))")
+    # end
 
     latent_dim = size(zs[1], 1)
     idx_samples = round.(Int, range(1, stop=latent_dim, length=n_reconstruct))
@@ -273,7 +309,7 @@ function plot_multiple_shoot_multi(node::NODE, predss::Vector, zs::Vector{<:Abst
                       label=first_chunk ? "z (truth)" : "")
                 plot!(p, t[rg], preds[j][lat_idx, :];
                       color=c, linestyle=:dash, alpha=0.9,
-                      label=first_chunk ? "ẑ (pred)" : "")
+                      label=first_chunk ? "z̃ (pred)" : "")
 
                 t_start, t_end = t[rg][1], t[rg][end]
                 pred_start, pred_end = preds[j][lat_idx, 1], preds[j][lat_idx, end]
@@ -296,29 +332,42 @@ end
 function plot_node_trajectory(node::NODE, z::AbstractMatrix, z0; p=nothing, t=nothing, n_reconstruct=4, loss=nothing, plt=nothing, labels=true)
     idx_samples = round.(Int, range(1, stop=size(z, 1), length=n_reconstruct))
     z_samples = [vec(z[i, :]) for i in idx_samples]  # Vector of 8 one-dimensional arrays, each length 179
-    ẑ = predict_array(node, z0; p=p, t=t)
-    ẑ_samples = [vec(ẑ[i, :]) for i in idx_samples]  # Vector of 4 one-dimensional arrays, each length 179
-    fig = plt === nothing ? plot() : plt
-    if !isnothing(loss)
-        title!(fig, "loss = $(loss)")
-    end
-    colors = [:black, :red, :blue, :green, :purple, :orange, :yellow]
+    z̃ = predict_array(node, z0; p=p, t=t)
+    z̃_samples = [vec(z̃[i, :]) for i in idx_samples]  # Vector of 4 one-dimensional arrays, each length 179
 
-    lw_truth = 2.2
-    lw_pred  = 1.4
-    α_truth  = 0.95
-    α_pred   = 0.70
+    standard_fig = plot(
+        dpi=400,
+        size=(1000,350), 
+        ylims=(minimum(z), maximum(z)),
+        xlabel=L"t^*", 
+        ylabel=L"\mathbf{z}", 
+        framestyle   = :box,
+        gridalpha    = 0.20,
+        gridlinewidth = 0.5,
+        foreground_color_axis  = :black,
+        foreground_color_text  = :black,
+        left_margin   = 6Plots.mm,
+        right_margin  = 3Plots.mm,
+        top_margin    = 1Plots.mm,
+        bottom_margin = 8Plots.mm,
+        xguide_position = :bottom,   # default, but explicit
+        )
+
+    fig = plt === nothing ? standard_fig : plt
+    # if !isnothing(loss)
+    #     title!(fig, "loss = $(loss)")
+    # end
+    palette = [:black, :red, :blue, :green, :purple, :orange, :yellow]
+    ncolors = length(palette)
     
     for i in 1:n_reconstruct
-        c = colors[i]
+        c = palette[(i - 1) % ncolors + 1]
         plot!(fig, node.t, z_samples[i];
-            color=c, linewidth=lw_truth, alpha=α_truth,
-            label = labels ? "z $(idx_samples[i]) (truth)" : ""
-        )
-        plot!(fig, node.t, ẑ_samples[i];
-            color=c, linewidth=lw_pred, alpha=α_pred, linestyle=:dash,
-            label = labels ? "ẑ $(idx_samples[i]) (NODE)" : ""
-        )
+            color=c, linestyle=:solid,
+            label = labels && i == 1 ? "z (truth)" : "")
+        plot!(fig, node.t, z̃_samples[i];
+            color=c, linestyle=:dash,
+            label = labels && i == 1 ? "z̃ (pred)" : "")
     end
     return fig
 end

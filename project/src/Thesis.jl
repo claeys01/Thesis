@@ -24,7 +24,16 @@ using Dates
 # Visualization - Always loaded (needed by custom.jl and other modules)
 # ═══════════════════════════════════════════════════════════════════════════════
 using Plots
+using LaTeXStrings
 using Printf
+
+function set_plot_defaults!()
+    default(fontfamily="Computer Modern",
+            titlefontsize=16,
+            guidefontsize=16,
+            tickfontsize=12,
+            legendfontsize=9)
+end
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Machine Learning Stack
@@ -56,6 +65,8 @@ using Reactant
 const USE_CUDA = Ref(false)
 
 function __init__()
+    set_plot_defaults!()
+
     if get(ENV, "THESIS_USE_CUDA", "false") == "true"
         try
             @eval begin
@@ -252,6 +263,7 @@ export run_warmup!, run_hybrid!, save_results
 # Exports - Utilities
 # ═══════════════════════════════════════════════════════════════════════════════
 export to
+export set_plot_defaults!
 export @with_plots, load_plots
 export is_hpc, get_device
 export cpu_device, gpu_device
@@ -338,5 +350,8 @@ export struct2dict
 
 # JLD2 macros
 export @save, @load
+
+# LaTeXStrings macro
+export @L_str
 
 end # module Thesis

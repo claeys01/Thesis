@@ -34,7 +34,7 @@ function main()
     device = get_device()
 
     # ── Step 1: Train (or load) the Autoencoder ──
-    ae_checkpoint = joinpath(root_path, "data/saved_models/u/Lux/256h_16l/RE2500/2e8/Feb12-1530__E1000_HW256x256_C4to2_nc6_nd2_z16_C8_lr0p001_wd0p0009_bs16_NY_LL1_Tl0p0471/checkpoint.jld2")
+    ae_checkpoint = joinpath(root_path, "data/saved_models/u/Lux/256h_16l/RE2500/2e8/TL1_E500_HW256x256_C4to2_nc6_nd2_z16_C8_lr0p001_wd0p0009_bs16_NY_LL1_Tl0p0/checkpoint.jld2")
     
     # Load the trained AE into memory (no need to reload later)
     ae_bundle, ae_args = load_trained_AE(ae_checkpoint; device=device, return_params=true)
@@ -47,7 +47,9 @@ function main()
             train_latent_path = train_latent_path,
             test_latent_path = test_latent_path,
             total_latent_path = total_latent_path,
+            maxiters=250,
             extrapolate = false,
+            multiple_shooting=false,
             use_gpu = false,
             latent_dim = ae_args.latent_dim,  # match AE latent dim
         );

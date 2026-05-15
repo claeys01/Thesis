@@ -5,6 +5,7 @@ using Statistics
 using Dates
 using JLD2
 using Plots
+using LaTeXStrings
 
 
 root_path = is_hpc() ? "/scratch/mfbclaeys" : ""
@@ -22,32 +23,50 @@ node, node_args = load_node(node_path)
 z, t, tspan = Thesis.get_latent_vectors(ae_bundle, normalizer, ae_args; downsample=node_args.downsample)
 
 
-dims = (1, 4, 8, 12)
-ylims = (-1, 1)
-n = length(dims)
-default(fontfamily="Computer Modern", titlefontsize=11,
-        guidefontsize=10, tickfontsize=8, legendfontsize=9)
 
-plt = plot(layout=(n, 1), size=(700, 750), legend=false,
-           link=:x, framestyle=:box,
-           grid=true, gridalpha=0.18, gridlinewidth=0.6,
-           foreground_color_axis=:black, foreground_color_text=:black,
-           left_margin=8Plots.mm, right_margin=6Plots.mm,
-           top_margin=2Plots.mm, bottom_margin=2Plots.mm)
+dims = (1, 4, 8, 12)
+n = length(dims)
+
+# Compute a shared y-limit from the data, or per-panel — your call
+ymax = maximum(abs, z) * 1.15  # shared, tight to data
+# round to a clean tick value
+ymax = ceil(ymax * 10) / 10  # e.g. 0.8, 0.9, 1.0
+
+
+plt = plot(
+    layout       = (2, 2),
+    size         = (1000, 320),          # narrower, slightly less tall → better panel aspect
+    legend       = false,
+    link         = :x,
+    framestyle   = :box,
+    grid         = :y,                  # horizontal gridlines only
+    gridalpha    = 0.20,
+    gridlinewidth = 0.5,
+    foreground_color_axis  = :black,
+    foreground_color_text  = :black,
+    left_margin   = 6Plots.mm,
+    right_margin  = 3Plots.mm,
+    top_margin    = 1Plots.mm,
+    # bottom_margin = 4Plots.mm,
+)
 
 for (i, d) in enumerate(dims)
+    is_bottom = i > 2
     plot!(plt[i], t, z[d, :];
-          lw=1.4, color=:steelblue,
-          xlims=(minimum(t), maximum(t)),
-          ylims=ylims,
-          ylabel="\$z_{$(d)}\$",
-          yguidefontsize=14,
-          xlabel=i == n ? "\$t^*\$" : "",
-          xformatter=i == n ? :auto : _ -> "",
-          widen=false)
-    hline!(plt[i], [0]; lw=0.6, color=:gray60, ls=:dash, label="")
+          lw        = 1.2,
+          color     = :midnightblue,
+          xlims     = extrema(t),
+          ylims     = (-ymax, ymax),
+          ylabel    = L"z_{%$d}",       # LaTeXStrings interpolation — renders correctly
+          xlabel     = is_bottom ? L"t^{*}" : "",
+          xformatter = is_bottom ? :auto : _ -> "",
+          bottom_margin = is_bottom ? 6Plots.mm : 1Plots.mm,
+          xguide_position = :bottom,   # default, but explicit
+
+          yguidefontrotation = 0,       # horizontal y-label, reads better in stacked panels
+          widen     = false,
+    )
 end
 
 display(plt)
-
-# savefig(plt, "latent_trajectories.pdf")
+savefig(plt, "figs/latent_trajectories.pdf")
