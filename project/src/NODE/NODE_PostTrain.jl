@@ -83,7 +83,7 @@ function extrapolate_node(params_path; test_downsample::Int = -1, total_downsamp
     data = load_datasets(args; total_downsample=total_downsample, verbose=verbose)
     test_node, total_node = make_nodes(train_node, data.t_test, data.tspan_test, data.t_total, data.tspan_total)
     
-    ẑ_train, ẑ_test = predict_array(train_node, data.z0_train), predict_array(test_node, data.z0_test)
+    z̃_train, z̃_test = predict_array(train_node, data.z0_train), predict_array(test_node, data.z0_test)
 
     test_loss, total_loss, avg_test_loss, avg_total_loss =
         predictions_and_losses(test_node, data.z0_test, data.z_test, total_node, data.z0_total, data.z_total)
@@ -94,7 +94,7 @@ function extrapolate_node(params_path; test_downsample::Int = -1, total_downsamp
     plt = plot_losses(test_node, total_node, test_loss, total_loss, avg_test_loss, avg_total_loss)
     region_spans!(plt, data.t_train, data.t_test)
 
-    return plot(p, plt; layout=(2, 1), size=(900, 900)), (ẑ_train, ẑ_test)
+    return plot(p, plt; layout=(2, 1), size=(900, 900)), (z̃_train, z̃_test)
 
 end
 

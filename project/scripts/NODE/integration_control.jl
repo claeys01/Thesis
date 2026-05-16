@@ -19,10 +19,10 @@ time = simdata.time[rollout_range]
 z0 = latent_data.z_total[:, rollout_range[1]]
 sol = Thesis.predict_array(aenode.NODE,  z0; t=simdata.time, onlysol=false)
 
-ẑ = Array(sol[1])
+z̃ = Array(sol[1])
 
-@show size(ẑ)
-ẑ_norms = norm.(eachcol(ẑ))
+@show size(z̃)
+z̃_norms = norm.(eachcol(z̃))
 
 
 
@@ -32,10 +32,10 @@ ẑ_norms = norm.(eachcol(ẑ))
 # for i in 1:16
 #     for j in 1:16
 #         if i == j
-#             histogram!(p[subplot_idx], ẑ[i, :], bins=30, alpha=0.6, 
+#             histogram!(p[subplot_idx], z̃[i, :], bins=30, alpha=0.6, 
 #                 label="", legend=false, ticks=false)
 #         else
-#             scatter!(p[subplot_idx], ẑ[j, :], ẑ[i, :], markersize=1, alpha=0.3,
+#             scatter!(p[subplot_idx], z̃[j, :], z̃[i, :], markersize=1, alpha=0.3,
 #                 label="", legend=false, ticks=false, color=:blue)
 #         end
 #         subplot_idx += 1
@@ -46,7 +46,7 @@ ẑ_norms = norm.(eachcol(ẑ))
 # savefig(p, "figs/latent_trajectories_hist_clusters.png")
 # plt = plot()
 # for i in 1:16
-#     plot!(plt, simdata.time, ẑ[i, :])
+#     plot!(plt, simdata.time, z̃[i, :])
 # end
 # display(plt)
 

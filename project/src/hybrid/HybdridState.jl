@@ -9,6 +9,7 @@ Base.@kwdef struct InlineParams
     n_switch = 150
     pred_Δt = 0.35
     save_interval = 0.25
+    sample_interval = 0.1
     max_retrain_flags = 3
 end
 
@@ -28,6 +29,7 @@ Base.@kwdef mutable struct HybridState
     simdata_path::String = ""
     step::Int = 1
     next_save::Float32 = 0
+    next_sample::Float32 = 0
     retrain_needed::Bool = false
     mode_log::Vector{@NamedTuple{t_start::Float32, t_end::Float32, mode::String}} = @NamedTuple{t_start::Float32, t_end::Float32, mode::String}[]
 end
@@ -45,6 +47,7 @@ function HybridState(sim, aenode, params, savedir, AE_path, node_path)
         gif_frames=[],
         savedir, AE_path, node_path,
         next_save=Float64(params.save_interval),
+        next_sample=Float64(params.sample_interval),
     )
 end
 
@@ -79,19 +82,30 @@ function run_warmup!(hs::HybridState, t_end; simdata::Union{SimData,Nothing}=not
             WaterLily.update!(hs.ref_meanflow, ref_sim.flow)
             hs.next_save = sim_time(sim) + hs.params.save_interval
             save_velocity_frame!(hs.gif_frames, sim, sim_time(sim))
-            verbose && @info "Updating MeanFlow statistics at: $(sim_time(sim))"
+            verbose && @info "  Updating MeanFlow statistics at: $(sim_time(sim))"
         end
 
-        push!(u_list, copy(sim.flow.u))
-        push!(p_list, copy(sim.flow.p))
-        push!(μ₀_list, copy(sim.flow.μ₀))
-        push!(force_list, copy(res.hybrid_forces_wat[end]))
-        push!(time_vec, res.hybrid_time_wat[end])
-        push!(Δt_vec, Float32(round(sim.flow.Δt[end], digits=3)))
+        if sim_time(sim) ≥ hs.next_sample
+            push!(u_list, copy(sim.flow.u))
+            push!(p_list, copy(sim.flow.p))
+            push!(μ₀_list, copy(sim.flow.μ₀))
+            push!(force_list, copy(res.hybrid_forces_wat[end]))
+            push!(time_vec, res.hybrid_time_wat[end])
+            push!(Δt_vec, Float32(round(sim.flow.Δt[end], digits=3)))
+            hs.next_sample = sim_time(sim) + hs.params.sample_interval
+            # record_waterlily_step!(res, sim, wall_time)
+            verbose && @info "Updating simdata statistics at: $(sim_time(sim))"
+        end
 
         hs.step += 1
     end
-    verbose && @info "Warmup complete" sim_time = sim_time(sim) steps = hs.step - 1
+    verbose && @info "Warmup complete" sim_time = sim_time(sim) steps = hs.step - 1 samples = length(time_vec)
+
+    if isempty(time_vec)
+        @warn "run_warmup! collected no samples — sample_interval $(hs.params.sample_interval) exceeds the warmup window"
+        push!(mode_log, (t_start=t_sim_start, t_end=Float32(sim_time(sim)), mode="Training"))
+        return simdata
+    end
 
     push!(mode_log, (t_start=t_sim_start, t_end=time_vec[end], mode="Training"))
 
@@ -134,7 +148,10 @@ function run_warmup!(hs::HybridState, t_end; simdata::Union{SimData,Nothing}=not
         hs.simdata_path = save_path
         @info "Saved simdata to $save_path"
     end
-
+    u_list = nothing
+    p_list = nothing
+    μ₀_list = nothing
+    force_list = nothing
     return simdata
 end
 

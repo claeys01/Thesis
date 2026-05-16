@@ -149,7 +149,7 @@ function plot_forces_comparison(res::AccelResults, t_end; t_train=nothing, t_tes
     rel_lift = round(m.rel_err.lift_rms, digits=2)
 
     plt = plot(framestyle=:box, size=(600, 400), dpi=500,
-        xlabel="tU/L", ylabel="Force coefficient",
+        xlabel="\$t^*\$", ylabel="Force coefficient",
         xlims=(0, t_end), ylims=(-3, 2),
         title="Force Comparison")
 

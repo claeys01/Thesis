@@ -24,8 +24,19 @@ using JLD2
 # end
 
 simdata = load_simdata("data/datasets/RE2500/2e8/U_128_full.jld2")
-@show size(simdata.u)
-println(dump(simdata))
+# display(Thesis.train_force_plot(simdata))
+default(fontfamily="Computer Modern", titlefontsize=14,
+        guidefontsize=12, tickfontsize=8, legendfontsize=9)
+plt = plot(framestyle=:box, size=(600, 300), dpi=500,
+        xlabel="\$t^*\$", ylabel="Force coefficient",
+        xlims=(0, 50), ylims=(-3, 2))
+plot!(simdata.time, first.(simdata.force), label=L"C_{d}", color=:red, lw=1)
+plot!(simdata.time, last.(simdata.force), label=L"C_{L}", color=:blue, lw=1)
+display(plt)
+savefig(plt, "figs/256_forces.pdf")
+
+# @show size(simdata.u)
+# println(dump(simdata))
 
 # n = 2^8
 # sim = circle_shedding_biot(;n=n, m=n)
@@ -57,7 +68,7 @@ println(dump(simdata))
 #     end
 # end
 
-# function run_oscillating_flow(n=2^8, stop=20)
+# function run_oscillating_flow(n=2^9, stop=20)
 #     sim = circle_shedding_biot(;n=n,m=n)
 #     sim_step!(sim,0.1)
 
