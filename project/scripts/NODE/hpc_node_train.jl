@@ -49,7 +49,7 @@ function main()
             total_latent_path = total_latent_path,
             maxiters=250,
             extrapolate = false,
-            multiple_shooting=false,
+            multiple_shooting=true,
             use_gpu = false,
             latent_dim = ae_args.latent_dim,  # match AE latent dim
         );
