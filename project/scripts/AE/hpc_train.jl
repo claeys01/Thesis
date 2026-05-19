@@ -30,7 +30,7 @@ function main()
 
     # node_path = joinpath(root_path, "data/saved_models/NODE/16/RE2500/E1000_curldiv_MS_Adam_250/node_params.jld2")div = 1000.0
     div = 100.0
-    curl = 10.0
+    curl = 100.0
     epochs = 1000
     println("\nTraining AE for $epochs epochs with λdiv=$(div), λcurl=$(curl))")
 
@@ -42,7 +42,8 @@ function main()
             train_downsample = 500,
             test_loss=false,
             t_training = 50,
-            full_data_path=tl_path
+            full_data_path=tl_path,
+            n_dense=1,
         ); return_path=true
     )
 end
