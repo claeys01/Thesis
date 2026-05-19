@@ -30,6 +30,7 @@ params = params = InlineParams(
         n_switch = 150,
         max_retrain_flags = 3,
         save_interval = 0.25, # needs to be fixed still, 
+        sample_interval=0
     )
 
 savedir = joinpath(root_path, "data", "inline_runs", Dates.format(now(), "yyyy-mm-dd_HH-MM"))

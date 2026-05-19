@@ -42,21 +42,24 @@ function main()
     @info "AE loaded into memory"
 
     # ── Step 2: Train NODE using in-memory AE ──
-    train_NODE(
-        NodeArgs(
-            train_latent_path = train_latent_path,
-            test_latent_path = test_latent_path,
-            total_latent_path = total_latent_path,
-            maxiters=250,
-            extrapolate = false,
-            multiple_shooting=true,
-            use_gpu = false,
-            latent_dim = ae_args.latent_dim,  # match AE latent dim
-        );
-        ae_bundle = ae_bundle,
-        normalizer = normalizer,
-        ae_args = ae_args,
-    )
+
+    for train_iters in [2, 20, 100, 250]
+        train_NODE(
+            NodeArgs(
+                train_latent_path = train_latent_path,
+                test_latent_path = test_latent_path,
+                total_latent_path = total_latent_path,
+                maxiters=train_iters,
+                extrapolate = false,
+                multiple_shooting=true,
+                use_gpu = false,
+                latent_dim = ae_args.latent_dim,  # match AE latent dim
+            );
+            ae_bundle = ae_bundle,
+            normalizer = normalizer,
+            ae_args = ae_args,
+        )
+    end
 end
 
 main()

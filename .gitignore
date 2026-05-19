@@ -18,6 +18,7 @@ deps/src/
 gifs/
 figs/biot_shedding_plots
 figs/biot*
+*.pdf
 data/
 logs/
 docs/

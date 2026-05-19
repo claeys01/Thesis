@@ -71,17 +71,29 @@ function train_force_plot(forces::Vector{Vector{Float32}}, time::Vector{Float32}
     lift = last.(forces)
     zero_idxs = zero_crossing(lift; direction=:rising)
 
-    plt = plot(xlabel="tU/L",
-        ylabel="Pressure force coefficients",
+    plt = plot(framestyle=:box, size=(600, 300), dpi=500,
+        xlabel="\$t^*\$", ylabel="Force coefficient",
+        xlims=(0, 50), ylims=(-3, 2),
+        titlefontsize=14,
+        guidefontsize=12, tickfontsize=8, legendfontsize=7,
+        foreground_color_axis  = :black,
+        foreground_color_text  = :black,
+        left_margin   = 3Plots.mm,
+        right_margin  = 1Plots.mm,
+        top_margin    = 1Plots.mm,
+        bottom_margin = 2Plots.mm,
         legend=:topright) 
-    plot!(plt, time, drag, label="drag", color=:red, linewidth=1.5)
-    plot!(plt, time, lift, label="lift", color=:blue, linewidth=1.5)
+    plot!(plt, time, drag, label=L"C_{d}", color=:red, lw=1)
+    plot!(plt, time, lift, label=L"C_{L}", color=:blue, lw=1)
 
 
     if !isnothing(val_idx) && !isempty(val_idx)
         scatter!(plt, time[val_idx], lift[val_idx], 
-        markersize = 2, color=:darkgreen, markerstrokewidth = 0, markershape =:dtriangle, 
+        markersize = 2, color=:black, markerstrokewidth = 0, markershape =:circle, 
         label="validation points")
+        scatter!(plt, time[val_idx], drag[val_idx], 
+        markersize = 2, color=:black, markerstrokewidth = 0, markershape =:circle, 
+        label="")
     end
     # Highlight train/val region (before test starts)
     if !isnothing(train_idx) && !isempty(train_idx)
@@ -89,7 +101,7 @@ function train_force_plot(forces::Vector{Vector{Float32}}, time::Vector{Float32}
         
         # Add vertical shaded region for train/val
         vspan!(plt, [time[first(train_range)], time[last(train_range)]];
-            fillcolor=:green, alpha=0.1, label="train/val region")
+            fillcolor=:green, alpha=0.075, label="train/val region")
     end
  
     # Highlight test region
@@ -98,7 +110,7 @@ function train_force_plot(forces::Vector{Vector{Float32}}, time::Vector{Float32}
         
         # Add vertical shaded region for test
         vspan!(plt, [time[first(test_range)], time[last(test_range)]];
-            fillcolor=:purple, alpha=0.1, label="test region")
+            fillcolor=:purple, alpha=0.075, label="test region")
         
     end
     # Annotate zero crossings

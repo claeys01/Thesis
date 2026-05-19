@@ -267,7 +267,7 @@ function plot_multiple_shoot_multi(node::NODE, predss::Vector, zs::Vector{<:Abst
         group_size::Int, ts::Vector, title_loss=nothing, n_reconstruct=4)
     n = length(zs)
     p = plot(size=(1100, 450),
-        ylims=(minimum(zs), maximum(zs)),
+        ylims=(minimum(minimum, zs), maximum(maximum, zs)),
         dpi=400,
         xlabel=L"t^*",
         ylabel=L"\mathbf{z}", 

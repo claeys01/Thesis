@@ -197,7 +197,7 @@ function train_NODE(args::NodeArgs;
 
     # saving the model
     @info "Saving model and plots"
-    timestamp = "NODE_" * Dates.format(now(), "udd-HHMM")
+    timestamp = "NODE_" * Dates.format(now(), "udd-HHMMSS")
 
     # out_dir = joinpath("data", "NODE_models", timestamp)
     out_dir = joinpath(args.save_path, timestamp)
