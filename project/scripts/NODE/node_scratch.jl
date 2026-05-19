@@ -23,7 +23,6 @@ node, node_args = load_node(node_path)
 z, t, tspan = Thesis.get_latent_vectors(ae_bundle, normalizer, ae_args; downsample=node_args.downsample)
 
 
-
 dims = (1, 4, 8, 12)
 n = length(dims)
 
@@ -70,3 +69,5 @@ end
 
 display(plt)
 savefig(plt, "figs/latent_trajectories.pdf")
+
+# %%
