@@ -125,7 +125,7 @@ function predict_flex(aenode::AENODE, u::AbstractArray, μ₀::AbstractArray, t�
     # NODE integration untill cutoff criteria is met.
     tₙ = t₀ + Δt/L
     n_integr = 1
-    1 = predict_array(aenode.NODE,  z; t=[t₀, tₙ], onlysol=true)[:, end]
+    z̃ = predict_array(aenode.NODE,  z; t=[t₀, tₙ], onlysol=true)[:, end]
 
     z̃_meanflow = Vector{typeof(z̃)}()
     t_meanflow = Float32[]

@@ -11,7 +11,7 @@ root_path = ""
 if is_hpc()
     root_path = "/scratch/mfbclaeys"
     # Log job info
-    @info "Starting HPC AE+NODE retrain pipeline"
+    @info "Starting HPC AE pipeline"
     @info "  SLURM_JOB_ID: $(get(ENV, "SLURM_JOB_ID", "N/A"))"
     @info "  SLURM_NTASKS: $(get(ENV, "SLURM_NTASKS", "N/A"))"
     @info "  SLURM_CPUS_PER_TASK: $(get(ENV, "SLURM_CPUS_PER_TASK", "N/A"))"
@@ -25,7 +25,7 @@ params = InlineParams(
     t_accel_end = 50,
     save_interval = 0.25,
     sample_interval = 0.01,
-    ae_epochs = 1,
+    ae_epochs = 1000,
     ae_retrain_epochs = 300,
     node_iters = 1,
     node_retrain_iters = 100,
@@ -47,7 +47,6 @@ hs = HybridState(sim, nothing, params, savedir, nothing, nothing)
 
 simdata = run_warmup!(hs, params.t_run; u₀=u₀, save_path=simdata_path)
 
-@show size(simdata.u)
 display(Thesis.train_force_plot(simdata))
 
 # ================================ Step 1: Train Autoencoder ================================
@@ -77,39 +76,3 @@ ae_args = LuxArgs(
 ae_bundle, AE_path = train_AE(ae_args; return_path=true)
 ae_elapsed = round((time() - ae_start) / 60; digits=1)
 @info "AE initial training complete" elapsed_min=ae_elapsed checkpoint=AE_path
-
-# ae_args.simdata_ram = nothing   # release the simdata ref
-normalizer = load_normalizer(AE_path)
-
-ae_bundle = cpu_device()(ae_bundle)
-
-# ================================ Step 2: Train NODE ================================
-@info "── Step 2/4: Training Neural ODE ──"
-node_args = NodeArgs(
-        save_path=savedir,
-        maxiters = params.node_iters,
-        extrapolate = false,
-        use_gpu = false,
-        latent_dim = ae_args.latent_dim,
-    )
-node_start = time()
-node, node_path = train_NODE(
-    node_args;
-    ae_bundle = ae_bundle,
-    normalizer = normalizer,
-    ae_args = ae_args,
-)
-node_elapsed = round((time() - node_start) / 60; digits=1)
-@info "NODE training complete" elapsed_min=node_elapsed node_path=node_path
-
-# @info "Steps 1-2 complete" elapsed_min=round((time() - total_start) / 60; digits=1)
-# ae_bundle = cpu_device()(ae_bundle)
-
-aenode = AENODE(ae_bundle, node, ae_args, node_args, normalizer; verbose=true)
-
-# hs = HybridState(sim, aenode, params, savedir, AE_path_tl1, node_path)
-hs.aenode = aenode
-hs.AE_path = AE_path
-hs.node_path = node_path
-
-run_hybrid!(hs)
