@@ -398,12 +398,12 @@ end
 Encode simulation data into latent vectors using a trained AE already in memory.
 Returns `(z, t, tspan, z0)` on CPU.
 """
-function get_latent_vectors(ae_bundle, normalizer::Normalizer, ae_args::LuxArgs; downsample=300, device=cpu_device())
+function get_latent_vectors(ae_bundle, normalizer::Normalizer, ae_args::LuxArgs; downsample=300, device=cpu_device(), ae_t_train=nothing)
     ae, ps, st = ae_bundle.ae, ae_bundle.ps, ae_bundle.st
     simdata = load_simdata(ae_args.full_data_path)
     preprocess_data!(simdata; verbose=true)
-    
-    train_idx = get_trainval_idx(simdata, ae_args.t_training, downsample)
+    t_train = ae_t_train === nothing ? ae_args.t_training : ae_t_train
+    train_idx = get_trainval_idx(simdata, t_train, downsample)
     
     x_in, _, _ = build_batch(
         EpochData(get_data_in(simdata.u, simdata.μ₀; idx=train_idx)...), 
