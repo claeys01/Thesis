@@ -25,9 +25,9 @@ params = InlineParams(
     t_accel_end = 50,
     save_interval = 0.25,
     sample_interval = 0.01,
-    ae_epochs = 1,
+    ae_epochs = 1000,
     ae_retrain_epochs = 300,
-    node_iters = 1,
+    node_iters = 250,
     node_retrain_iters = 100,
     n_switch = 150,
     max_retrain_flags = 3,
@@ -41,13 +41,12 @@ simdata_path = joinpath(savedir, "U_inline_finer.jld2")
 # u₀ = load_u0("data/datasets/RE2500/2e8/U_128_full_u0.jld2")
 
 sim = circle_shedding_biot(n=2^9, m=2^9; mem=Array, perturb=false)
-u₀ = load_u0("data/initial_fields/u0_biot_n512_t50.jld2")
+u₀ = load_u0(joinpath(root_path, "data/initial_fields/u0_biot_n512_t50.jld2"))
 
 hs = HybridState(sim, nothing, params, savedir, nothing, nothing)
 
 simdata = run_warmup!(hs, params.t_run; u₀=u₀, save_path=simdata_path)
 
-@show size(simdata.u)
 display(Thesis.train_force_plot(simdata))
 
 # ================================ Step 1: Train Autoencoder ================================
@@ -102,7 +101,6 @@ node, node_path = train_NODE(
 node_elapsed = round((time() - node_start) / 60; digits=1)
 @info "NODE training complete" elapsed_min=node_elapsed node_path=node_path
 
-# @info "Steps 1-2 complete" elapsed_min=round((time() - total_start) / 60; digits=1)
 # ae_bundle = cpu_device()(ae_bundle)
 
 aenode = AENODE(ae_bundle, node, ae_args, node_args, normalizer; verbose=true)
