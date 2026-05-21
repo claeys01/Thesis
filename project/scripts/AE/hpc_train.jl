@@ -31,21 +31,24 @@ function main()
     # node_path = joinpath(root_path, "data/saved_models/NODE/16/RE2500/E1000_curldiv_MS_Adam_250/node_params.jld2")div = 1000.0
     div = 100.0
     curl = 100.0
-    epochs = 1000
-    println("\nTraining AE for $epochs epochs with λdiv=$(div), λcurl=$(curl))")
 
-    AE_path = train_AE(
-        LuxArgs(
-            epochs=epochs, 
-            λdiv=Float64(div), 
-            λcurl=Float64(curl), 
-            train_downsample = 500,
-            test_loss=true,
-            t_training = 16.603,
-            full_data_path=tl_path,
-            n_dense=1,
-        ); return_path=true
-    )
+    epochs = [10, 50, 100, 250, 500, 750, 100]
+
+    savedir = joinpath(root_path, "data", "Lux_models", "epoch_tune")
+    for epoch in epochs
+        AE_path = train_AE(
+            LuxArgs(
+                epochs=epoch, 
+                λdiv=Float64(div), 
+                λcurl=Float64(curl), 
+                train_downsample = 500,
+                test_loss=true,
+                t_training = 25,
+                full_data_path=tl_path,
+                n_dense=1,
+            ); return_path=true
+        )
+    end
 end
 
 main()

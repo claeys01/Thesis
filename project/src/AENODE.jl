@@ -108,6 +108,8 @@ function predict_flex(aenode::AENODE, sim::BiotSimulation;
     if isnothing(û)
         return sim, n_integr, retrain_required, nothing, nothing
     end
+    display(Thesis.curl_plot(û))
+    display(Thesis.velocity_flood(û)[1])
     apply_prediction!(sim, û, Δt, n_integr; impose_biot=impose_biot)
     return sim, n_integr, retrain_required, û_meanflow, t_meanflow
 end

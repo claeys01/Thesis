@@ -184,3 +184,14 @@ velocity_flood(u::AbstractArray{T, 3}; title="") where {T} = velocity_flood(u[:,
 velocity_flood(sim::AbstractSimulation; title="") = velocity_flood(remove_ghosts(sim.flow.u); title=title)
 
 
+
+function curl_plot(u::AbstractArray{T, 3}; L=32, U=1) where {T}
+    ω = zeros(size(u)[1], size(u)[2])
+    @inside ω[I] = WaterLily.curl(3,I,u)*L/U
+    @inside ω[I] = ifelse(abs(ω[I])<0.001,0.0,ω[I])
+    plt = flood(ω,shift=(-2,-1.5),clims=(-8,8), axis=([], false),  
+    background=:white,
+    cfill=:seismic,legend=false,border=:none,dpi=350, size=(800, 800))
+    return plt
+end
+curl_plot(sim::AbstractSimulation) = curl_plot(sim.flow.u; L=sim.L, U=sim.U)

@@ -9,7 +9,7 @@ Base.@kwdef struct InlineParams
     n_switch = 150
     pred_Δt = 0.35
     save_interval = 0.25
-    sample_interval = 0.1
+    sample_interval = 0.0
     max_retrain_flags = 3
 end
 
@@ -229,6 +229,8 @@ function run_hybrid!(hs::HybridState; verbose=true)
             sim_dt = sim_time(sim) - sim_time_before
 
             if n_integr != 0
+                # display(Thesis.curl_plot(sim.flow.u)) 
+                # display(Thesis.curl_plot(û_meanflow[:, :, :, end]))
                 pred_forces, pred_times = update_predicted_meanflow!(sim_meanflow, sim, û_meanflow, t_meanflow)
                 push!(n_integrs, n_integr)
                 record_prediction!(
