@@ -24,8 +24,8 @@ params = params = InlineParams(
         t_run = 20, 
         t_train = 16.603,
         t_accel_end = 50,
-        ae_epochs = 1000,
-        ae_retrain_epochs = 300,
+        ae_epochs = 500,
+        ae_retrain_epochs = 100,
         node_iters = 250,
         node_retrain_iters = 100,
         n_switch = 150,
@@ -53,7 +53,7 @@ wl_warmup_elapsed = round((time() - wl_warmup_start) / 60; digits=2)
 ae_start = time()
 
 div = 100.0
-curl = 10.0
+curl = 100.0
 @info "AE hyperparameters" epochs=params.ae_epochs λdiv=div λcurl=curl
 
 ae_args = LuxArgs(
@@ -62,6 +62,7 @@ ae_args = LuxArgs(
         λdiv=Float64(div), 
         λcurl=Float64(curl),
         train_downsample=500,
+        n_dense=1,
         t_training=params.t_train,
         full_data_path=simdata_path, 
         simdata_ram=simdata,
