@@ -301,7 +301,7 @@ function save_results(hs::HybridState)
     accel_path = joinpath(savedir, "accel_results.jld2")
     hs_path = joinpath(savedir, "hybrid_state.jld2")
     @save accel_path res
-    @save hs_path hs
+    @save hs_path res sim_meanflow ref_meanflow params mode_log n_integrs AE_path node_path savedir
     println("AccelResults saved to: $(accel_path)")
     println("HybridState saved to: $(hs_path)")
 
