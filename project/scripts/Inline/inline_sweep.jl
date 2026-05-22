@@ -14,7 +14,7 @@ using Printf
 # All other training params are fixed across runs.
 fixed = (
     t_run              = 20,
-    ae_retrain_epochs  = 250,
+    ae_retrain_epochs  = 100,
     node_iters         = 250,
     node_retrain_iters = 100,
     t_cutoff_extra     = 10.0,
@@ -44,8 +44,8 @@ function run_inline(p::InlineParams, latent_dim::Int, t_cutoff_extra::Real, save
     simdata = run_warmup!(hs, p.t_run; u₀=u₀, save_path=simdata_path)
     t = merge(t, (wl = t.wl + (time() - wl0),))
 
-    ae_args = LuxArgs(epochs=p.ae_epochs, latent_dim=latent_dim, save_path=savedir,
-        λdiv=100.0, λcurl=10.0, train_downsample=500, t_training=p.t_train,
+    ae_args = LuxArgs(epochs=p.ae_epochs, latent_dim=latent_dim, save_path=savedir,n_dense=1,
+        λdiv=100.0, λcurl=100.0, train_downsample=500, t_training=p.t_train,
         full_data_path=simdata_path, simdata_ram=simdata)
     t0 = time()
     ae_bundle, AE_path = train_AE(ae_args; return_path=true)
@@ -73,7 +73,7 @@ function run_inline(p::InlineParams, latent_dim::Int, t_cutoff_extra::Real, save
         t = merge(t, (wl = t.wl + (time() - wl0),))
 
         ae_re_args = LuxArgs(η=2e-4, epochs=p.ae_retrain_epochs,
-            λdiv=100.0, λcurl=10.0, t_training=simdata.time[end] * 0.8,
+            λdiv=100.0, λcurl=100.0, t_training=simdata.time[end] * 0.8, n_dense=1,
             retrain=true, checkpoint_path=AE_path, save_path=savedir,
             full_data_path=simdata_path, simdata_ram=simdata)
         t0 = time()
