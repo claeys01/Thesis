@@ -298,6 +298,13 @@ function save_results(hs::HybridState)
         create_velocity_gif(gif_frames, savedir)
     end
 
+    accel_path = joinpath(savedir, "accel_results.jld2")
+    hs_path = joinpath(savedir, "hybrid_state.jld2")
+    @save accel_path res
+    @save hs_path hs
+    println("AccelResults saved to: $(accel_path)")
+    println("HybridState saved to: $(hs_path)")
+
     println("AE checkpoint: $(AE_path)")
     println("NODE checkpoint: $(node_path)")
     println("Saved outputs to: $(savedir)")

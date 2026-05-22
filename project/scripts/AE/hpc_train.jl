@@ -32,7 +32,7 @@ function main()
     div = 100.0
     curl = 100.0
 
-    epochs = [10, 50, 100, 250, 500, 750, 100]
+    epochs = [1000]
 
     savedir = joinpath(root_path, "data", "Lux_models", "epoch_tune")
     for epoch in epochs
