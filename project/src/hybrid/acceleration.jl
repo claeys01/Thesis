@@ -148,10 +148,12 @@ function plot_forces_comparison(res::AccelResults, t_end; t_train=nothing, t_tes
     rel_drag = round(m.rel_err.drag_mean, digits=2)
     rel_lift = round(m.rel_err.lift_rms, digits=2)
 
-    plt = plot(framestyle=:box, size=(600, 400), dpi=500,
+    plt = plot(framestyle=:box, size=(600, 300), dpi=500,
+        titlefontsize=14,
+        guidefontsize=12, tickfontsize=8, legendfontsize=9,
         xlabel="\$t^*\$", ylabel="Force coefficient",
-        xlims=(0, t_end), ylims=(-3, 2),
-        title="Force Comparison")
+        bottom_margin    = 2Plots.mm,
+        xlims=(0, t_end), ylims=(-3, 2))
 
     if !isnothing(mode_log)
         train_labeled = false
@@ -179,9 +181,9 @@ function plot_forces_comparison(res::AccelResults, t_end; t_train=nothing, t_tes
     for rng in res.pred_ranges
         plot!(plt, res.hybrid_time_wat[rng], wat_lift[rng],
             label=labeled ? "" : "Prediction",
-            color=:black, lw=2.2)
+            color=:black, lw=1.5)
         plot!(plt, res.hybrid_time_wat[rng], wat_drag[rng],
-            label="", color=:black, lw=2.2)
+            label="", color=:black, lw=1.5)
         labeled = true
     end
 

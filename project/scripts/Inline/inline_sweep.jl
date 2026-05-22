@@ -7,49 +7,33 @@ using JLD2
 using Plots
 using Printf
 
-# ─────────────────────────────────────────────────────────────────
-# One-factor-at-a-time sweep around a baseline.
-# Baseline runs once; for each axis, we try the two NON-baseline values.
-# Total runs = 1 + sum(length(values) - 1)  (= 1 + 6×2 = 13 for 3 values each).
-# t_cutoff_extra = sim time of fresh WaterLily data after retrain flag.
-# ─────────────────────────────────────────────────────────────────
-baseline = (
-    t_run             = 20,
-    ae_epochs         = 1000,
-    node_iters        = 250,
-    ae_retrain_epochs = 300,
+# Two-axis sweep:
+#   1) AE training epochs: 100, 250, 500     (latent_dim = 16)
+#   2) Latent dimension:    8,  16,  32      (ae_epochs  = 500)
+# The (ae_epochs=500, latent_dim=16) point is shared between both axes.
+# All other training params are fixed across runs.
+fixed = (
+    t_run              = 20,
+    ae_retrain_epochs  = 250,
+    node_iters         = 250,
     node_retrain_iters = 100,
-    t_cutoff_extra    = 10.0,
+    t_cutoff_extra     = 10.0,
 )
 
-axis_values = (
-    t_run              = [15, 20, 25],
-    ae_epochs          = [500, 1000, 1500],
-    node_iters         = [150, 250, 400],
-    ae_retrain_epochs  = [150, 300, 500],
-    node_retrain_iters = [50, 100, 200],
-    t_cutoff_extra     = [5.0, 10.0, 15.0],
-)
-
-# Build the OFAT sweep: baseline first, then per-axis variants.
-sweep = NamedTuple[]
-push!(sweep, merge((; axis=:baseline), baseline))
-for axis in keys(axis_values)
-    for v in axis_values[axis]
-        v == baseline[axis] && continue   # skip the baseline value on each axis
-        push!(sweep, merge((; axis=axis), baseline, NamedTuple{(axis,)}((v,))))
-    end
-end
+configs = [
+    (sweep = "ae_epochs",  ae_epochs = 100, latent_dim = 16),
+    (sweep = "ae_epochs",  ae_epochs = 250, latent_dim = 16),
+    (sweep = "ae_epochs",  ae_epochs = 500, latent_dim = 16),  # shared with latent sweep
+    (sweep = "latent_dim", ae_epochs = 500, latent_dim = 8),
+    (sweep = "latent_dim", ae_epochs = 500, latent_dim = 32),
+]
 
 root_path = is_hpc() ? "/scratch/mfbclaeys" : ""
 sweep_root = joinpath(root_path, "data", "inline_sweeps", Dates.format(now(), "yyyy-mm-dd_HH-MM"))
 mkpath(sweep_root)
 u₀ = load_u0("data/datasets/RE2500/2e8/U_128_full_u0.jld2")
 
-# ─────────────────────────────────────────────────────────────────
-# Run a single configuration end-to-end. Mirrors inline_noload.jl.
-# ─────────────────────────────────────────────────────────────────
-function run_inline(p::InlineParams, t_cutoff_extra::Real, savedir::String, u₀)
+function run_inline(p::InlineParams, latent_dim::Int, t_cutoff_extra::Real, savedir::String, u₀)
     mkpath(savedir)
     simdata_path = joinpath(savedir, "U_inline.jld2")
     sim = circle_shedding_biot(; mem=Array, perturb=false)
@@ -60,8 +44,8 @@ function run_inline(p::InlineParams, t_cutoff_extra::Real, savedir::String, u₀
     simdata = run_warmup!(hs, p.t_run; u₀=u₀, save_path=simdata_path)
     t = merge(t, (wl = t.wl + (time() - wl0),))
 
-    ae_args = LuxArgs(epochs=p.ae_epochs, save_path=savedir, λdiv=100.0, λcurl=10.0,
-        train_downsample=500, t_training=p.t_train,
+    ae_args = LuxArgs(epochs=p.ae_epochs, latent_dim=latent_dim, save_path=savedir,
+        λdiv=100.0, λcurl=10.0, train_downsample=500, t_training=p.t_train,
         full_data_path=simdata_path, simdata_ram=simdata)
     t0 = time()
     ae_bundle, AE_path = train_AE(ae_args; return_path=true)
@@ -124,9 +108,6 @@ function run_inline(p::InlineParams, t_cutoff_extra::Real, savedir::String, u₀
     return hs, t
 end
 
-# ─────────────────────────────────────────────────────────────────
-# Errors of hybrid against reference.
-# ─────────────────────────────────────────────────────────────────
 relerr(a, b) = sqrt(sum(abs2, a .- b)) / max(sqrt(sum(abs2, b)), eps(eltype(b)))
 
 function field_errors(hs::HybridState)
@@ -148,26 +129,24 @@ function field_errors(hs::HybridState)
     return (; drag_rel, lift_rel, u_rel, v_rel, uu_rel, vv_rel, uv_rel)
 end
 
-# ─────────────────────────────────────────────────────────────────
-# Sweep loop.
-# ─────────────────────────────────────────────────────────────────
 records = []
-for (i, cfg) in enumerate(sweep)
-    @info "Sweep $i / $(length(sweep))" cfg
+for (i, cfg) in enumerate(configs)
+    @info "Sweep $i / $(length(configs))" cfg
     p = InlineParams(
-        t_run = cfg.t_run,
-        t_train = round(cfg.t_run * 0.83, digits=3),
+        t_run = fixed.t_run,
+        t_train = round(fixed.t_run * 0.83, digits=3),
         t_accel_end = 50,
         ae_epochs = cfg.ae_epochs,
-        ae_retrain_epochs = cfg.ae_retrain_epochs,
-        node_iters = cfg.node_iters,
-        node_retrain_iters = cfg.node_retrain_iters,
+        ae_retrain_epochs = fixed.ae_retrain_epochs,
+        node_iters = fixed.node_iters,
+        node_retrain_iters = fixed.node_retrain_iters,
         n_switch = 150, max_retrain_flags = 3, save_interval = 0.25,
     )
-    run_dir = joinpath(sweep_root, @sprintf("run_%02d_%s", i, String(cfg.axis)))
-    hs, t = run_inline(p, cfg.t_cutoff_extra, run_dir, u₀)
+    run_name = @sprintf("ae_epochs_%d_latent_%d", cfg.ae_epochs, cfg.latent_dim)
+    run_dir  = joinpath(sweep_root, run_name)
+    hs, t = run_inline(p, cfg.latent_dim, fixed.t_cutoff_extra, run_dir, u₀)
     e = field_errors(hs)
-    push!(records, merge((; run=i), cfg, e,
+    push!(records, merge((; run=i, name=run_name), cfg, e,
         (; ae_min=t.ae/60, node_min=t.node/60,
            ae_re_min=t.ae_re/60, node_re_min=t.node_re/60,
            wl_min=t.wl/60)))
@@ -175,21 +154,17 @@ for (i, cfg) in enumerate(sweep)
     GC.gc()
 end
 
-# ─────────────────────────────────────────────────────────────────
-# Print summary table.
-# ─────────────────────────────────────────────────────────────────
-println("\n" * "="^120)
-println("OFAT SWEEP SUMMARY  (relative errors, hybrid vs reference)")
-println("="^120)
-@printf("%-3s %-19s %-6s %-7s %-7s %-9s %-9s %-7s | %-7s %-7s %-6s %-6s %-7s %-7s %-7s\n",
-    "i","axis","t_run","ae_ep","node_it","ae_re_ep","nd_re_it","cut+",
-    "drag%","lift%","u","v","uu","vv","uv")
-println("-"^120)
+println("\n" * "="^110)
+println("INLINE SWEEP SUMMARY  (relative errors, hybrid vs reference)")
+println("="^110)
+@printf("%-3s %-12s %-7s %-7s | %-7s %-7s %-6s %-6s %-7s %-7s %-7s\n",
+    "i", "sweep", "ae_ep", "latent",
+    "drag%", "lift%", "u", "v", "uu", "vv", "uv")
+println("-"^110)
 for r in records
-    @printf("%-3d %-19s %-6.1f %-7d %-7d %-9d %-9d %-7.1f | %-7.2f %-7.2f %-6.3f %-6.3f %-7.3f %-7.3f %-7.3f\n",
-        r.run, String(r.axis), r.t_run, r.ae_epochs, r.node_iters, r.ae_retrain_epochs,
-        r.node_retrain_iters, r.t_cutoff_extra,
+    @printf("%-3d %-12s %-7d %-7d | %-7.2f %-7.2f %-6.3f %-6.3f %-7.3f %-7.3f %-7.3f\n",
+        r.run, r.sweep, r.ae_epochs, r.latent_dim,
         r.drag_rel, r.lift_rel, r.u_rel, r.v_rel, r.uu_rel, r.vv_rel, r.uv_rel)
 end
-println("="^120)
+println("="^110)
 @info "Sweep complete" sweep_root n_runs=length(records)

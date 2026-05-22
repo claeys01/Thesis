@@ -60,6 +60,7 @@ ae_args.full_data_path = simdata_path
 node_args = NodeArgs(
         save_path=savedir,
         maxiters = params.node_iters,
+        group_size=10,
         extrapolate = false,
         use_gpu = false,
         latent_dim = ae_args.latent_dim,
@@ -116,7 +117,7 @@ if hs.retrain_needed
             latent_dim = ae_args.latent_dim,
             η = 0.01,              # lower LR for fine-tuning
             maxiters = params.node_retrain_iters,          # more iterations
-            group_size = 20,         # keep tighter segments
+            group_size = 10,         # keep tighter segments
             continuity_term = 500,   # stronger continuity for stability
             downsample = 400,  
             retrain = true,
@@ -148,3 +149,5 @@ if hs.retrain_needed
 end
 
 save_results(hs)
+plt, _ = Thesis.velocity_flood(sim; colorbar=true)
+display(plt)

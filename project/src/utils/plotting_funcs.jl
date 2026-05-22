@@ -147,19 +147,21 @@ function velocity_flood(u::AbstractArray{T, 2}, v::AbstractArray{T, 2};title="",
 end
 
 function u_flood(u::AbstractArray{T, 2}; colorbar=false) where {T}
-    u_clims = (0.1, 2)
+    u_clims = (0, 2)
     flood(u;
     clims=u_clims,
-    # levels=20,
+    shift=(-2, -1.5),
     title="u-velocity",
-    # xlabel="x",
-    # ylabel="y",
     aspectratio=:equal,
+    axis=([], false),
     framestyle=:none,
     border=:none,
+    background=:white,
+    cfill=:seismic,
     colorbar=colorbar,
+    legend=false,
     titlefontsize=12,
-    dpi=150,
+    dpi=350,
     size=(400, 350))
 end
 
@@ -167,21 +169,23 @@ function v_flood(v::AbstractArray{T, 2}; colorbar=false) where {T}
     v_clims = (-1, 1)
     flood(v;
     clims=v_clims,
-    # levels=20,
+    shift=(-2, -1.5),
     title="v-velocity",
-    # xlabel="x",
-    # ylabel="y",
     aspectratio=:equal,
+    axis=([], false),
     framestyle=:none,
     border=:none,
+    background=:white,
+    cfill=:seismic,
     colorbar=colorbar,
+    legend=false,
     titlefontsize=12,
-    dpi=150,
-    size=(400, 350))    
+    dpi=350,
+    size=(400, 350))
 end
 
-velocity_flood(u::AbstractArray{T, 3}; title="") where {T} = velocity_flood(u[:, :, 1], u[:, :, 2]; title=title)
-velocity_flood(sim::AbstractSimulation; title="") = velocity_flood(remove_ghosts(sim.flow.u); title=title)
+velocity_flood(u::AbstractArray{T, 3}; title="", colorbar=false) where {T} = velocity_flood(u[:, :, 1], u[:, :, 2]; title=title, colorbar=colorbar)
+velocity_flood(sim::AbstractSimulation; title="", colorbar=false) = velocity_flood(remove_ghosts(sim.flow.u); title=title, colorbar=colorbar)
 
 
 
