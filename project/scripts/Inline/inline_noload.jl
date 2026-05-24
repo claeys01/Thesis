@@ -81,6 +81,7 @@ ae_bundle = cpu_device()(ae_bundle)
 @info "── Step 2/4: Training Neural ODE ──"
 node_args = NodeArgs(
         save_path=savedir,
+        downsample=ae_args.train_downsample,
         maxiters = params.node_iters,
         extrapolate = false,
         use_gpu = false,
@@ -117,7 +118,7 @@ if hs.retrain_needed
 
     wl_cutoff_start = time()
     t_before = sim_time(hs.sim)
-    simdata = run_warmup!(hs, sim_time(hs.sim) + 10; simdata=simdata, save_path=simdata_path)
+    simdata = run_warmup!(hs, sim_time(hs.sim) + 15; simdata=simdata, save_path=simdata_path)
     wl_cutoff_elapsed = round((time() - wl_cutoff_start) / 60; digits=2)
     @info "WaterLily cutoff run complete" elapsed_min=wl_cutoff_elapsed t_simulated=(sim_time(hs.sim) - t_before)
 
@@ -152,11 +153,11 @@ if hs.retrain_needed
             save_path=savedir,
             extrapolate = false,
             latent_dim = ae_args.latent_dim,
-            η = 0.005,              # lower LR for fine-tuning
+            η = 0.01,              # lower LR for fine-tuning
             maxiters = params.node_retrain_iters,          # more iterations
             group_size = 20,         # keep tighter segments
             continuity_term = 600,   # stronger continuity for stability
-            downsample = 400,  
+            downsample = ae_retrain_args.train_downsample,  
             retrain = true,
             multiple_shooting = true,
             use_gpu = false, 
