@@ -11,7 +11,7 @@ Base.@kwdef mutable struct NodeArgs
     dense_mult = 2
     activation = tanhshrink
     n_reconstruct = 4
-    downsample = 300
+    downsample = 500
     test_downsample = 500
     clip_bc = true
     use_gpu = false             # use GPU

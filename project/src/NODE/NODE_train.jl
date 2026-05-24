@@ -27,14 +27,14 @@ function train_NODE(args::NodeArgs;
             multi = true
             @info "Multi-chunk simdata detected, using disjoint-trajectory NODE training" n_chunks
             zs, ts, tspans, z0s = get_latent_chunks(ae_bundle, normalizer, ae_args;
-                downsample=args.downsample, device=device,
+                downsample=ae_args.train_downsample, device=device,
                 min_chunk_size=max(args.group_size + 1, 21))
             multi = length(zs) > 1  # in case some chunks were skipped
         end
 
         if !multi
             @info "Encoding latent vectors from AE in memory (no disk I/O)"
-            z, t, tspan, z0 = get_latent_vectors(ae_bundle, normalizer, ae_args; device=device, downsample=args.downsample)
+            z, t, tspan, z0 = get_latent_vectors(ae_bundle, normalizer, ae_args; device=device, downsample=ae_args.train_downsample)
             if args.downsample > 0 && args.downsample < size(z, 2)
                 idx = downsample_equal(collect(1:size(z, 2)), args.downsample)
                 z = z[:, idx]

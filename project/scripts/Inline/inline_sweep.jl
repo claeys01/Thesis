@@ -7,25 +7,30 @@ using JLD2
 using Plots
 using Printf
 
-# Two-axis sweep:
-#   1) AE training epochs: 100, 250, 500     (latent_dim = 16)
-#   2) Latent dimension:    8,  16,  32      (ae_epochs  = 500)
-# The (ae_epochs=500, latent_dim=16) point is shared between both axes.
-# All other training params are fixed across runs.
+# Four-axis sweep, one-at-a-time around the default point
+#   (ae_epochs=500, latent_dim=16, node_iters=250, group_size=20):
+#   1) AE training epochs: 100, 250, 500
+#   2) Latent dimension:    8,  16,  32
+#   3) NODE iters:        100, 250, 500
+#   4) Group size:         10,  20,  40
+# The default point is shared across all four axes.
 fixed = (
     t_run              = 20,
     ae_retrain_epochs  = 100,
-    node_iters         = 250,
     node_retrain_iters = 100,
     t_cutoff_extra     = 10.0,
 )
 
 configs = [
-    (sweep = "ae_epochs",  ae_epochs = 100, latent_dim = 16),
-    (sweep = "ae_epochs",  ae_epochs = 250, latent_dim = 16),
-    (sweep = "ae_epochs",  ae_epochs = 500, latent_dim = 16),  # shared with latent sweep
-    (sweep = "latent_dim", ae_epochs = 500, latent_dim = 8),
-    (sweep = "latent_dim", ae_epochs = 500, latent_dim = 32),
+    # (sweep = "ae_epochs",  ae_epochs = 100, latent_dim = 16, node_iters = 250, group_size = 20),
+    # (sweep = "ae_epochs",  ae_epochs = 250, latent_dim = 16, node_iters = 250, group_size = 20),
+    # (sweep = "ae_epochs",  ae_epochs = 500, latent_dim = 16, node_iters = 250, group_size = 20),  # shared default point
+    # (sweep = "latent_dim", ae_epochs = 500, latent_dim = 8,  node_iters = 250, group_size = 20),
+    # (sweep = "latent_dim", ae_epochs = 500, latent_dim = 32, node_iters = 250, group_size = 20),
+    (sweep = "node_iters", ae_epochs = 500, latent_dim = 16, node_iters = 100, group_size = 20),
+    (sweep = "node_iters", ae_epochs = 500, latent_dim = 16, node_iters = 500, group_size = 20),
+    (sweep = "group_size", ae_epochs = 500, latent_dim = 16, node_iters = 250, group_size = 10),
+    (sweep = "group_size", ae_epochs = 500, latent_dim = 16, node_iters = 250, group_size = 40),
 ]
 
 root_path = is_hpc() ? "/scratch/mfbclaeys" : ""
@@ -54,6 +59,7 @@ function run_inline(p::InlineParams, latent_dim::Int, t_cutoff_extra::Real, save
     ae_bundle = cpu_device()(ae_bundle)
 
     node_args = NodeArgs(save_path=savedir, maxiters=p.node_iters,
+        group_size=p.group_size,
         extrapolate=false, use_gpu=false, latent_dim=ae_args.latent_dim)
     t0 = time()
     node, node_path = train_NODE(node_args; ae_bundle=ae_bundle,
@@ -74,7 +80,7 @@ function run_inline(p::InlineParams, latent_dim::Int, t_cutoff_extra::Real, save
 
         ae_re_args = LuxArgs(η=2e-4, epochs=p.ae_retrain_epochs,
             λdiv=100.0, λcurl=100.0, t_training=simdata.time[end] * 0.8, n_dense=1,
-            retrain=true, checkpoint_path=AE_path, save_path=savedir,
+            retrain=true, checkpoint_path=AE_path, save_path=savedir, train_downsample=500,
             full_data_path=simdata_path, simdata_ram=simdata)
         t0 = time()
         ae_re_bundle, AE_re_path = train_AE(ae_re_args; return_path=true)
@@ -105,6 +111,7 @@ function run_inline(p::InlineParams, latent_dim::Int, t_cutoff_extra::Real, save
             t = merge(t, (wl = t.wl + (time() - wl0),))
         end
     end
+    save_results(hs)
     return hs, t
 end
 
@@ -138,11 +145,13 @@ for (i, cfg) in enumerate(configs)
         t_accel_end = 50,
         ae_epochs = cfg.ae_epochs,
         ae_retrain_epochs = fixed.ae_retrain_epochs,
-        node_iters = fixed.node_iters,
+        node_iters = cfg.node_iters,
         node_retrain_iters = fixed.node_retrain_iters,
+        group_size = cfg.group_size,
         n_switch = 150, max_retrain_flags = 3, save_interval = 0.25,
     )
-    run_name = @sprintf("ae_epochs_%d_latent_%d", cfg.ae_epochs, cfg.latent_dim)
+    run_name = @sprintf("ae%d_lat%d_nit%d_gs%d",
+        cfg.ae_epochs, cfg.latent_dim, cfg.node_iters, cfg.group_size)
     run_dir  = joinpath(sweep_root, run_name)
     hs, t = run_inline(p, cfg.latent_dim, fixed.t_cutoff_extra, run_dir, u₀)
     e = field_errors(hs)
@@ -154,17 +163,17 @@ for (i, cfg) in enumerate(configs)
     GC.gc()
 end
 
-println("\n" * "="^110)
+println("\n" * "="^130)
 println("INLINE SWEEP SUMMARY  (relative errors, hybrid vs reference)")
-println("="^110)
-@printf("%-3s %-12s %-7s %-7s | %-7s %-7s %-6s %-6s %-7s %-7s %-7s\n",
-    "i", "sweep", "ae_ep", "latent",
+println("="^130)
+@printf("%-3s %-12s %-6s %-6s %-6s %-6s | %-7s %-7s %-6s %-6s %-7s %-7s %-7s\n",
+    "i", "sweep", "ae_ep", "latent", "nit", "gs",
     "drag%", "lift%", "u", "v", "uu", "vv", "uv")
-println("-"^110)
+println("-"^130)
 for r in records
-    @printf("%-3d %-12s %-7d %-7d | %-7.2f %-7.2f %-6.3f %-6.3f %-7.3f %-7.3f %-7.3f\n",
-        r.run, r.sweep, r.ae_epochs, r.latent_dim,
+    @printf("%-3d %-12s %-6d %-6d %-6d %-6d | %-7.2f %-7.2f %-6.3f %-6.3f %-7.3f %-7.3f %-7.3f\n",
+        r.run, r.sweep, r.ae_epochs, r.latent_dim, r.node_iters, r.group_size,
         r.drag_rel, r.lift_rel, r.u_rel, r.v_rel, r.uu_rel, r.vv_rel, r.uv_rel)
 end
-println("="^110)
+println("="^130)
 @info "Sweep complete" sweep_root n_runs=length(records)

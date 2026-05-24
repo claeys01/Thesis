@@ -6,6 +6,7 @@ Base.@kwdef struct InlineParams
     ae_retrain_epochs = 1
     node_iters = 50
     node_retrain_iters = 50
+    group_size=20
     n_switch = 150
     pred_Δt = 0.35
     save_interval = 0.25

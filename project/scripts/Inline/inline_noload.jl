@@ -20,7 +20,7 @@ if is_hpc()
     @info "  Julia threads: $(Threads.nthreads())"
 end
 
-params = params = InlineParams(
+arams = InlineParams(
         t_run = 20, 
         t_train = 16.603,
         t_accel_end = 50,
@@ -129,6 +129,7 @@ if hs.retrain_needed
         λdiv=Float64(div), 
         λcurl=Float64(curl),
         t_training=simdata.time[end] * 0.8 ,
+        train_downsample=500,
         retrain=true,
         checkpoint_path=AE_path,
         save_path=savedir,
