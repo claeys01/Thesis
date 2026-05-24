@@ -38,7 +38,7 @@ savedir = joinpath(root_path, "data", "inline_runs", Dates.format(now(), "yyyy-m
 mkpath(savedir)
 simdata_path = joinpath(savedir, "U_inline.jld2")
 
-u₀ = load_u0("data/datasets/RE2500/2e8/U_128_full_u0.jld2")
+u₀ = load_u0(joinpath(root_path, "data/initial_fields/RE2500/2e8/u_0.jld2"))
 sim = circle_shedding_biot(; mem=Array, perturb=false)
 
 hs = HybridState(sim, nothing, params, savedir, nothing, nothing)

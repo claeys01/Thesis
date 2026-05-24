@@ -1,45 +1,72 @@
 using Thesis
 using WaterLily
-using Plots
-using WaterLily: flood, body_plot!
+using WaterLily: MeanFlow
+using Statistics
+using Dates
 using JLD2
+using Plots
+using Printf
 
-# ---- One-off: migrate old simdata to trimmed SimData with chunk_ranges ----
-# let src = "data/datasets/RE2500/2e8/U_128_full.jld2"
-#     @load src simdata  # JLD2 reconstructs the old type; access via getfield
-#     N = length(simdata.time)
-#     new_simdata = SimData(
-#         time         = simdata.time,
-#         Δt           = simdata.Δt,
-#         u            = simdata.u,
-#         p            = simdata.p,
-#         μ₀           = simdata.μ₀,
-#         force        = simdata.force,
-#         chunk_ranges = [1:N],
-#     )
-#     mv(src, src * ".bak"; force=true)
-#     simdata = new_simdata
-#     @save src simdata
-#     @info "Rewrote $src; backup at $(src).bak"
-# end
 
-simdata = load_simdata("data/datasets/RE2500/2e8/U_128_full.jld2")
+root_path = ""
+if is_hpc()
+    root_path = "/scratch/mfbclaeys"
+    # Log job info
+    @info "Starting HPC AE+NODE retrain pipeline"
+    @info "  SLURM_JOB_ID: $(get(ENV, "SLURM_JOB_ID", "N/A"))"
+    @info "  SLURM_NTASKS: $(get(ENV, "SLURM_NTASKS", "N/A"))"
+    @info "  SLURM_CPUS_PER_TASK: $(get(ENV, "SLURM_CPUS_PER_TASK", "N/A"))"
+    @info "  Hostname: $(gethostname())"
+    @info "  Julia threads: $(Threads.nthreads())"
+end
+
+params = params = InlineParams(
+        t_run = 50, 
+        t_train = 16.603,
+        t_accel_end = 50,
+        ae_epochs = 500,
+        ae_retrain_epochs = 100,
+        node_iters = 250,
+        node_retrain_iters = 100,
+        n_switch = 150,
+        max_retrain_flags = 3,
+        save_interval = 0.25, # needs to be fixed still, 
+    )
+
+
+savedir = joinpath(root_path, "data", "inline_runs", Dates.format(now(), "yyyy-mm-dd_HH-MM"))
+mkpath(savedir)
+# simdata_path = joinpath(savedir, "U_inline.jld2")
+
+# u₀ = load_u0("data/datasets/RE2500/2e8/U_128_full_u0.jld2")
+sim = circle_shedding_biot(; Re=250, mem=Array, perturb=true)
+sim_step!(sim, 50; verbose=true)
+u₀ = sim.flow.u
+@save "data/initial_fields/RE250/2e8/u_0.jld2" u₀
+datasets
+hs = HybridState(sim, nothing, params, savedir, nothing, nothing)
+
+simdata = run_warmup!(hs, params.t_run)
+
+# simdata = load_simdata("data/datasets/RE2500/2e8/U_128_full.jld2")
 # display(Thesis.train_force_plot(simdata))
-default(fontfamily="Computer Modern", titlefontsize=14,
-        guidefontsize=12, tickfontsize=8, legendfontsize=9)
+# default(fontfamily="Computer Modern", titlefontsize=14,
+#         guidefontsize=12, tickfontsize=8, legendfontsize=9)
 plt = plot(framestyle=:box, size=(600, 300), dpi=500,
         xlabel="\$t^*\$", ylabel="Force coefficient",
         xlims=(0, 50), ylims=(-3, 2))
 plot!(simdata.time, first.(simdata.force), label=L"C_{d}", color=:red, lw=1)
 plot!(simdata.time, last.(simdata.force), label=L"C_{L}", color=:blue, lw=1)
 display(plt)
-savefig(plt, "figs/256_forces.pdf")
+# savefig(plt, "figs/256_forces.pdf")
 
 # @show size(simdata.u)
 # println(dump(simdata))
 
 # n = 2^8
-# sim = circle_shedding_biot(;n=n, m=n)
+# sim = circle_shedding_biot(;n=n, m=n, Re=2500)
+
+# sim_step!(sim, )
 
 # u₀ = load_u0("data/datasets/RE2500/2e8/U_128_full_u0.jld2")
 # sim.flow.u .= u₀
