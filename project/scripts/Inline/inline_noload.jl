@@ -24,7 +24,7 @@ arams = InlineParams(
         t_run = 20, 
         t_train = 16.603,
         t_accel_end = 50,
-        ae_epochs = 500,
+        ae_epochs = 400,
         ae_retrain_epochs = 100,
         node_iters = 250,
         node_retrain_iters = 100,
@@ -62,7 +62,8 @@ ae_args = LuxArgs(
         λdiv=Float64(div), 
         λcurl=Float64(curl),
         train_downsample=500,
-        n_dense=2,
+        n_dense=1,
+        n_conv=5,
         t_training=params.t_train,
         full_data_path=simdata_path, 
         simdata_ram=simdata,
@@ -97,7 +98,6 @@ node, node_path = train_NODE(
 node_elapsed = round((time() - node_start) / 60; digits=1)
 @info "NODE training complete" elapsed_min=node_elapsed node_path=node_path
 
-# @info "Steps 1-2 complete" elapsed_min=round((time() - total_start) / 60; digits=1)
 # ae_bundle = cpu_device()(ae_bundle)
 
 aenode = AENODE(ae_bundle, node, ae_args, node_args, normalizer; verbose=true)

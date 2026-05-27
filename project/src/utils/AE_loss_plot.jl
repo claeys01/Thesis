@@ -1,16 +1,3 @@
-default(
-    # fontfamily = "Computer Modern",         # looks LaTeX-y if you have it
-    linewidth  = 1.0,
-    guidefont  = font(10),
-    tickfont   = font(8),
-    legendfont = font(8),
-    gridalpha  = 0.2,
-    gridlinewidth = 0.4,
-    foreground_color_legend = :black,
-    background_color_legend = RGBA(1,1,1,0.8), # light transparent white
-    size=(600,400),                         # nice aspect for papers
-)
-
 function plot_losses(loss_trajectory_path::AbstractString, checkpoint_path::AbstractString)
 
    # ------------------
@@ -42,6 +29,27 @@ function plot_losses(loss_trajectory_path::AbstractString, checkpoint_path::Abst
         iters = collect(1:length(train_losses))
     end
 
+    # convert iterations -> epochs.
+    # val_iters[k] = (iter count at end of epoch k), so val_iters[1] = iters_per_epoch.
+    iters_per_epoch = if !isempty(val_iters)
+        Float64(val_iters[1])
+    elseif !isempty(iters)
+        Float64(length(iters) / max(args.epochs, 1))
+    else
+        1.0
+    end
+    train_epochs = iters ./ iters_per_epoch
+    val_epochs   = val_iters ./ iters_per_epoch
+
+    # explicit log-scale ticks at every power of 10 covering the data range
+    positive_vals = Float64[]
+    for s in (train_losses, val_losses, test_losses, div_losses, curl_losses, strain_losses)
+        append!(positive_vals, (v for v in s if v > 0 && isfinite(v)))
+    end
+    ylo = isempty(positive_vals) ? -5 : floor(Int, log10(minimum(positive_vals)))
+    yhi = 0   # top of plot is capped at 1 = 10^0
+    yticks_pow10 = 10.0 .^ (ylo:yhi)
+
     # figure annotation text (final val loss)
     final_loss_str = if !isempty(val_losses)
         @sprintf("final val loss = %.3g", val_losses[end])
@@ -54,69 +62,86 @@ function plot_losses(loss_trajectory_path::AbstractString, checkpoint_path::Abst
     else
         ""
     end
-
-
     p = plot(
-        iters, train_losses;
-        label = "train",
-        xlabel = "Iteration",
-        ylabel = "Loss",
-        lw = 1,
-        color = :gray,
-        # alpha = 0.8,
-        xguidefont = font(10),
-        yguidefont = font(10),
-        xtickfont  = font(8),
-        ytickfont  = font(8),
+        yscale = :log10,
+        yticks = yticks_pow10,
+        minorgrid = true,
+        minor_ticks = true,
+        gridalpha  = 0.2,
+        gridlinewidth = 0.4,
+        grid = :y,
+        foreground_color_legend = :black,
+        background_color_legend = RGBA(1,1,1,0.8), # light transparent white
+        framestyle = :box,
+        dpi = 500,
+        size = (700, 300),
+        titlefontsize = 12,
+        guidefontsize = 10,
+        tickfontsize  = 8,
+        legendfontsize = 6,
+        foreground_color_axis = :black,
+        foreground_color_text = :black,
+        left_margin   = 3Plots.mm,
+        right_margin  = 8Plots.mm,   # leave room for twin CC axis label
+        top_margin    = 1Plots.mm,
+        bottom_margin = 2Plots.mm,
         ylims = (-Inf, 1),  # cap the upper limit at 1
+        )
 
+    plot!(p,
+        train_epochs, train_losses;
+        label = "train",
+        xlabel = "Epoch",
+        ylabel = L"$\mathcal{L}$",
+        lw = 1.2,
+        color = :black,
     )
 
     # validation loss
     if !isempty(val_losses)
-        plot!(p, val_iters, val_losses;
-            label = "val",
+        plot!(p, val_epochs, val_losses;
+            label = @sprintf("val (final %.3g)", val_losses[end]),
             lw = 1,
             color = :red,
             # alpha = 0.9,
         )
     end
 
-    # test losses 
+    # test losses
     if !isempty(test_losses)
-        plot!(p, val_iters, test_losses;
-                linestyle=:dashdot,
-                label = "test",
+        plot!(p, val_epochs, test_losses;
+                # linestyle=:dashdot,
+                label = @sprintf("test (final %.3g)", test_losses[end]),
                 lw = 1,
-                color = :purple,
+                color = :blue,
                 # alpha = 0.9,
             )
     end
 
     # optional extra loss terms if enabled
     if args.λdiv != 0 && !isempty(div_losses)
-        plot!(p, iters, div_losses;
-            label = "∇⋅u",
+        plot!(p, train_epochs, div_losses;
+            label = L"\nabla \cdot u",
             lw = 0.8,
-            ls = :dot,
+            # ls = :dot,
             color = :purple,
             alpha = 0.9,
         )
     end
 
     if args.λcurl != 0 && !isempty(curl_losses)
-        plot!(p, iters, curl_losses;
-            label = "ω loss",
+        plot!(p, train_epochs, curl_losses;
+            label = L"\omega\ \mathrm{loss}",
             lw = 0.8,
-            ls = :dashdot,
+            # ls = :dot,
             color = :orange,
             alpha = 0.9,
         )
     end
 
     if args.λstrain != 0 && !isempty(strain_losses)
-        plot!(p, iters, strain_losses;
-            label = "strain term",
+        plot!(p, train_epochs, strain_losses;
+            label = L"\mathrm{strain\ term}",
             lw = 0.8,
             ls = :dashdot,
             color = :blue,
@@ -125,23 +150,22 @@ function plot_losses(loss_trajectory_path::AbstractString, checkpoint_path::Abst
     end
 
     # log scale + nice ticks
-    plot!(p;
-        yscale = :log10,
-        minorgrid = true,
-        minor_ticks = true,
-        grid = :y,
-        framestyle = :box,
-
-    )
-    if final_loss_str != ""
-        if final_test_loss_str != ""
-            title = final_loss_str * ",  " * final_test_loss_str
-            # plot!(p, title = title, titlefont = font(10))  # change 10 to desired point siz
-        else
-            title = final_loss_str
-        end
-        plot!(p, title = title, titlefont = font(10))  # change 10 to desired point siz
-    end
+    # plot!(p;
+    #     yscale = :log10,
+    #     minorgrid = true,
+    #     minor_ticks = true,
+    #     grid = :y,
+    #     framestyle = :box,
+    # )
+    # if final_loss_str != ""
+    #     if final_test_loss_str != ""
+    #         title = final_loss_str * ",  " * final_test_loss_str
+    #         # plot!(p, title = title, titlefont = font(12))  # change 10 to desired point siz
+    #     else
+    #         title = final_loss_str
+    #     end
+    #     plot!(p, title = title, titlefont = font(12))  # change 10 to desired point siz
+    # end
 
 
     # ------------------
@@ -154,22 +178,23 @@ function plot_losses(loss_trajectory_path::AbstractString, checkpoint_path::Abst
         cc2 = last.(val_corrs)
 
         p2 = twinx()
-        plot!(p2, val_iters, cc1;
-            label = "CCᵤ",
-            lw = 0.8,
-            color = :green,
-            alpha = 0.9,
+        plot!(p2, val_epochs, cc1;
+            label = L"CC_u",
+            lw = 1,
+            color = "#0F7173",   # dark teal (colorblind-safe blue-yellow axis)
             ylabel = "CC",
             ylims = (0,1),
-            yguidefont = font(10),
-            ytickfont  = font(8),
+            guidefontsize = 10,
+            tickfontsize  = 8,
+            legendfontsize = 6,
+            foreground_color_axis = :black,
+            foreground_color_text = :black,
         )
 
-        plot!(p2, val_iters, cc2;
-            label = "CCᵥ",
-            lw = 0.8,
-            color = :magenta,
-            alpha = 0.9,
+        plot!(p2, val_epochs, cc2;
+            label = L"CC_v",
+            lw = 1,
+            color = "#B8860B",   # dark goldenrod
             ylims = (0,1),
         )
     end
@@ -179,22 +204,19 @@ function plot_losses(loss_trajectory_path::AbstractString, checkpoint_path::Abst
         test_cc2 = last.(test_corrs)
 
         # p2 = twinx()
-        plot!(p2, val_iters, test_cc1;
-            label = "test CCᵤ",
+        plot!(p2, val_epochs, test_cc1;
+            label = L"\mathrm{test}\ CC_u",
             lw = 0.8,
             linestyle=:dashdot,
-            color = :green,
-            alpha = 0.9,
-            ylabel = "CC",
+            color = "#0F7173",   # dark teal (colorblind-safe blue-yellow axis)
             ylims = (0,1),
         )
 
-        plot!(p2, val_iters, test_cc2;
-            label = "test CCᵥ",
+        plot!(p2, val_epochs, test_cc2;
+            label = L"\mathrm{test}\ CC_v",
             lw = 0.8,
             linestyle=:dashdot,
-            color = :magenta,
-            alpha = 0.9,
+            color = "#B8860B",   # dark goldenrod
             ylims = (0,1),
         )
     end
@@ -204,9 +226,9 @@ function plot_losses(loss_trajectory_path::AbstractString, checkpoint_path::Abst
     # 1. remove big title from top, just annotate final loss small in plot area
 
     # shrink legend boxes (border thin)
-    plot!(p; legend = (0.9,0.3), legendfontsize=8, foreground_color_legend=:black,
+    plot!(p; legend=:bottomleft, foreground_color_legend=:black,
              background_color_legend=RGBA(1,1,1,0.7))
-    plot!(p2; legend = (0.88,0.9), legendfontsize=8, foreground_color_legend=:black,
+    plot!(p2; legend=:bottomright,  foreground_color_legend=:black,
              background_color_legend=RGBA(1,1,1,0.7))
 
     
