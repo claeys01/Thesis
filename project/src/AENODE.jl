@@ -24,7 +24,7 @@ function AENODE(AE_path::String, NODE_path::String; verbose=false, k=5, q=0.99)
 end
 
 function AENODE(ae_bundle, node::NODE, ae_args::LuxArgs, node_args::NodeArgs, normalizer::Normalizer; verbose=false, k=5, q=0.99)
-    knnood = fit_knn_ood(get_latent_vectors(ae_bundle, normalizer, ae_args; downsample=node_args.downsample)[1])
+    knnood = fit_knn_ood(get_latent_vectors(ae_bundle, normalizer, ae_args; downsample=node_args.downsample)[1], k=k, q=q)
     dev = get_device()
     # node.p0 = cpu_device()(node.p0)
     # node.st = cpu_device()(node.st)
