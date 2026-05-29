@@ -66,55 +66,71 @@ end
 plot_reynolds_stresses(simdata::SimData) = plot_reynolds_stresses(RST(simdata.u, simdata.μ₀[:, :, :, 1])...)
 
 
-function train_force_plot(forces::Vector{Vector{Float32}}, time::Vector{Float32}; train_idx=nothing, val_idx=nothing, test_idx=nothing, show_zeros=true)
+function train_force_plot(forces::Vector{Vector{Float32}}, time::Vector{Float32};
+        train_idx=nothing, val_idx=nothing, test_idx=nothing, show_zeros=true,
+        chunk_ranges::Vector{UnitRange{Int}}=UnitRange{Int}[])
     drag = first.(forces)
     lift = last.(forces)
-    zero_idxs = zero_crossing(lift; direction=:rising)
+
+    ranges = isempty(chunk_ranges) ? [1:length(time)] : chunk_ranges
+    xmax = max(50, ceil(maximum(time)))
 
     plt = plot(framestyle=:box, size=(600, 300), dpi=500,
         xlabel="\$t^*\$", ylabel="Force coefficient",
-        xlims=(0, 50), ylims=(-3, 2),
+        xlims=(0, xmax), ylims=(-3, 2),
         titlefontsize=14,
-        guidefontsize=12, tickfontsize=8, legendfontsize=7,
+        guidefontsize=12, tickfontsize=8, legendfontsize=6,
         foreground_color_axis  = :black,
         foreground_color_text  = :black,
         left_margin   = 3Plots.mm,
         right_margin  = 1Plots.mm,
         top_margin    = 1Plots.mm,
         bottom_margin = 2Plots.mm,
-        legend=:topright) 
-    plot!(plt, time, drag, label=L"C_{d}", color=:red, lw=1)
-    plot!(plt, time, lift, label=L"C_{L}", color=:blue, lw=1)
+        legend=:topright,
+        background_color_legend = RGBA(1, 1, 1, 0.7))
 
+    for (i, rg) in enumerate(ranges)
+        first_chunk = (i == 1)
+        plot!(plt, time[rg], drag[rg], label=first_chunk ? L"C_{d}" : "", color=:red, lw=1)
+        plot!(plt, time[rg], lift[rg], label=first_chunk ? L"C_{L}" : "", color=:blue, lw=1)
+        if !first_chunk
+            vline!(plt, [time[first(rg)]]; color=:gray, linestyle=:dot, alpha=0.5,
+                label=(i == 2 ? "chunk start" : ""))
+        end
+    end
 
     if !isnothing(val_idx) && !isempty(val_idx)
-        scatter!(plt, time[val_idx], lift[val_idx], 
-        markersize = 2, color=:black, markerstrokewidth = 0, markershape =:circle, 
+        scatter!(plt, time[val_idx], lift[val_idx],
+        markersize = 2, color=:black, markerstrokewidth = 0, markershape =:circle,
         label="validation points")
-        scatter!(plt, time[val_idx], drag[val_idx], 
-        markersize = 2, color=:black, markerstrokewidth = 0, markershape =:circle, 
+        scatter!(plt, time[val_idx], drag[val_idx],
+        markersize = 2, color=:black, markerstrokewidth = 0, markershape =:circle,
         label="")
     end
     # Highlight train/val region (before test starts)
     if !isnothing(train_idx) && !isempty(train_idx)
         train_range = first(train_idx) : last(train_idx)
-        
+
         # Add vertical shaded region for train/val
         vspan!(plt, [time[first(train_range)], time[last(train_range)]];
             fillcolor=:green, alpha=0.075, label="train/val region")
     end
- 
+
     # Highlight test region
     if !isnothing(test_idx) && !isempty(test_idx)
         test_range = first(test_idx) : last(test_idx)
-        
+
         # Add vertical shaded region for test
         vspan!(plt, [time[first(test_range)], time[last(test_range)]];
             fillcolor=:purple, alpha=0.075, label="test region")
-        
+
     end
-    # Annotate zero crossings
+    # Annotate zero crossings — computed per chunk so boundaries don't create spurious crossings
     if show_zeros
+        zero_idxs = Int[]
+        for rg in ranges
+            append!(zero_idxs, first(rg) .- 1 .+ zero_crossing(lift[rg]; direction=:rising))
+        end
         for (i, idx) in enumerate(zero_idxs)
             shift = i % 2
             scatter!(plt, [time[idx]], [lift[idx]]; label=false, color=:black, markersize=3)
@@ -126,10 +142,11 @@ function train_force_plot(forces::Vector{Vector{Float32}}, time::Vector{Float32}
     return plt
 end
 
-function train_force_plot(simdata::SimData; 
+function train_force_plot(simdata::SimData;
         train_idx=nothing, val_idx=nothing, test_idx=nothing, show_zeros=true)
-   train_force_plot(simdata.force, simdata.time; 
-        train_idx=train_idx, val_idx=val_idx, test_idx=test_idx, show_zeros=show_zeros)
+   train_force_plot(simdata.force, simdata.time;
+        train_idx=train_idx, val_idx=val_idx, test_idx=test_idx, show_zeros=show_zeros,
+        chunk_ranges=simdata.chunk_ranges)
 end
 
 

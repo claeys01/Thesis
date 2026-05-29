@@ -207,8 +207,11 @@ function plot_multiple_shoot(node::NODE, preds::Vector{<:AbstractMatrix}, z::Abs
     group_size::Int, title_loss=nothing, n_reconstruct=4, t=nothing)
     ts = t === nothing ? node.t : t
     ranges = DiffEqFlux.group_ranges(size(z, 2), group_size)
+    idx_samples = round.(Int, range(1, stop=size(z, 1), length=n_reconstruct))
+    zlo = min(minimum(view(z, idx_samples, :)), minimum(minimum(view(pr, idx_samples, :)) for pr in preds))
+    zhi = max(maximum(view(z, idx_samples, :)), maximum(maximum(view(pr, idx_samples, :)) for pr in preds))
     p = plot(
-        ylims=(minimum(z), maximum(z)),
+        ylims=(zlo, zhi),
         dpi=400,
         size=(1000,350),
         xlabel=L"t^*",
@@ -266,8 +269,18 @@ end
 function plot_multiple_shoot_multi(node::NODE, predss::Vector, zs::Vector{<:AbstractMatrix};
         group_size::Int, ts::Vector, title_loss=nothing, n_reconstruct=4)
     n = length(zs)
+    latent_dim = size(zs[1], 1)
+    idx_samples = round.(Int, range(1, stop=latent_dim, length=n_reconstruct))
+    zlo = min(
+        minimum(minimum(view(z, idx_samples, :)) for z in zs),
+        minimum(minimum(view(pr, idx_samples, :)) for preds in predss for pr in preds),
+    )
+    zhi = max(
+        maximum(maximum(view(z, idx_samples, :)) for z in zs),
+        maximum(maximum(view(pr, idx_samples, :)) for preds in predss for pr in preds),
+    )
     p = plot(size=(1100, 450),
-        ylims=(minimum(minimum, zs), maximum(maximum, zs)),
+        ylims=(zlo, zhi),
         dpi=400,
         xlabel=L"t^*",
         ylabel=L"\mathbf{z}", 
@@ -289,8 +302,6 @@ function plot_multiple_shoot_multi(node::NODE, predss::Vector, zs::Vector{<:Abst
     #     title!(p, "$n chunks (total loss = $(title_loss))")
     # end
 
-    latent_dim = size(zs[1], 1)
-    idx_samples = round.(Int, range(1, stop=latent_dim, length=n_reconstruct))
     palette = [:black, :red, :blue, :green, :purple, :orange, :yellow]
     ncolors = length(palette)
 
@@ -335,10 +346,12 @@ function plot_node_trajectory(node::NODE, z::AbstractMatrix, z0; p=nothing, t=no
     z̃ = predict_array(node, z0; p=p, t=t)
     z̃_samples = [vec(z̃[i, :]) for i in idx_samples]  # Vector of 4 one-dimensional arrays, each length 179
 
+    zlo = min(minimum(minimum, z_samples), minimum(minimum, z̃_samples))
+    zhi = max(maximum(maximum, z_samples), maximum(maximum, z̃_samples))
     standard_fig = plot(
         dpi=400,
-        size=(1000,350), 
-        ylims=(minimum(z), maximum(z)),
+        size=(1000,350),
+        ylims=(zlo, zhi),
         xlabel=L"t^*", 
         ylabel=L"\mathbf{z}", 
         framestyle   = :box,

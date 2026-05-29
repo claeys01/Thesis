@@ -91,8 +91,8 @@ function run_inline(p::InlineParams, latent_dim::Int, t_cutoff_extra::Real, save
 
         node_re_args = NodeArgs(save_path=savedir, extrapolate=false,
             latent_dim=ae_args.latent_dim, η=0.005,
-            maxiters=p.node_retrain_iters, group_size=20, continuity_term=600,
-            downsample=400, retrain=true, multiple_shooting=true,
+            maxiters=p.node_retrain_iters, group_size=p.group_size, continuity_term=600,
+            downsample=ae_re_args.train_downsample, retrain=true, multiple_shooting=true,
             use_gpu=false, node_checkpoint=node_path)
         t0 = time()
         node_re, node_re_path = train_NODE(node_re_args; ae_bundle=ae_re_bundle,

@@ -20,7 +20,7 @@ if is_hpc()
     @info "  Julia threads: $(Threads.nthreads())"
 end
 
-arams = InlineParams(
+params = InlineParams(
         t_run = 20, 
         t_train = 16.603,
         t_accel_end = 50,

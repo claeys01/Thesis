@@ -19,7 +19,13 @@ if is_hpc()
     @info "  Julia threads: $(Threads.nthreads())"
 end
 
-params = params = InlineParams(
+AE_path = "data/saved_models/u/Lux/256h_16l/RE2500/2e8/TL1_E500_HW256x256_C4to2_nc6_nd2_z16_C8_lr0p001_wd0p0009_bs16_NY_LL1_Tl0p0/checkpoint.jld2"
+AE_retrain_path = "data/saved_models/u/Lux/256h_16l/RE2500/2e8/TL2_E300_HW256x256_C4to2_nc6_nd2_z16_C8_lr0p0002_wd0p0009_bs16_NY_LL1_Tl0p0/checkpoint.jld2"
+
+# AE_path = "data/saved_models/inline_runs_hpc/latent_epoch_sweep/ae_epochs_100_latent_16/AE_May24-0724__E100_HW256x256_C4to2_nc6_nd1_z16_C8_lr0p001_wd0p0009_bs16_NY_LL1_Tl0p0/checkpoint.jld2"
+# AE_retrain_path = "data/saved_models/inline_runs_hpc/ae500_lat16_nit250_gs10/AE_May26-0337__E100_HW256x256_C4to2_nc6_nd1_z16_C8_lr0p0002_wd0p0009_bs16_NY_LL1_Tl0p0/checkpoint.jld2"
+
+params = InlineParams(
         t_run = 20, 
         t_train = 16.603,
         t_accel_end = 50,
@@ -48,11 +54,12 @@ simdata = run_warmup!(hs, params.t_run; u₀=u₀, save_path=simdata_path)
 @info "── Step 1/4: Training Autoencoder ──"
 
 root_path = is_hpc() ? "/scratch/mfbclaeys" : ""
-AE_path = "data/saved_models/u/Lux/256h_16l/RE2500/2e8/TL1_E500_HW256x256_C4to2_nc6_nd2_z16_C8_lr0p001_wd0p0009_bs16_NY_LL1_Tl0p0/checkpoint.jld2"
+# AE_path = "data/saved_models/u/Lux/256h_16l/RE2500/2e8/TL1_E500_HW256x256_C4to2_nc6_nd2_z16_C8_lr0p001_wd0p0009_bs16_NY_LL1_Tl0p0/checkpoint.jld2"
 AE_path = joinpath(root_path, AE_path)
 
 normalizer = load_normalizer(AE_path)
 ae_bundle, ae_args = load_trained_AE(AE_path)
+ae_args.train_downsample = 500
 ae_args.full_data_path = simdata_path
 
 # ================================ Step 2: Train NODE ================================
@@ -60,7 +67,8 @@ ae_args.full_data_path = simdata_path
 node_args = NodeArgs(
         save_path=savedir,
         maxiters = params.node_iters,
-        group_size=10,
+        downsample=ae_args.train_downsample,
+        group_size=20,
         extrapolate = false,
         use_gpu = false,
         latent_dim = ae_args.latent_dim,
@@ -94,21 +102,21 @@ if hs.retrain_needed
 
     println("continueing to run simulation without AENODE")
 
-    simdata = run_warmup!(hs, sim_time(hs.sim) + 10; simdata=simdata, save_path=simdata_path)
+    simdata = run_warmup!(hs, sim_time(hs.sim) + 15; simdata=simdata, save_path=simdata_path)
 
     # ================================ Step 3: Retrain AE ================================
-    AE_retrain_path = "data/saved_models/u/Lux/256h_16l/RE2500/2e8/TL2_E300_HW256x256_C4to2_nc6_nd2_z16_C8_lr0p0002_wd0p0009_bs16_NY_LL1_Tl0p0/checkpoint.jld2"
     AE_retrain_path = joinpath(root_path, AE_retrain_path)
 
     retrain_normalizer = load_normalizer(AE_retrain_path)
     ae_retrain_bundle, ae_retrain_args = load_trained_AE(AE_retrain_path)
     ae_retrain_args.full_data_path = simdata_path
+    ae_retrain_args.train_downsample = 500
 
 
     # ================================ Step 4: Retrain NODE ================================
 
     @info "── Step 4/4: Retraining Neural ODE ──"
-    ae_retrain_bundle = cpu_device()(ae_retrain_bundle)
+    # ae_retrain_bundle = cpu_device()(ae_retrain_bundle)
     GC.gc()
     node_retrain_start = time()
     node_retrain_args = NodeArgs(
@@ -117,9 +125,9 @@ if hs.retrain_needed
             latent_dim = ae_args.latent_dim,
             η = 0.01,              # lower LR for fine-tuning
             maxiters = params.node_retrain_iters,          # more iterations
-            group_size = 10,         # keep tighter segments
+            group_size = 20,         # keep tighter segments
             continuity_term = 500,   # stronger continuity for stability
-            downsample = 400,  
+            downsample = 500,  
             retrain = true,
             multiple_shooting = true,
             use_gpu = false, 
@@ -132,7 +140,6 @@ if hs.retrain_needed
     )
     node_retrain_elapsed = round((time() - node_retrain_start) / 60; digits=1)
     @info "NODE retraining complete" elapsed_min=node_retrain_elapsed node_path=node_retrain_path
-
 
     hs.aenode = AENODE(ae_retrain_bundle, node_retrain, ae_retrain_args, node_retrain_args, retrain_normalizer; verbose=true)
     hs.AE_path = AE_retrain_path
@@ -149,5 +156,5 @@ if hs.retrain_needed
 end
 
 save_results(hs)
-plt, _ = Thesis.velocity_flood(sim; colorbar=true)
-display(plt)
+# plt, _ = Thesis.velocity_flood(sim; colorbar=true)
+# display(plt)
