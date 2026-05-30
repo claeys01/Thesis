@@ -225,6 +225,18 @@ function train_NODE(args::NodeArgs;
     @info "  Saved trajectory plot to $png_path"
     savefig(plt, png_path)
 
+    # Single-shooting rollout after (multiple shooting) training: integrate the full
+    # trajectory from t_0 to t_train (no segment resets) on the same latent components
+    # as above, to assess plain rollout performance.
+    if multi || args.multiple_shooting
+        rollout_plt = multi ?
+            plot_node_rollout_multi(node, zs, z0s; p=node.p0, ts=ts, n_reconstruct=args.n_reconstruct) :
+            plot_node_trajectory(node, z, z0; n_reconstruct=args.n_reconstruct, loss=final_loss)
+        rollout_path = joinpath(out_dir, "rollout_single_shooting.pdf")
+        savefig(rollout_plt, rollout_path)
+        @info "  Saved single-shooting rollout plot to $rollout_path"
+    end
+
     metrics_path = joinpath(out_dir, "training_loss_rmse.pdf")
     if !isempty(epochs) && !isempty(train_losses) && !isempty(rmse_errors)
         loss_for_plot = max.(train_losses, eps(Float64))

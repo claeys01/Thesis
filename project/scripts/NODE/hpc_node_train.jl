@@ -48,9 +48,10 @@ function main()
 
      train_NODE(
             NodeArgs(
-                maxiters=250,
+                maxiters=100,
                 extrapolate = false,
                 multiple_shooting=true,
+                downsample=500,
                 use_gpu = false,
                 latent_dim = ae_args.latent_dim,  # match AE latent dim
             );

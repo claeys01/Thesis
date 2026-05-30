@@ -19,15 +19,19 @@ if is_hpc()
     @info "  Julia threads: $(Threads.nthreads())"
 end
 
-AE_path = "data/saved_models/u/Lux/256h_16l/RE2500/2e8/TL1_E500_HW256x256_C4to2_nc6_nd2_z16_C8_lr0p001_wd0p0009_bs16_NY_LL1_Tl0p0/checkpoint.jld2"
-AE_retrain_path = "data/saved_models/u/Lux/256h_16l/RE2500/2e8/TL2_E300_HW256x256_C4to2_nc6_nd2_z16_C8_lr0p0002_wd0p0009_bs16_NY_LL1_Tl0p0/checkpoint.jld2"
+# AE_path = "data/saved_models/u/Lux/256h_16l/RE2500/2e8/TL1_E500_HW256x256_C4to2_nc6_nd2_z16_C8_lr0p001_wd0p0009_bs16_NY_LL1_Tl0p0/checkpoint.jld2"
+# AE_retrain_path = "data/saved_models/u/Lux/256h_16l/RE2500/2e8/TL2_E300_HW256x256_C4to2_nc6_nd2_z16_C8_lr0p0002_wd0p0009_bs16_NY_LL1_Tl0p0/checkpoint.jld2"
+
+AE_path = "data/saved_models/inline_runs_hpc/ae500_lat16_nit250_gs10/AE_May26-0321__E500_HW256x256_C4to2_nc6_nd1_z16_C8_lr0p001_wd0p0009_bs16_NY_LL1_Tl0p0/checkpoint.jld2"
+AE_retrain_path = "data/saved_models/inline_runs_hpc/ae500_lat16_nit250_gs10/AE_May26-0337__E100_HW256x256_C4to2_nc6_nd1_z16_C8_lr0p0002_wd0p0009_bs16_NY_LL1_Tl0p0/checkpoint.jld2"
+
+# AE_path = "data/saved_models/inline_runs_hpc/latent_epoch_sweep/ae_epochs_250_latent_16/AE_May24-0739__E250_HW256x256_C4to2_nc6_nd1_z16_C8_lr0p001_wd0p0009_bs16_NY_LL1_Tl0p0/checkpoint.jld2"
+# AE_retrain_path = "data/saved_models/inline_runs_hpc/latent_epoch_sweep/ae_epochs_250_latent_16/AE_May24-0749__E100_HW256x256_C4to2_nc6_nd1_z16_C8_lr0p0002_wd0p0009_bs16_NY_LL1_Tl0p0/checkpoint.jld2"
 
 # AE_path = "data/saved_models/inline_runs_hpc/latent_epoch_sweep/ae_epochs_100_latent_16/AE_May24-0724__E100_HW256x256_C4to2_nc6_nd1_z16_C8_lr0p001_wd0p0009_bs16_NY_LL1_Tl0p0/checkpoint.jld2"
-# AE_retrain_path = "data/saved_models/inline_runs_hpc/ae500_lat16_nit250_gs10/AE_May26-0337__E100_HW256x256_C4to2_nc6_nd1_z16_C8_lr0p0002_wd0p0009_bs16_NY_LL1_Tl0p0/checkpoint.jld2"
+# AE_retrain_path = "data/saved_models/inline_runs_hpc/latent_epoch_sweep/ae_epochs_100_latent_16/AE_May24-0734__E100_HW256x256_C4to2_nc6_nd1_z16_C8_lr0p0002_wd0p0009_bs16_NY_LL1_Tl0p0/checkpoint.jld2"
 
 params = InlineParams(
-        t_run = 20, 
-        t_train = 16.603,
         t_accel_end = 50,
         ae_epochs = 1000,
         ae_retrain_epochs = 300,
@@ -35,7 +39,7 @@ params = InlineParams(
         node_retrain_iters = 100,
         n_switch = 150,
         max_retrain_flags = 3,
-        save_interval = 0.25, # needs to be fixed still, 
+        save_interval = 0.1, # needs to be fixed still, 
         sample_interval=0
     )
 
@@ -64,16 +68,19 @@ ae_args.full_data_path = simdata_path
 
 # ================================ Step 2: Train NODE ================================
 @info "── Step 2/4: Training Neural ODE ──"
+
+node_start = time()
+
 node_args = NodeArgs(
         save_path=savedir,
         maxiters = params.node_iters,
         downsample=ae_args.train_downsample,
         group_size=20,
+        continuity_term=250,
         extrapolate = false,
         use_gpu = false,
         latent_dim = ae_args.latent_dim,
     )
-node_start = time()
 node, node_path = train_NODE(
     node_args;
     ae_bundle = ae_bundle,
@@ -102,7 +109,7 @@ if hs.retrain_needed
 
     println("continueing to run simulation without AENODE")
 
-    simdata = run_warmup!(hs, sim_time(hs.sim) + 15; simdata=simdata, save_path=simdata_path)
+    simdata = run_warmup!(hs, sim_time(hs.sim) + hs.params.t_update; simdata=simdata, save_path=simdata_path)
 
     # ================================ Step 3: Retrain AE ================================
     AE_retrain_path = joinpath(root_path, AE_retrain_path)
@@ -118,22 +125,22 @@ if hs.retrain_needed
     @info "── Step 4/4: Retraining Neural ODE ──"
     # ae_retrain_bundle = cpu_device()(ae_retrain_bundle)
     GC.gc()
-    node_retrain_start = time()
+    node_retrain_start = time()     
     node_retrain_args = NodeArgs(
-            save_path=savedir,
-            extrapolate = false,
-            latent_dim = ae_args.latent_dim,
-            η = 0.01,              # lower LR for fine-tuning
-            maxiters = params.node_retrain_iters,          # more iterations
-            group_size = 20,         # keep tighter segments
-            continuity_term = 500,   # stronger continuity for stability
-            downsample = 500,  
-            retrain = true,
-            multiple_shooting = true,
-            use_gpu = false, 
-            node_checkpoint = node_path,
-        )
-        
+        save_path=savedir,
+        extrapolate = false,
+        latent_dim = ae_args.latent_dim,
+        η = 0.01,              # lower LR for fine-tuning
+        maxiters = params.node_retrain_iters,          # more iterations
+        group_size = 20,         # keep tighter segments
+        continuity_term = 500,   # stronger continuity for stability
+        downsample = 500,  
+        retrain = true,
+        multiple_shooting = true,
+        use_gpu = false, 
+        node_checkpoint = node_path,
+    )
+
     node_retrain, node_retrain_path = train_NODE(node_retrain_args;
         ae_bundle = ae_retrain_bundle,
         normalizer = retrain_normalizer, ae_args = ae_retrain_args,

@@ -385,6 +385,68 @@ function plot_node_trajectory(node::NODE, z::AbstractMatrix, z0; p=nothing, t=no
     return fig
 end
 
+# Single-shooting rollout for multiple disjoint trajectories: integrate each chunk
+# from its own initial condition across its full tspan (no segment resets), to assess
+# plain rollout performance after multiple-shooting training. Same latent components.
+function plot_node_rollout_multi(node::NODE, zs::Vector{<:AbstractMatrix}, z0s::Vector;
+        p=nothing, ts::Vector, n_reconstruct=4, loss=nothing)
+    n = length(zs)
+    latent_dim = size(zs[1], 1)
+    idx_samples = round.(Int, range(1, stop=latent_dim, length=n_reconstruct))
+
+    preds   = [Array(predict_array(node, z0s[i]; p=p, t=ts[i])) for i in 1:n]
+    zs_cpu  = [Array(z) for z in zs]
+    ts_cpu  = [Array(t) for t in ts]
+
+    zlo = min(
+        minimum(minimum(view(z, idx_samples, :)) for z in zs_cpu),
+        minimum(minimum(view(pr, idx_samples, :)) for pr in preds),
+    )
+    zhi = max(
+        maximum(maximum(view(z, idx_samples, :)) for z in zs_cpu),
+        maximum(maximum(view(pr, idx_samples, :)) for pr in preds),
+    )
+    fig = plot(size=(1100, 450),
+        ylims=(zlo, zhi),
+        dpi=400,
+        xlabel=L"t^*",
+        ylabel=L"\mathbf{z}",
+        legendfontsize=7,
+        framestyle   = :box,
+        gridalpha    = 0.20,
+        gridlinewidth = 0.5,
+        foreground_color_axis  = :black,
+        foreground_color_text  = :black,
+        left_margin   = 6Plots.mm,
+        right_margin  = 3Plots.mm,
+        top_margin    = 1Plots.mm,
+        bottom_margin = 8Plots.mm,
+        xguide_position = :bottom,
+        )
+
+    palette = [:black, :red, :blue, :green, :purple, :orange, :yellow]
+    ncolors = length(palette)
+
+    for i in 1:n
+        z = zs_cpu[i]; pred = preds[i]; t = ts_cpu[i]
+        for (sidx, lat_idx) in enumerate(idx_samples)
+            c = palette[(sidx - 1) % ncolors + 1]
+            first_chunk = (i == 1 && sidx == 1)
+            plot!(fig, t, z[lat_idx, :];
+                  color=c, linestyle=:solid, alpha=0.9,
+                  label=first_chunk ? "z (truth)" : "")
+            plot!(fig, t, pred[lat_idx, :];
+                  color=c, linestyle=:dash, alpha=0.9,
+                  label=first_chunk ? "z̃ (pred)" : "")
+            if sidx == 1
+                vline!(fig, [t[1]]; color=:gray, linestyle=:dot, alpha=0.4,
+                       label=(i == 1 ? "chunk start" : ""))
+            end
+        end
+    end
+    return fig
+end
+
 function save_node(path::AbstractString, node::NODE, args::NodeArgs)
     args_copy = deepcopy(args)
     node_tspan = node.tspan

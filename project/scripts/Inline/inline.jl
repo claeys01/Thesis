@@ -8,9 +8,9 @@ using Plots
 
 
 params = InlineParams(
-        t_run = 16.03, 
-        t_train = 7.5,
-        t_accel_end = 50,
+        t_run = 6.03, 
+        t_train = 3.5,
+        t_accel_end = 10,
         ae_epochs = 500,
         ae_retrain_epochs = 500,
         node_iters = 500,

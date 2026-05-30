@@ -1,11 +1,12 @@
 Base.@kwdef struct InlineParams
     t_run = 20
-    t_train = 17.5
+    t_train = 16.603
     t_accel_end = 50
-    ae_epochs = 1
-    ae_retrain_epochs = 1
-    node_iters = 50
-    node_retrain_iters = 50
+    t_update = 15
+    ae_epochs = 500
+    ae_retrain_epochs = 200
+    node_iters = 250
+    node_retrain_iters = 150
     group_size=20
     n_switch = 150
     pred_Δt = 0.35
@@ -33,6 +34,10 @@ Base.@kwdef mutable struct HybridState
     next_sample::Float32 = 0
     retrain_needed::Bool = false
     mode_log::Vector{@NamedTuple{t_start::Float32, t_end::Float32, mode::String}} = @NamedTuple{t_start::Float32, t_end::Float32, mode::String}[]
+    save_fields::Bool = true
+    n_field_saved::Int = 0
+    hybrid_field_file::Any = nothing
+    ref_field_file::Any = nothing
 end
 
 function HybridState(sim, aenode, params, savedir, AE_path, node_path)
@@ -266,6 +271,8 @@ function run_hybrid!(hs::HybridState; verbose=true)
             @info "Updating MeanFlow statistics at: $(sim_time(sim))"
         end
 
+        save_field_step!(hs, sim, ref_sim)
+
         hs.step += 1
 
         if retrain_req_counter ≥ params.max_retrain_flags
@@ -282,7 +289,31 @@ function run_hybrid!(hs::HybridState; verbose=true)
     return hs
 end
 
+function save_field_step!(hs::HybridState, sim, ref_sim)
+    hs.save_fields || return
+    if hs.hybrid_field_file === nothing
+        hs.hybrid_field_file = jldopen(joinpath(hs.savedir, "U_hybrid_inline.jld2"), "w")
+        hs.ref_field_file    = jldopen(joinpath(hs.savedir, "U_ref_inline.jld2"), "w")
+    end
+    i = (hs.n_field_saved += 1)
+    hs.hybrid_field_file["u/$i"] = Array(sim.flow.u)
+    hs.hybrid_field_file["t/$i"] = Float32(sim_time(sim))
+    hs.ref_field_file["u/$i"]    = Array(ref_sim.flow.u)
+    hs.ref_field_file["t/$i"]    = Float32(sim_time(ref_sim))
+end
+
+function close_field_files!(hs::HybridState)
+    if hs.hybrid_field_file !== nothing
+        hs.hybrid_field_file["n"] = hs.n_field_saved
+        hs.ref_field_file["n"]    = hs.n_field_saved
+        close(hs.hybrid_field_file); close(hs.ref_field_file)
+        hs.hybrid_field_file = nothing; hs.ref_field_file = nothing
+        @info "Saved $(hs.n_field_saved) hybrid/ref field snapshots to $(hs.savedir)"
+    end
+end
+
 function save_results(hs::HybridState)
+    close_field_files!(hs)
     (; res, n_integrs, params, savedir,
         sim_meanflow, ref_meanflow, gif_frames, AE_path, node_path, mode_log) = hs
 
