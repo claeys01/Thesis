@@ -22,7 +22,6 @@ end
 
 params = InlineParams(
     sample_interval = 0.005,
-
 )
 
 savedir = joinpath(root_path, "data", "inline_runs", "finer_" * Dates.format(now(), "yyyy-mm-dd_HH-MM"))
