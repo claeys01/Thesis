@@ -29,7 +29,7 @@ module load julia
 module load slurm
 
 echo "Finished loading modules"
-echo "Running inline_noload.jl"
+echo "Running inline_noload_finer.jl"
 
 srun julia --project=project project/scripts/Inline/inline_finer.jl
 
