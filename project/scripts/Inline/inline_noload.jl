@@ -157,7 +157,7 @@ while sim_time(hs.sim) < hs.params.t_accel_end
         hs.retrain_needed = false
         hs.step = 0
 
-        push!(hs.mode_log, (t_start=sim_time(hs.sim), t_end=sim_time(hs.sim), mode="Restarted")
+        push!(hs.mode_log, (t_start=sim_time(hs.sim), t_end=sim_time(hs.sim), mode="Restarted"))
     end
 end
 
