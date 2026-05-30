@@ -29,9 +29,9 @@ using Printf
 
 function set_plot_defaults!()
     default(fontfamily="Computer Modern",
-            titlefontsize=16,
-            guidefontsize=16,
-            tickfontsize=12,
+            titlefontsize=14,
+            guidefontsize=12,
+            tickfontsize=10,
             legendfontsize=9)
 end
 
@@ -60,7 +60,6 @@ using Optimization, OptimizationOptimisers, OptimizationPolyalgorithms
 # ═══════════════════════════════════════════════════════════════════════════════
 # GPU/Accelerator Support (conditional loading)
 # ═══════════════════════════════════════════════════════════════════════════════
-using Reactant
 
 const USE_CUDA = Ref(false)
 
