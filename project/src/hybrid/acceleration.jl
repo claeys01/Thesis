@@ -58,7 +58,10 @@ function record_prediction!(res::AccelResults, sim, wall_time, sim_dt, step;
 end
 
 function step_reference!(res::AccelResults, ref_sim)
-    wall_time = @elapsed sim_step!(ref_sim)
+    wall_time = @elapsed begin
+        sim_step!(ref_sim)
+        sync_device!()
+    end
     sim_dt = ref_sim.flow.Δt[end] * ref_sim.U / ref_sim.L
     push!(res.reference_wall_times, wall_time)
     push!(res.reference_sim_times, sim_dt)
@@ -67,22 +70,36 @@ function step_reference!(res::AccelResults, ref_sim)
 end
 
 function compute_metrics(res::AccelResults)
+    safediv(a, b) = b == 0 ? 0.0 : a / b
+    safemean(x) = isempty(x) ? 0.0 : mean(x)
+
     total_hybrid_waterlily_wall = sum(res.hybrid_waterlily_wall_times)
     total_hybrid_predict_wall = sum(res.hybrid_predict_wall_times)
     total_hybrid_wall = total_hybrid_waterlily_wall + total_hybrid_predict_wall
 
-    avg_hybrid_waterlily_wall = mean(res.hybrid_waterlily_wall_times) * 1000
-    avg_hybrid_predict_wall = mean(res.hybrid_predict_wall_times) * 1000
-    avg_hybrid_wall = (avg_hybrid_waterlily_wall + avg_hybrid_predict_wall) / 2
-
-    avg_hybrid_predict_sim = mean(res.hybrid_predict_sim_times)
-    avg_hybrid_waterlily_sim = mean(res.hybrid_waterlily_sim_times)
-    avg_hybrid_sim = (avg_hybrid_waterlily_sim + avg_hybrid_predict_sim) / 2
+    total_hybrid_waterlily_sim = sum(res.hybrid_waterlily_sim_times)
+    total_hybrid_predict_sim = sum(res.hybrid_predict_sim_times)
+    total_hybrid_sim = total_hybrid_waterlily_sim + total_hybrid_predict_sim
 
     total_reference_wall = sum(res.reference_wall_times)
-    average_reference_wall = mean(res.reference_wall_times) * 1000
-    average_reference_sim = mean(res.reference_sim_times)
-    overall_speedup = total_reference_wall / total_hybrid_wall
+    total_reference_sim = sum(res.reference_sim_times)
+
+    # Wall time to advance one convective time unit (ms / CTU)
+    ref_wall_per_ctu = safediv(total_reference_wall, total_reference_sim) * 1000
+    hybrid_waterlily_wall_per_ctu = safediv(total_hybrid_waterlily_wall, total_hybrid_waterlily_sim) * 1000
+    hybrid_predict_wall_per_ctu = safediv(total_hybrid_predict_wall, total_hybrid_predict_sim) * 1000
+    hybrid_wall_per_ctu = safediv(total_hybrid_wall, total_hybrid_sim) * 1000
+
+    # Per-event averages, kept for the per-step / per-call breakdown in print_metrics
+    avg_hybrid_waterlily_wall = safemean(res.hybrid_waterlily_wall_times) * 1000
+    avg_hybrid_predict_wall = safemean(res.hybrid_predict_wall_times) * 1000
+    avg_hybrid_predict_sim = safemean(res.hybrid_predict_sim_times)
+    avg_hybrid_waterlily_sim = safemean(res.hybrid_waterlily_sim_times)
+    average_reference_wall = safemean(res.reference_wall_times) * 1000
+    average_reference_sim = safemean(res.reference_sim_times)
+
+    overall_speedup = safediv(total_reference_wall, total_hybrid_wall)
+    ctu_speedup = safediv(ref_wall_per_ctu, hybrid_wall_per_ctu)
 
     stats_hybrid = force_stats(res.hybrid_forces_wat)
     stats_ref = force_stats(res.forces_ref)
@@ -91,10 +108,14 @@ function compute_metrics(res::AccelResults)
 
     return (;
         total_hybrid_waterlily_wall, total_hybrid_predict_wall, total_hybrid_wall,
-        avg_hybrid_waterlily_wall, avg_hybrid_predict_wall, avg_hybrid_wall,
-        avg_hybrid_predict_sim, avg_hybrid_waterlily_sim, avg_hybrid_sim,
-        total_reference_wall, average_reference_wall, average_reference_sim,
-        overall_speedup,
+        total_hybrid_waterlily_sim, total_hybrid_predict_sim, total_hybrid_sim,
+        total_reference_wall, total_reference_sim,
+        ref_wall_per_ctu, hybrid_waterlily_wall_per_ctu,
+        hybrid_predict_wall_per_ctu, hybrid_wall_per_ctu,
+        avg_hybrid_waterlily_wall, avg_hybrid_predict_wall,
+        avg_hybrid_predict_sim, avg_hybrid_waterlily_sim,
+        average_reference_wall, average_reference_sim,
+        overall_speedup, ctu_speedup,
         stats_hybrid, stats_ref, abs_err, rel_err,
     )
 end
@@ -110,13 +131,14 @@ function print_metrics(res::AccelResults; pred_label="", avg_steps_per_pred=noth
     println("  Number of steps:     $(length(res.reference_wall_times))")
     println("  Total wall time:     $(m.total_reference_wall) s")
     println("  Avg wall time/step:  $(round(m.average_reference_wall, digits=2)) ms")
-    println("  Avg sim time/step:   $(round(m.average_reference_sim, digits=4)) tU/L")
+    println("  Wall time / CTU:     $(round(m.ref_wall_per_ctu, digits=2)) ms/CTU")
 
     println("\n--- Hybrid ---")
     println("  Number of steps:     $(length(res.hybrid_time_wat))")
     println("  Total wall time:     $(m.total_hybrid_wall) s")
-    println("  Avg wall time/step:  $(round(m.avg_hybrid_wall, digits=2)) ms")
-    println("  Avg sim time/step:   $(round(m.avg_hybrid_sim, digits=4)) tU/L")
+    println("  Wall time / CTU:     $(round(m.hybrid_wall_per_ctu, digits=2)) ms/CTU")
+    println("    └ CFD steps:       $(round(m.hybrid_waterlily_wall_per_ctu, digits=2)) ms/CTU")
+    println("    └ Rollout:         $(round(m.hybrid_predict_wall_per_ctu, digits=2)) ms/CTU")
 
     println("\n--- Predictions $(pred_label) ---")
     println("  Number of predictions: $(length(res.hybrid_predict_wall_times))")
@@ -131,6 +153,7 @@ function print_metrics(res::AccelResults; pred_label="", avg_steps_per_pred=noth
     println("  Reference WaterLily:   $(round(m.total_reference_wall, digits=2)) s")
     println("  Actual hybrid time:    $(round(m.total_hybrid_wall, digits=2)) s")
     println("  Overall speedup:       $(round(m.overall_speedup, digits=4))x")
+    println("  Speedup (per CTU):     $(round(m.ctu_speedup, digits=4))x")
 
     println("\n" * "="^60)
     println("FORCE ANALYSIS")
@@ -194,13 +217,15 @@ end
 function plot_timing_bars(res::AccelResults)
     m = compute_metrics(res)
 
+    timing_vals = [m.ref_wall_per_ctu, m.hybrid_waterlily_wall_per_ctu,
+        m.hybrid_predict_wall_per_ctu, m.hybrid_wall_per_ctu]
     plt_timing = bar(
-        ["WaterLily\n(per step)", "Prediction\n(per call)"],
-        [m.average_reference_wall, m.avg_hybrid_predict_wall],
-        ylabel="Wall time (ms)", title="Average Computation Time",
-        legend=false, color=[:steelblue, :darkorange],
+        ["Reference", "Hybrid\n(CFD)", "Hybrid\n(rollout)", "Hybrid\n(total)"],
+        timing_vals,
+        ylabel="Wall time per CTU (ms)", title="Cost per convective time unit",
+        legend=false, color=[:steelblue, :darkorange, :firebrick, :seagreen],
         framestyle=:box, size=(400, 350), dpi=500,
-        ylim=(0, m.avg_hybrid_predict_wall + 10))
+        ylim=(0, maximum(timing_vals) * 1.15 + eps()))
 
     y_max = max(m.total_reference_wall, m.total_hybrid_wall)
     plt_total = bar(

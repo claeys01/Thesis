@@ -3,14 +3,17 @@ Base.@kwdef struct InlineParams
     t_train = 16.603
     t_accel_end = 50
     t_update = 15
-    ae_epochs = 500
-    ae_retrain_epochs = 200
+    ae_epochs = 400
+    ae_retrain_epochs = 100
     node_iters = 250
+    continuity_term = 250
     node_retrain_iters = 150
+    continuity_term_retrain = 500
+    downsample=500
     group_size=20
     n_switch = 150
     pred_Δt = 0.35
-    save_interval = 0.25
+    save_interval = 0.05
     sample_interval = 0.0
     max_retrain_flags = 3
 end
@@ -76,9 +79,12 @@ function run_warmup!(hs::HybridState, t_end; simdata::Union{SimData,Nothing}=not
     t_sim_start = sim_time(sim)
 
     verbose && @info "Starting warmup simulation" t_end continuing = !isnothing(simdata)
-    while sim_time(sim) < t_end
-        wall_time = @elapsed sim_step!(sim)
-        record_waterlily_step!(res, sim, wall_time)
+    while sim_time(sim) < t_end && sim_time(sim) < hs.params.t_accel_end
+        wall_time = @elapsed begin
+            sim_step!(sim)
+            sync_device!()
+        end
+        # record_waterlily_step!(res, sim, wall_time)
 
         while sim_time(ref_sim) < sim_time(sim) && run_ref
             step_reference!(res, ref_sim)
@@ -93,6 +99,8 @@ function run_warmup!(hs::HybridState, t_end; simdata::Union{SimData,Nothing}=not
         end
 
         if sim_time(sim) ≥ hs.next_sample
+            record_waterlily_step!(res, sim, wall_time)
+
             push!(u_list, copy(sim.flow.u))
             push!(p_list, copy(sim.flow.p))
             push!(μ₀_list, copy(sim.flow.μ₀))
@@ -100,9 +108,10 @@ function run_warmup!(hs::HybridState, t_end; simdata::Union{SimData,Nothing}=not
             push!(time_vec, res.hybrid_time_wat[end])
             push!(Δt_vec, Float32(round(sim.flow.Δt[end], digits=3)))
             hs.next_sample = sim_time(sim) + hs.params.sample_interval
-            # record_waterlily_step!(res, sim, wall_time)
-            verbose && @info "Updating simdata statistics at: $(sim_time(sim))"
+            # verbose && @info "Updating simdata statistics at: $(sim_time(sim))"
         end
+
+        run_ref && save_field_step!(hs, sim, ref_sim)
 
         hs.step += 1
     end
@@ -227,6 +236,7 @@ function run_hybrid!(hs::HybridState; verbose=true)
                     next_save=hs.next_save,
                     save_interval=params.save_interval,
                 )
+                sync_device!()
             end
             if retrain_required
                 retrain_req_counter += 1
@@ -251,11 +261,19 @@ function run_hybrid!(hs::HybridState; verbose=true)
                 println(" Inserted prediction for $n_integr steps: tU/L=$(round(sim_time(sim), digits=4)), wall time: $(round(predict_wall_time*1000, digits=4)) ms, force: $(res.hybrid_forces_preds[end])")
             else
                 @info "nothing inserted: $(sim_time(sim))"
-                wall_time = @elapsed sim_step!(sim)
-                record_waterlily_step!(res, sim, wall_time)
+                wall_time = @elapsed begin
+                    sim_step!(sim)
+                    sync_device!()
+                end
+                # the prediction attempt cost real wall time even though nothing
+                # was inserted — attribute it to the CFD step that did advance
+                record_waterlily_step!(res, sim, predict_wall_time + wall_time)
             end
         else
-            wall_time = @elapsed sim_step!(sim)
+            wall_time = @elapsed begin
+                sim_step!(sim)
+                sync_device!()
+            end
             record_waterlily_step!(res, sim, wall_time)
         end
 
@@ -327,7 +345,7 @@ function save_results(hs::HybridState)
     save_accel_plots(savedir, plt_combined, rst_comp_plot, plt_meanflow)
 
     if !isempty(gif_frames)
-        create_velocity_gif(gif_frames, savedir)
+        # create_velocity_gif(gif_frames, savedir)
     end
 
     accel_path = joinpath(savedir, "accel_results.jld2")

@@ -41,7 +41,7 @@ simdata_path = joinpath(savedir, "U_inline_finer.jld2")
 # u₀ = load_u0("data/datasets/RE2500/2e8/U_128_full_u0.jld2")
 
 sim = circle_shedding_biot(n=2^9, m=2^9; mem=Array, perturb=false)
-u₀ = load_u0(joinpath(root_path, "data/initial_fields/Ru0_biot_n512_t50.jld2"))
+u₀ = load_u0(joinpath(root_path, "data/initial_fields/u0_biot_n512_t50.jld2"))
 
 hs = HybridState(sim, nothing, params, savedir, nothing, nothing)
 

@@ -301,6 +301,20 @@ function get_device(; prefer_gpu=true)
 end
 
 """
+    sync_device!()
+
+Block until all queued GPU work has finished (no-op on CPU). Call this inside a
+timed region so `@elapsed` captures actual device compute instead of just the
+async kernel-launch time.
+"""
+function sync_device!()
+    if USE_CUDA[]
+        Base.invokelatest(CUDA.synchronize)
+    end
+    return nothing
+end
+
+"""
     set_seed!(seed::Int)
 
 Set random seed for reproducibility across all RNGs.

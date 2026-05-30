@@ -31,17 +31,7 @@ AE_retrain_path = "data/saved_models/inline_runs_hpc/ae500_lat16_nit250_gs10/AE_
 # AE_path = "data/saved_models/inline_runs_hpc/latent_epoch_sweep/ae_epochs_100_latent_16/AE_May24-0724__E100_HW256x256_C4to2_nc6_nd1_z16_C8_lr0p001_wd0p0009_bs16_NY_LL1_Tl0p0/checkpoint.jld2"
 # AE_retrain_path = "data/saved_models/inline_runs_hpc/latent_epoch_sweep/ae_epochs_100_latent_16/AE_May24-0734__E100_HW256x256_C4to2_nc6_nd1_z16_C8_lr0p0002_wd0p0009_bs16_NY_LL1_Tl0p0/checkpoint.jld2"
 
-params = InlineParams(
-        t_accel_end = 50,
-        ae_epochs = 1000,
-        ae_retrain_epochs = 300,
-        node_iters = 250,
-        node_retrain_iters = 100,
-        n_switch = 150,
-        max_retrain_flags = 3,
-        save_interval = 0.1, # needs to be fixed still, 
-        sample_interval=0
-    )
+params = InlineParams()
 
 savedir = joinpath(root_path, "data", "inline_runs", Dates.format(now(), "yyyy-mm-dd_HH-MM"))
 mkpath(savedir)
@@ -58,7 +48,6 @@ simdata = run_warmup!(hs, params.t_run; u₀=u₀, save_path=simdata_path)
 @info "── Step 1/4: Training Autoencoder ──"
 
 root_path = is_hpc() ? "/scratch/mfbclaeys" : ""
-# AE_path = "data/saved_models/u/Lux/256h_16l/RE2500/2e8/TL1_E500_HW256x256_C4to2_nc6_nd2_z16_C8_lr0p001_wd0p0009_bs16_NY_LL1_Tl0p0/checkpoint.jld2"
 AE_path = joinpath(root_path, AE_path)
 
 normalizer = load_normalizer(AE_path)
@@ -75,12 +64,11 @@ node_args = NodeArgs(
         save_path=savedir,
         maxiters = params.node_iters,
         downsample=ae_args.train_downsample,
-        group_size=20,
-        continuity_term=250,
-        extrapolate = false,
-        use_gpu = false,
+        group_size=hs.params.group_size,
+        continuity_term=hs.params.continuity_term,
         latent_dim = ae_args.latent_dim,
     )
+
 node, node_path = train_NODE(
     node_args;
     ae_bundle = ae_bundle,
@@ -95,70 +83,69 @@ node_elapsed = round((time() - node_start) / 60; digits=1)
 
 aenode = AENODE(ae_bundle, node, ae_args, node_args, normalizer; verbose=true)
 
-# hs = HybridState(sim, aenode, params, savedir, AE_path_tl1, node_path)
 hs.aenode = aenode
 hs.AE_path = AE_path
 hs.node_path = node_path
 
-run_hybrid!(hs)
+# run_hybrid!(hs)
 
-if hs.retrain_needed
-    GC.gc()
-    @info "Retraining triggered at sim_time=$(sim_time(hs.sim)), step=$(hs.step)"
-    push!(hs.mode_log, (t_start=sim_time(hs.sim), t_end=sim_time(hs.sim), mode="Cutoff"))
-
-    println("continueing to run simulation without AENODE")
-
-    simdata = run_warmup!(hs, sim_time(hs.sim) + hs.params.t_update; simdata=simdata, save_path=simdata_path)
-
-    # ================================ Step 3: Retrain AE ================================
-    AE_retrain_path = joinpath(root_path, AE_retrain_path)
-
-    retrain_normalizer = load_normalizer(AE_retrain_path)
-    ae_retrain_bundle, ae_retrain_args = load_trained_AE(AE_retrain_path)
-    ae_retrain_args.full_data_path = simdata_path
-    ae_retrain_args.train_downsample = 500
-
-
-    # ================================ Step 4: Retrain NODE ================================
-
-    @info "── Step 4/4: Retraining Neural ODE ──"
-    # ae_retrain_bundle = cpu_device()(ae_retrain_bundle)
-    GC.gc()
-    node_retrain_start = time()     
-    node_retrain_args = NodeArgs(
-        save_path=savedir,
-        extrapolate = false,
-        latent_dim = ae_args.latent_dim,
-        η = 0.01,              # lower LR for fine-tuning
-        maxiters = params.node_retrain_iters,          # more iterations
-        group_size = 20,         # keep tighter segments
-        continuity_term = 500,   # stronger continuity for stability
-        downsample = 500,  
-        retrain = true,
-        multiple_shooting = true,
-        use_gpu = false, 
-        node_checkpoint = node_path,
-    )
-
-    node_retrain, node_retrain_path = train_NODE(node_retrain_args;
-        ae_bundle = ae_retrain_bundle,
-        normalizer = retrain_normalizer, ae_args = ae_retrain_args,
-    )
-    node_retrain_elapsed = round((time() - node_retrain_start) / 60; digits=1)
-    @info "NODE retraining complete" elapsed_min=node_retrain_elapsed node_path=node_retrain_path
-
-    hs.aenode = AENODE(ae_retrain_bundle, node_retrain, ae_retrain_args, node_retrain_args, retrain_normalizer; verbose=true)
-    hs.AE_path = AE_retrain_path
-    hs.node_path = node_retrain_path
-    hs.retrain_needed = false
-    hs.step = 0
-    
-    push!(hs.mode_log, (t_start=sim_time(hs.sim), t_end=sim_time(hs.sim), mode="Restarted"))
+while sim_time(hs.sim) < hs.params.t_accel_end
     run_hybrid!(hs)
+    sim_time(hs.sim) >  hs.params.t_accel_end && break
 
-    if sim_time(hs.sim) < params.t_accel_end
-        simdata = run_warmup!(hs, params.t_accel_end; simdata=simdata, save_path=simdata_path)
+    if hs.retrain_needed
+        GC.gc()
+        @info "Retraining triggered at sim_time=$(sim_time(hs.sim)), step=$(hs.step)"
+        push!(hs.mode_log, (t_start=sim_time(hs.sim), t_end=sim_time(hs.sim), mode="Cutoff"))
+
+        println("continueing to run simulation without AENODE")
+
+        simdata = run_warmup!(hs, sim_time(hs.sim) + hs.params.t_update; simdata=simdata, save_path=simdata_path)
+        sim_time(hs.sim) >  hs.params.t_accel_end && break
+
+        # ================================ Step 3: Retrain AE ================================
+        AE_retrain_path = joinpath(root_path, AE_retrain_path)
+
+        retrain_normalizer = load_normalizer(AE_retrain_path)
+        ae_retrain_bundle, ae_retrain_args = load_trained_AE(AE_retrain_path)
+        ae_retrain_args.full_data_path = simdata_path
+        ae_retrain_args.train_downsample = 500
+
+
+        # ================================ Step 4: Retrain NODE ================================
+
+        @info "── Step 4/4: Retraining Neural ODE ──"
+        # ae_retrain_bundle = cpu_device()(ae_retrain_bundle)
+        GC.gc()
+        node_retrain_start = time()     
+        node_retrain_args = NodeArgs(
+            save_path=savedir,
+            latent_dim = ae_args.latent_dim,
+            η = 0.0075,              # lower LR for fine-tuning
+            maxiters = hs.params.node_retrain_iters,          # more iterations
+            group_size = hs.params.group_size,         # keep tighter segments
+            continuity_term = hs.params.continuity_term_retrain,   # stronger continuity for stability
+            downsample = hs.params.downsample,  
+            retrain = true,
+            multiple_shooting = true,
+            node_checkpoint = node_path,
+        )
+
+        node_retrain, node_retrain_path = train_NODE(node_retrain_args;
+            ae_bundle = ae_retrain_bundle,
+            normalizer = retrain_normalizer, ae_args = ae_retrain_args,
+        )
+        node_retrain_elapsed = round((time() - node_retrain_start) / 60; digits=1)
+        @info "NODE retraining complete" elapsed_min=node_retrain_elapsed node_path=node_retrain_path
+
+        hs.aenode = AENODE(ae_retrain_bundle, node_retrain, ae_retrain_args, node_retrain_args, retrain_normalizer; verbose=true)
+        hs.AE_path = AE_retrain_path
+        hs.node_path = node_retrain_path
+        hs.retrain_needed = false
+        hs.step = 0
+        
+        push!(hs.mode_log, (t_start=sim_time(hs.sim), t_end=sim_time(hs.sim), mode="Restarted"))
+
     end
 end
 

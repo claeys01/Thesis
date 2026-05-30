@@ -18,7 +18,7 @@ Base.@kwdef mutable struct NodeArgs
     multiple_shooting = true
     retrain = false
     node_checkpoint = ""
-    extrapolate = true
+    extrapolate = false
     group_size = 20
     continuity_term = 200
     save_path = "data/NODE_models"   # results dir
