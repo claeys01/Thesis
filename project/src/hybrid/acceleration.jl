@@ -217,22 +217,32 @@ end
 function plot_timing_bars(res::AccelResults)
     m = compute_metrics(res)
 
-    timing_vals = [m.ref_wall_per_ctu, m.hybrid_waterlily_wall_per_ctu,
-        m.hybrid_predict_wall_per_ctu, m.hybrid_wall_per_ctu]
+    timing_vals = [m.ref_wall_per_ctu, m.hybrid_wall_per_ctu, m.hybrid_waterlily_wall_per_ctu,m.hybrid_predict_wall_per_ctu]
+    # Reference sits apart; the three hybrid bars are spaced 1 unit apart with
+    # bar_width=1 so their edges meet (touch) while keeping a gap to Reference.
+    xs = [1.0, 2.5, 3.5, 4.5]
     plt_timing = bar(
-        ["Reference", "Hybrid\n(CFD)", "Hybrid\n(rollout)", "Hybrid\n(total)"],
-        timing_vals,
-        ylabel="Wall time per CTU (ms)", title="Cost per convective time unit",
+        xs, timing_vals,
+        ylabel="Wall time (ms)", title="Cost per convective time unit",
         legend=false, color=[:steelblue, :darkorange, :firebrick, :seagreen],
+        bar_width=1.0,
+        # bar_width=bar_widths,
+        alpha=[1, 1, 0.75, 0.75],
+        titlefontsize=14,
+        guidefontsize=12, tickfontsize=10, legendfontsize=9,
         framestyle=:box, size=(400, 350), dpi=500,
+        xticks=(xs, ["Reference", "Hybrid\n(total)", "Hybrid\n(CFD)", "Hybrid\n(rollout)"]),
+        # xlim=(0.3, 5.2),
         ylim=(0, maximum(timing_vals) * 1.15 + eps()))
 
     y_max = max(m.total_reference_wall, m.total_hybrid_wall)
     plt_total = bar(
-        ["WaterLily", "Hybrid"],
+        ["Reference", "Hybrid"],
         [m.total_reference_wall, m.total_hybrid_wall],
         ylabel="Wall time (s)", title="Total Simulation Time",
         legend=false, color=[:steelblue, :darkorange],
+        titlefontsize=14,
+        guidefontsize=12, tickfontsize=10, legendfontsize=9,
         framestyle=:box, size=(400, 350), dpi=500,
         ylim=(0, y_max + 10))
     # annotate!(plt_total, 2, m.total_hybrid_wall + 0.05 * y_max,
