@@ -41,8 +41,8 @@ wl_warmup_elapsed = round((time() - wl_warmup_start) / 60; digits=2)
 ae_start = time()
 
 ae_args = LuxArgs(
-        λ_div=Float64(0.0),
-        λ_curl=Float64(0.0),
+        λdiv=Float64(0.0),
+        λcurl=Float64(0.0),
         epochs=hs.params.ae_epochs, 
         save_path=savedir,
         train_downsample=hs.params.downsample,
