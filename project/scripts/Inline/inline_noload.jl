@@ -147,7 +147,7 @@ while sim_time(hs.sim) < hs.params.t_accel_end
         node_retrain_args = NodeArgs(
             save_path=savedir,
             latent_dim = ae_args.latent_dim,
-            η = 0.0075,              # lower LR for fine-tuning
+            η = 0.01,              # lower LR for fine-tuning
             maxiters = hs.params.node_retrain_iters,          # more iterations
             group_size = hs.params.group_size,         # keep tighter segments
             continuity_term = hs.params.continuity_term_retrain,   # stronger continuity for stability
