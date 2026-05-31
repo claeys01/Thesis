@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 #SBATCH --job-name="inline"
-#SBATCH --partition=gpu
+#SBATCH --partition=gpu-a100
 #SBATCH --output=logs/%x_%j.out
 #SBATCH --error=logs/%x_%j.err
 #SBATCH --time=02:00:00
