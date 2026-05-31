@@ -12,11 +12,14 @@
 #SBATCH --account=education-ME-msc-mt
 
 export JULIA_NUM_THREADS=$SLURM_CPUS_PER_TASK
-# NOTE: JULIA_CUDA_USE_BINARYBUILDER is a CUDA.jl 3.x flag and is a no-op in 5.x.
-# CUDA.jl uses its own toolkit artifact and ignores `module load cuda`, so the
-# only thing that matters here is the node's DRIVER version (see nvidia-smi below).
 export THESIS_HPC="true"
 export THESIS_USE_CUDA="true"
+
+# The V100 node's system driver (580 / CUDA 13.0) natively supports this GPU.
+# Force CUDA.jl to use that system driver instead of the forward-compatible
+# libcuda from CUDA_Driver_jll (reported as 13.1), which fails
+# cuDevicePrimaryCtxRetain with error 999 on Volta (sm_70). This is the fix.
+export JULIA_CUDA_USE_COMPAT=false
 
 echo "Running on host $(hostname)"
 echo "Using $JULIA_NUM_THREADS Julia threads"
@@ -37,23 +40,21 @@ echo "--- nvidia-smi (DRIVER VERSION is the smoking gun; compare to an A100 node
 nvidia-smi || echo "nvidia-smi not found"
 echo "--- /dev/nvidia-uvm (missing => 999 at context creation) ---"
 ls -l /dev/nvidia-uvm /dev/nvidiactl /dev/nvidia0 2>&1
-echo "--- CUDA.jl view (artifact CUDA version vs driver, functional, context retain) ---"
+echo "--- CUDA.jl view: loaded libcuda path + context retain (all merged to stdout) ---"
 julia --project=project -e '
-    using CUDA
+    using CUDA, Libdl
     CUDA.versioninfo()
-    @show CUDA.functional()
+    println("--- loaded libcuda (system path = good; artifact path = forward-compat) ---")
+    foreach(l -> occursin("libcuda", l) && println("  ", l), Libdl.dllist())
+    println("functional     = ", CUDA.functional())
+    try; println("driver_version = ", CUDA.driver_version()); catch e; println("driver_version FAILED: ", e); end
+    print("context retain = ")
     try
-        @show CUDA.driver_version()
+        CUDA.context(); println("OK  <<< GPU usable on this node")
     catch e
-        @warn "driver_version() failed" exception=e
+        println("FAILED 999  <<<"); showerror(stdout, e); println()
     end
-    try
-        CUDA.context()            # this is exactly where cuDevicePrimaryCtxRetain (999) fires
-        println(">>> context retain OK on this node")
-    catch e
-        @warn ">>> context retain FAILED (this is the 999)" exception=e
-    end
-' || echo "CUDA probe exited nonzero"
+' 2>&1 || echo "CUDA probe exited nonzero"
 echo "================================================"
 
 echo "Running inline_noload.jl"
