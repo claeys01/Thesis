@@ -92,6 +92,8 @@ hs.node_path = node_path
 # run_hybrid!(hs)
 while sim_time(hs.sim) < hs.params.t_accel_end
     run_hybrid!(hs)
+    global simdata
+
     sim_time(hs.sim) >  hs.params.t_accel_end && break
     if hs.retrain_needed
         GC.gc()
