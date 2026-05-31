@@ -64,8 +64,10 @@ end
 function run_warmup!(hs::HybridState, t_end; simdata::Union{SimData,Nothing}=nothing, u₀=nothing, save_path=nothing, 
     verbose=true, run_ref=true, save_gif=false)
     (; sim, ref_sim, res, mode_log) = hs
-
+    
+    @show size(sim.flow.u), size(u₀)
     if !isnothing(u₀) && size(sim.flow.u) == size(u₀)
+        @info "Initial condition set"
         sim.flow.u .= u₀
         ref_sim.flow.u .= u₀
     end
@@ -83,7 +85,7 @@ function run_warmup!(hs::HybridState, t_end; simdata::Union{SimData,Nothing}=not
     while sim_time(sim) < t_end && sim_time(sim) < hs.params.t_accel_end
         wall_time = @elapsed begin
             sim_step!(sim)
-            sync_device!()
+            # sync_device!()
         end
         # record_waterlily_step!(res, sim, wall_time)
 
@@ -115,6 +117,7 @@ function run_warmup!(hs::HybridState, t_end; simdata::Union{SimData,Nothing}=not
         run_ref && save_field_step!(hs, sim, ref_sim)
 
         hs.step += 1
+
     end
     verbose && @info "Warmup complete" sim_time = sim_time(sim) steps = hs.step - 1 samples = length(time_vec)
 

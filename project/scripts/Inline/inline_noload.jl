@@ -27,6 +27,9 @@ mkpath(savedir)
 simdata_path = joinpath(savedir, "U_inline.jld2")
 
 u₀ = load_u0(joinpath(root_path, "data/initial_fields/RE2500/2e8/u_0.jld2"))
+# WaterLily.flood(u₀[:,:, 1])
+# plt, _  = Thesis.velocity_flood(u₀)
+# display(plt)
 sim = circle_shedding_biot(; mem=Array, perturb=false)
 
 hs = HybridState(sim, nothing, params, savedir, nothing, nothing)

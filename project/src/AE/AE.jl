@@ -10,7 +10,7 @@ Base.@kwdef mutable struct LuxArgs
     batch_size::Int = 16                 # batch size
     t_training::Float64 = 16.603
     train_downsample::Int = 500          # amount of data used for training
-    test_downsample::Int = 500
+    test_downsample::Int = 200
     split::Float64 = 0.2
     epochs::Int = 1000                   # number of epochs
     seed::Int = 42                       # random seed
