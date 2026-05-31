@@ -22,7 +22,7 @@
 Base.@kwdef struct InlineParams
     t_run = 20
     t_train = 17.5
-    t_accel_end = 100
+    t_accel_end = 50
     t_update = 10
     ae_epochs = 500
     ae_retrain_epochs = 100
