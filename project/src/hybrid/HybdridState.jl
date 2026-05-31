@@ -65,7 +65,6 @@ function run_warmup!(hs::HybridState, t_end; simdata::Union{SimData,Nothing}=not
     verbose=true, run_ref=true, save_gif=false)
     (; sim, ref_sim, res, mode_log) = hs
     
-    @show size(sim.flow.u), size(u₀)
     if !isnothing(u₀) && size(sim.flow.u) == size(u₀)
         @info "Initial condition set"
         sim.flow.u .= u₀
