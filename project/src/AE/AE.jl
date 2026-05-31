@@ -22,8 +22,8 @@ Base.@kwdef mutable struct LuxArgs
     output_dim::Tuple{Int,Int,Int} = (2^8, 2^8, 2)  # size of reconstructed RHS field
     conv_kernel::Int = 3                 # DO NOT CHANGE
     pool_kernel::Int = 2                 # DO NOT CHANGE
-    n_conv::Int = 6                      # number of convolutional layers
-    n_dense::Int = 2                     # number of dense layers in bottleneck
+    n_conv::Int = 5                      # number of convolutional layers
+    n_dense::Int = 1                     # number of dense layers in bottleneck
     latent_dim::Int = 16                 # latent dimension
     stride::Int = 1                      # stride for convolutions
     C_base::Int = 8                      # first amount of channels for convs
