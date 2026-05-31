@@ -31,6 +31,6 @@ module load slurm
 echo "Finished loading modules"
 echo "Running inline_noload_finer.jl"
 
-srun julia --project=project project/scripts/Inline/inline_finer.jl
+srun julia --project=project project/scripts/Inline/inline_finer_new.jl
 
 echo "Finished at $(date)"
