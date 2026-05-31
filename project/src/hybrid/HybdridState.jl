@@ -1,35 +1,14 @@
-Base.@kwdef struct InlineParams
-    t_run = 20
-    t_train = 17.5
-    t_accel_end = 50
-    t_update = 10
-    ae_epochs = 4
-    ae_retrain_epochs = 2
-    ae_batch_size = 8
-    node_iters = 2
-    continuity_term = 250
-    node_retrain_iters = 2
-    continuity_term_retrain = 500
-    downsample=500
-    group_size=20
-    n_switch = 150
-    pred_Δt = 0.35
-    save_interval = 0.05
-    sample_interval = 0.0
-    max_retrain_flags = 3
-end
-
 # Base.@kwdef struct InlineParams
 #     t_run = 20
 #     t_train = 17.5
 #     t_accel_end = 50
 #     t_update = 10
-#     ae_epochs = 400
-#     ae_retrain_epochs = 100
+#     ae_epochs = 4
+#     ae_retrain_epochs = 2
 #     ae_batch_size = 8
-#     node_iters = 250
+#     node_iters = 2
 #     continuity_term = 250
-#     node_retrain_iters = 150
+#     node_retrain_iters = 2
 #     continuity_term_retrain = 500
 #     downsample=500
 #     group_size=20
@@ -39,6 +18,27 @@ end
 #     sample_interval = 0.0
 #     max_retrain_flags = 3
 # end
+
+Base.@kwdef struct InlineParams
+    t_run = 20
+    t_train = 17.5
+    t_accel_end = 50
+    t_update = 10
+    ae_epochs = 400
+    ae_retrain_epochs = 100
+    ae_batch_size = 8
+    node_iters = 250
+    continuity_term = 250
+    node_retrain_iters = 150
+    continuity_term_retrain = 500
+    downsample=500
+    group_size=20
+    n_switch = 150
+    pred_Δt = 0.35
+    save_interval = 0.05
+    sample_interval = 0.0
+    max_retrain_flags = 3
+end
 
 Base.@kwdef mutable struct HybridState
     sim::BiotSimulation
