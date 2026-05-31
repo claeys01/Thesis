@@ -22,13 +22,13 @@ end
 # AE_path = "data/saved_models/u/Lux/256h_16l/RE2500/2e8/TL1_E500_HW256x256_C4to2_nc6_nd2_z16_C8_lr0p001_wd0p0009_bs16_NY_LL1_Tl0p0/checkpoint.jld2"
 # AE_retrain_path = "data/saved_models/u/Lux/256h_16l/RE2500/2e8/TL2_E300_HW256x256_C4to2_nc6_nd2_z16_C8_lr0p0002_wd0p0009_bs16_NY_LL1_Tl0p0/checkpoint.jld2"
 
-AE_path = "data/saved_models/inline_runs_hpc/ae500_lat16_nit250_gs10/AE_May26-0321__E500_HW256x256_C4to2_nc6_nd1_z16_C8_lr0p001_wd0p0009_bs16_NY_LL1_Tl0p0/checkpoint.jld2"
-AE_retrain_path = "data/saved_models/inline_runs_hpc/ae500_lat16_nit250_gs10/AE_May26-0337__E100_HW256x256_C4to2_nc6_nd1_z16_C8_lr0p0002_wd0p0009_bs16_NY_LL1_Tl0p0/checkpoint.jld2"
+# AE_path = "data/saved_models/inline_runs_hpc/ae500_lat16_nit250_gs10/AE_May26-0321__E500_HW256x256_C4to2_nc6_nd1_z16_C8_lr0p001_wd0p0009_bs16_NY_LL1_Tl0p0/checkpoint.jld2"
+# AE_retrain_path = "data/saved_models/inline_runs_hpc/ae500_lat16_nit250_gs10/AE_May26-0337__E100_HW256x256_C4to2_nc6_nd1_z16_C8_lr0p0002_wd0p0009_bs16_NY_LL1_Tl0p0/checkpoint.jld2"
 
 # AE_path = "data/saved_models/inline_runs_hpc/latent_epoch_sweep/ae_epochs_250_latent_16/AE_May24-0739__E250_HW256x256_C4to2_nc6_nd1_z16_C8_lr0p001_wd0p0009_bs16_NY_LL1_Tl0p0/checkpoint.jld2"
 # AE_retrain_path = "data/saved_models/inline_runs_hpc/latent_epoch_sweep/ae_epochs_250_latent_16/AE_May24-0749__E100_HW256x256_C4to2_nc6_nd1_z16_C8_lr0p0002_wd0p0009_bs16_NY_LL1_Tl0p0/checkpoint.jld2"
 
-# AE_path = "data/saved_models/inline_runs_hpc/latent_epoch_sweep/ae_epochs_100_latent_16/AE_May24-0724__E100_HW256x256_C4to2_nc6_nd1_z16_C8_lr0p001_wd0p0009_bs16_NY_LL1_Tl0p0/checkpoint.jld2"
+AE_path = "data/saved_models/Thesis_definite_models/2e8/RE2500/AE_TL1/checkpoint.jld2"
 # AE_retrain_path = "data/saved_models/inline_runs_hpc/latent_epoch_sweep/ae_epochs_100_latent_16/AE_May24-0734__E100_HW256x256_C4to2_nc6_nd1_z16_C8_lr0p0002_wd0p0009_bs16_NY_LL1_Tl0p0/checkpoint.jld2"
 
 params = InlineParams()
@@ -64,7 +64,7 @@ node_args = NodeArgs(
         save_path=savedir,
         maxiters = params.node_iters,
         downsample=ae_args.train_downsample,
-        group_size=hs.params.group_size,
+        group_size=15,
         continuity_term=hs.params.continuity_term,
         latent_dim = ae_args.latent_dim,
     )
@@ -87,9 +87,10 @@ hs.aenode = aenode
 hs.AE_path = AE_path
 hs.node_path = node_path
 
-# run_hybrid!(hs)
+run_hybrid!(hs)
 
-while sim_time(hs.sim) < hs.params.t_accel_end
+# while sim_time(hs.sim) < hs.params.t_accel_end
+while false
     run_hybrid!(hs)
     sim_time(hs.sim) >  hs.params.t_accel_end && break
 

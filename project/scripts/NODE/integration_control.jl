@@ -56,61 +56,6 @@ z̃_norms = norm.(eachcol(z̃))
 #     threshold::Float64
 # end
 
-# function fit_mahalanobis_ood(Ztrain::AbstractMatrix; q=0.99, reg=1e-6)
-#     # columns = samples
-#     μ = vec(mean(Ztrain, dims=2))
-    
-#     Σ = cov(Ztrain, dims=2)
-    
-#     # regularization for numerical stability
-#     Σreg = Σ + reg * I(size(Σ, 1))
-#     Σinv = inv(Matrix(Σreg))
-    
-#     # distances of training points to define threshold
-#     dists = [sqrt(dot(Ztrain[:, i] - μ, Σinv * (Ztrain[:, i] - μ))) for i in axes(Ztrain, 2)]
-#     @show size(dists[1])
-#     threshold = quantile(dists, q)
-    
-#     return MahalanobisOOD(μ, Σinv, threshold)
-# end
-
-# train_OOD = fit_mahalanobis_ood(latent_data.z_train)
-# @show typeof(train_OOD.threshold)
-
-# function score(model::MahalanobisOOD, z::AbstractVector)
-#     δ = z - model.μ
-#     return sqrt(dot(δ, model.Σinv * δ))
-# end
-# using NearestNeighbors, Statistics
-
-# struct KNNOOD
-#     tree::KDTree
-#     Ztrain::Matrix{Float64}
-#     k::Int
-#     threshold::Float64
-# end
-
-# function fit_knn_ood(Ztrain::AbstractMatrix; k=5, q=0.99)
-#     tree = KDTree(Ztrain)
-    
-#     # score each training point against its neighbors
-#     # first neighbor is itself, so use k+1 and skip first
-#     train_scores = Float64[]
-#     for i in axes(Ztrain, 2)
-#         idxs, dists = knn(tree, Ztrain[:, i], k + 1, true)
-#         # @show dists
-#         push!(train_scores, mean(dists[2:end]))
-#     end
-    
-#     threshold = quantile(train_scores, q)
-#     # display(plot(train_scores))
-#     return KNNOOD(tree, Matrix(Ztrain), k, threshold)
-# end
-
-# function KNN_score(model::KNNOOD, z::AbstractVector)
-#     idxs, dists = knn(model.tree, z, model.k, true)
-#     return mean(dists)
-# end
 
 # z_train, _, _, _ = Thesis.get_NODE_data(aenode.node_args.train_latent_path)
 z_train = latent_data.z_train

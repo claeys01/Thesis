@@ -10,7 +10,7 @@ mutable struct AENODE{P,S}
     ae_state::S
 end
 
-function AENODE(AE_path::String, NODE_path::String; verbose=false, k=5, q=0.99)
+function AENODE(AE_path::String, NODE_path::String; verbose=false, k=5, q=0.999)
     ae_bundle, ae_args = load_trained_AE(AE_path; return_params=true)
     normalizer = load_normalizer(AE_path)
     node, node_args = load_node(NODE_path; verbose=verbose)
@@ -23,7 +23,7 @@ function AENODE(AE_path::String, NODE_path::String; verbose=false, k=5, q=0.99)
     return AENODE(ae_bundle, node, ae_args, node_args, normalizer; verbose=verbose, k=k, q=q)
 end
 
-function AENODE(ae_bundle, node::NODE, ae_args::LuxArgs, node_args::NodeArgs, normalizer::Normalizer; verbose=false, k=5, q=0.99)
+function AENODE(ae_bundle, node::NODE, ae_args::LuxArgs, node_args::NodeArgs, normalizer::Normalizer; verbose=false, k=5, q=0.999)
     knnood = fit_knn_ood(get_latent_vectors(ae_bundle, normalizer, ae_args; downsample=node_args.downsample)[1], k=k, q=q)
     dev = get_device()
     # node.p0 = cpu_device()(node.p0)

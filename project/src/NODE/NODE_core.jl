@@ -12,7 +12,7 @@ Base.@kwdef mutable struct NodeArgs
     activation = tanhshrink
     n_reconstruct = 4
     downsample = 500
-    test_downsample = 500
+    test_downsample = 200
     clip_bc = true
     use_gpu = false             # use GPU
     multiple_shooting = true
