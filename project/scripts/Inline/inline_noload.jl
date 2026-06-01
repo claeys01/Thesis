@@ -116,7 +116,7 @@ while sim_time(hs.sim) < hs.params.t_accel_end
         @info "WaterLily cutoff run complete" elapsed_min=wl_cutoff_elapsed t_simulated=(sim_time(hs.sim) - t_before)
 
         sim_time(hs.sim) >  hs.params.t_accel_end && break
-        hs.params.downsample = hs.params.downsample * simdata.chunks * 100
+        hs.params.downsample = hs.params.downsample * length(simdata.chunk_ranges) * 100
         # ================================ Step 3: Retrain AE ================================
         ae_retrain_start = time()
         ae_retrain_args = LuxArgs(
