@@ -131,7 +131,7 @@ function run_warmup!(hs::HybridState, t_end; simdata::Union{SimData,Nothing}=not
             push!(time_vec, res.hybrid_time_wat[end])
             push!(Δt_vec, Float32(round(sim.flow.Δt[end], digits=3)))
             hs.next_sample = sim_time(sim) + hs.params.sample_interval
-            # verbose && @info "Updating simdata statistics at: $(sim_time(sim))"
+            verbose && @info "Updating simdata statistics at: $(sim_time(sim))"
         end
 
         run_ref && save_field_step!(hs, sim, ref_sim)

@@ -22,12 +22,12 @@ end
 
 params = InlineParams()
 
-savedir = joinpath(root_path, "data", "inline_runs","RE250_", Dates.format(now(), "yyyy-mm-dd_HH-MM"))
+savedir = joinpath(root_path, "data", "inline_runs","RE250", Dates.format(now(), "yyyy-mm-dd_HH-MM"))
 mkpath(savedir)
 simdata_path = joinpath(savedir, "U_inline_RE250.jld2")
 
 u₀ = load_u0(joinpath(root_path, "data/initial_fields/RE250/2e8/u_0.jld2"))
-sim = circle_shedding_biot(; mem=Array, perturb=false)
+sim = circle_shedding_biot(; Re=250, mem=Array, perturb=false)
 
 hs = HybridState(sim, nothing, params, savedir, nothing, nothing)
 
