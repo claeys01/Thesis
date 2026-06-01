@@ -9,7 +9,7 @@
 #SBATCH --cpus-per-task=12
 #SBATCH --gpus-per-task=1
 #SBATCH --mem-per-cpu=4G
-#SBATCH --account=education-ME-msc-mt
+#SBATCH --account=research-me-mtt
 
 export JULIA_NUM_THREADS=$SLURM_CPUS_PER_TASK
 export THESIS_HPC="true"
