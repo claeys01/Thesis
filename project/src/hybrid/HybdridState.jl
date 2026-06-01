@@ -251,17 +251,14 @@ function run_hybrid!(hs::HybridState; verbose=true)
         # if hs.step % params.n_switch == 0 && sim_time(sim) > aenode.ae_args.t_training
         if hs.step % params.n_switch == 0
             sim_time_before = sim_time(sim)
-            predict_wall_time = @elapsed begin
-                sim, n_integr, retrain_required, û_meanflow, t_meanflow = predict_flex(
-                    aenode,
-                    sim;
-                    Δt=Float32(params.pred_Δt),
-                    impose_biot=true,
-                    next_save=hs.next_save,
-                    save_interval=params.save_interval,
-                )
-                sync_device!()
-            end
+            sim, n_integr, retrain_required, û_meanflow, t_meanflow, predict_wall_time = predict_flex(
+                aenode,
+                sim;
+                Δt=Float32(params.pred_Δt),
+                impose_biot=true,
+                next_save=hs.next_save,
+                save_interval=params.save_interval,
+            )
             if retrain_required
                 retrain_req_counter += 1
                 push!(mode_log, (t_start=sim_time(sim), t_end=sim_time(sim), mode="Retrain flag"))

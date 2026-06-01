@@ -94,7 +94,7 @@ end
 
 function predict_flex(aenode::AENODE, sim::BiotSimulation; 
     Δt::Float32=0.35f0, impose_biot=false, next_save=0.25, save_interval=0.25, verbose=true)
-    û, n_integr, retrain_required, û_meanflow, t_meanflow = predict_flex(
+    û, n_integr, retrain_required, û_meanflow, t_meanflow, rollout_time = predict_flex(
         aenode,
         sim.flow.u,
         sim.flow.μ₀,
@@ -106,15 +106,20 @@ function predict_flex(aenode::AENODE, sim::BiotSimulation;
         L=sim.L
     )
     if isnothing(û)
-        return sim, n_integr, retrain_required, nothing, nothing
+        return sim, n_integr, retrain_required, nothing, nothing, rollout_time
     end
     apply_prediction!(sim, û, Δt, n_integr; impose_biot=impose_biot)
-    return sim, n_integr, retrain_required, û_meanflow, t_meanflow
+    return sim, n_integr, retrain_required, û_meanflow, t_meanflow, rollout_time
 end
 
 function predict_flex(aenode::AENODE, u::AbstractArray, μ₀::AbstractArray, t₀::Float32; 
     Δt::Float32=0.35f0, next_save=0.25, save_interval=0.25, verbose=true, L=32.0f0)
-    z, μ₀ = encode_flow(aenode, u, μ₀)
+    # Only the encode → rollout → final decode is timed. The intermediate flow
+    # reconstructions needed to update the MeanFlow are excluded.
+    rollout_time = @elapsed begin
+        z, μ₀ = encode_flow(aenode, u, μ₀)
+        sync_device!()
+    end
     retrain_required = false
     knn_score = KNN_score(aenode.knn_ood, z)
     if knn_score > aenode.knn_ood.threshold
@@ -122,39 +127,45 @@ function predict_flex(aenode::AENODE, u::AbstractArray, μ₀::AbstractArray, t�
         # return nothing, 0, true, nothing, nothing
     end
 
-    # NODE integration untill cutoff criteria is met.
-    tₙ = t₀ + Δt/L
-    n_integr = 1
-    z̃ = predict_array(aenode.NODE,  z; t=[t₀, tₙ], onlysol=true)[:, end]
-
-    z̃_meanflow = Vector{typeof(z̃)}()
     t_meanflow = Float32[]
-
-    while true 
-        knn_score = KNN_score(aenode.knn_ood, z̃)
-        if knn_score > aenode.knn_ood.threshold
-            verbose && @warn "NODE integration too far outside of training distances, cutting of integration after $n_integr steps" knn_score threshold=aenode.knn_ood.threshold
-            retrain_required = true
-            break
-        elseif tₙ ≥ next_save
-            verbose && @info "Latent vector saved for correctly updating MeanFlow "
-            push!(z̃_meanflow, z̃)
-            push!(t_meanflow, tₙ)
-
-            next_save = tₙ + save_interval
-        end
-
-        tₙ += Δt/L
+    # NODE integration untill cutoff criteria is met.
+    rollout_time += @elapsed begin
+        tₙ = t₀ + Δt/L
+        n_integr = 1
         z̃ = predict_array(aenode.NODE,  z; t=[t₀, tₙ], onlysol=true)[:, end]
-        n_integr += 1
+
+        z̃_meanflow = Vector{typeof(z̃)}()
+
+        while true
+            knn_score = KNN_score(aenode.knn_ood, z̃)
+            if knn_score > aenode.knn_ood.threshold
+                verbose && @warn "NODE integration too far outside of training distances, cutting of integration after $n_integr steps" knn_score threshold=aenode.knn_ood.threshold
+                retrain_required = true
+                break
+            elseif tₙ ≥ next_save
+                verbose && @info "Latent vector saved for correctly updating MeanFlow "
+                push!(z̃_meanflow, z̃)
+                push!(t_meanflow, tₙ)
+
+                next_save = tₙ + save_interval
+            end
+
+            tₙ += Δt/L
+            z̃ = predict_array(aenode.NODE,  z; t=[t₀, tₙ], onlysol=true)[:, end]
+            n_integr += 1
+        end
+        sync_device!()
     end
     û_meanflow = nothing
     if !isempty(z̃_meanflow)
         saved_z̃ = hcat(z̃_meanflow...)
         û_meanflow = decode_flow(aenode, saved_z̃, μ₀)
     end
-    û = decode_flow(aenode, z̃[:, end], μ₀)
-    return û, n_integr, retrain_required, û_meanflow, t_meanflow
+    rollout_time += @elapsed begin
+        û = decode_flow(aenode, z̃[:, end], μ₀)
+        sync_device!()
+    end
+    return û, n_integr, retrain_required, û_meanflow, t_meanflow, rollout_time
 end
 
 
