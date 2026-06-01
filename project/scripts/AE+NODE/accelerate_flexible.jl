@@ -79,7 +79,8 @@ while sim_time(sim) < t_end
     step += 1
 end
 
-print_metrics(res; pred_label="(flexible OOD)", avg_steps_per_pred=mean(n_integrs))
+print_metrics(res; pred_label="(flexible OOD)", avg_steps_per_pred=mean(n_integrs),
+    sim_meanflow=sim_meanflow, ref_meanflow=ref_meanflow)
 
 plt_combined = plot_accel_combined(res, t_train, t_test, t_end)
 rst_comp_plot = plot_rst_comparison(sim_meanflow, ref_meanflow)

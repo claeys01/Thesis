@@ -355,7 +355,8 @@ function save_results(hs::HybridState)
         sim_meanflow, ref_meanflow, gif_frames, AE_path, node_path, mode_log) = hs
 
     print_metrics(res; pred_label="(flexible OOD)",
-        avg_steps_per_pred=isempty(n_integrs) ? nothing : mean(n_integrs))
+        avg_steps_per_pred=isempty(n_integrs) ? nothing : mean(n_integrs),
+        sim_meanflow=sim_meanflow, ref_meanflow=ref_meanflow)
 
     plt_combined = plot_accel_combined(res, params.t_accel_end; mode_log=mode_log)
     display(plt_combined)

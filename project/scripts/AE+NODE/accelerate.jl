@@ -72,7 +72,7 @@ end
 
 plot_logger("$(cID).log")
 
-print_metrics(res; pred_label="(n=$n_pred fixed)")
+print_metrics(res; pred_label="(n=$n_pred fixed)", sim_meanflow=sim_meanflow, ref_meanflow=ref_meanflow)
 
 plt_combined = plot_accel_combined(res, t_train, t_test, t_end)
 rst_comp_plot = plot_rst_comparison(sim_meanflow, ref_meanflow)

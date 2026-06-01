@@ -120,7 +120,25 @@ function compute_metrics(res::AccelResults)
     )
 end
 
-function print_metrics(res::AccelResults; pred_label="", avg_steps_per_pred=nothing)
+function meanflow_errors(sim_meanflow, ref_meanflow)
+    relerr(a, b) = sqrt(sum(abs2, a .- b)) / max(sqrt(sum(abs2, b)), eps(eltype(b))) * 100
+
+    sim_u, sim_v = sim_meanflow.U[:, :, 1], sim_meanflow.U[:, :, 2]
+    ref_u, ref_v = ref_meanflow.U[:, :, 1], ref_meanflow.U[:, :, 2]
+    u_rel = relerr(sim_u, ref_u)
+    v_rel = relerr(sim_v, ref_v)
+
+    τ     = WaterLily.uu(sim_meanflow)
+    τ_ref = WaterLily.uu(ref_meanflow)
+    uu_rel = relerr(τ[:, :, 1, 1], τ_ref[:, :, 1, 1])
+    vv_rel = relerr(τ[:, :, 2, 2], τ_ref[:, :, 2, 2])
+    uv_rel = relerr(τ[:, :, 2, 1], τ_ref[:, :, 2, 1])
+
+    return (; u_rel, v_rel, uu_rel, vv_rel, uv_rel)
+end
+
+function print_metrics(res::AccelResults; pred_label="", avg_steps_per_pred=nothing,
+    sim_meanflow=nothing, ref_meanflow=nothing)
     m = compute_metrics(res)
 
     println("\n" * "="^60)
@@ -163,6 +181,16 @@ function print_metrics(res::AccelResults; pred_label="", avg_steps_per_pred=noth
     println("-"^60)
     println("Abs Err   - Drag mean:  $(round(m.abs_err.drag_mean, digits=5)),   Lift RMS: $(round(m.abs_err.lift_rms, digits=5))")
     println("Rel Err   - Drag mean:  $(round(m.rel_err.drag_mean, digits=5)) %, Lift RMS: $(round(m.rel_err.lift_rms, digits=5)) %")
+
+    if !isnothing(sim_meanflow) && !isnothing(ref_meanflow)
+        fe = meanflow_errors(sim_meanflow, ref_meanflow)
+        println("\n" * "="^60)
+        println("FIELD ANALYSIS")
+        println("="^60 * "\n")
+        println("Rel Err (L2) - Mean flow ⟨u⟩: $(round(fe.u_rel, digits=3)) %,  ⟨v⟩: $(round(fe.v_rel, digits=3)) %")
+        println("Rel Err (L2) - RST ⟨u'u'⟩: $(round(fe.uu_rel, digits=3)) %,  ⟨v'v'⟩: $(round(fe.vv_rel, digits=3)) %,  ⟨u'v'⟩: $(round(fe.uv_rel, digits=3)) %")
+    end
+
     println("\n" * "="^60)
 end
 
