@@ -26,7 +26,7 @@ Base.@kwdef struct InlineParams
     t_update = 10
     ae_epochs = 500
     ae_retrain_epochs = 100
-    ae_batch_size = 8
+    ae_batch_size = 16
     node_iters = 250
     continuity_term = 250
     node_retrain_iters = 150
