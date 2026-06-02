@@ -22,6 +22,7 @@ end
 
 params = InlineParams(
     sample_interval = 0.005,
+    t_accel_end=100,
 )
 
 savedir = joinpath(root_path, "data", "inline_runs", "finer_" * Dates.format(now(), "yyyy-mm-dd_HH-MM"))
@@ -101,91 +102,91 @@ node_retrain_elapsed_total = 0.0
 wl_cutoff_elapsed_total = 0.0
 retrain_timings = NamedTuple[]   # one entry per completed retrain cycle
 
-run_hybrid!(hs)
-# while sim_time(hs.sim) < hs.params.t_accel_end
-#     run_hybrid!(hs)
-#     global simdata, ae_retrain_elapsed_total, node_retrain_elapsed_total, wl_cutoff_elapsed_total
-#     sim_time(hs.sim) >  hs.params.t_accel_end && break
-#     if hs.retrain_needed
-#         GC.gc()
-#         @info "Retraining triggered at sim_time=$(sim_time(hs.sim)), step=$(hs.step)"
-#         push!(hs.mode_log, (t_start=sim_time(hs.sim), t_end=sim_time(hs.sim), mode="Cutoff"))
+# run_hybrid!(hs)
+while sim_time(hs.sim) < hs.params.t_accel_end
+    run_hybrid!(hs)
+    global simdata, ae_retrain_elapsed_total, node_retrain_elapsed_total, wl_cutoff_elapsed_total
+    sim_time(hs.sim) >  hs.params.t_accel_end && break
+    if hs.retrain_needed
+        GC.gc()
+        @info "Retraining triggered at sim_time=$(sim_time(hs.sim)), step=$(hs.step)"
+        push!(hs.mode_log, (t_start=sim_time(hs.sim), t_end=sim_time(hs.sim), mode="Cutoff"))
 
-#         println("continueing to run simulation without AENODE")
+        println("continueing to run simulation without AENODE")
 
-#         wl_cutoff_start = time()
-#         t_before = sim_time(hs.sim)
-#         simdata = run_warmup!(hs, sim_time(hs.sim) + hs.params.t_update; simdata=simdata, save_path=simdata_path)
+        wl_cutoff_start = time()
+        t_before = sim_time(hs.sim)
+        simdata = run_warmup!(hs, sim_time(hs.sim) + hs.params.t_update; simdata=simdata, save_path=simdata_path)
 
-#         wl_cutoff_elapsed = round((time() - wl_cutoff_start) / 60; digits=2)
-#         wl_cutoff_elapsed_total += wl_cutoff_elapsed
-#         @info "WaterLily cutoff run complete" elapsed_min=wl_cutoff_elapsed t_simulated=(sim_time(hs.sim) - t_before)
+        wl_cutoff_elapsed = round((time() - wl_cutoff_start) / 60; digits=2)
+        wl_cutoff_elapsed_total += wl_cutoff_elapsed
+        @info "WaterLily cutoff run complete" elapsed_min=wl_cutoff_elapsed t_simulated=(sim_time(hs.sim) - t_before)
 
-#         sim_time(hs.sim) >  hs.params.t_accel_end && break
+        sim_time(hs.sim) >  hs.params.t_accel_end && break
 
-#         # ================================ Step 3: Retrain AE ================================
-#         ae_retrain_start = time()
-#         ae_retrain_args = LuxArgs(
-#             η = 2e-4,
-#             epochs=hs.params.ae_retrain_epochs,
-#             batch_size=4,
-#             t_training=simdata.time[end] * 0.85 ,
-#             train_downsample=hs.params.downsample,
-#             retrain=true,
-#             checkpoint_path=hs.AE_path,
-#             save_path=savedir,
-#             full_data_path=simdata_path,
-#             simdata_ram=simdata,
-#             input_dim = (2^9, 2^9, 4),
-#             output_dim = (2^9, 2^9, 2),
-#             n_conv = 8,
-#             n_dense = 2,
-#         )
+        # ================================ Step 3: Retrain AE ================================
+        ae_retrain_start = time()
+        ae_retrain_args = LuxArgs(
+            η = 2e-4,
+            epochs=hs.params.ae_retrain_epochs,
+            batch_size=4,
+            t_training=simdata.time[end] * 0.85 ,
+            train_downsample=hs.params.downsample,
+            retrain=true,
+            checkpoint_path=hs.AE_path,
+            save_path=savedir,
+            full_data_path=simdata_path,
+            simdata_ram=simdata,
+            input_dim = (2^9, 2^9, 4),
+            output_dim = (2^9, 2^9, 2),
+            n_conv = 8,
+            n_dense = 2,
+        )
 
-#         ae_retrain_bundle, AE_retrain_path = train_AE(ae_retrain_args; return_path=true)
-#         retrain_normalizer = load_normalizer(AE_retrain_path)
-#         ae_retrain_elapsed = round((time() - ae_retrain_start) / 60; digits=1)
-#         ae_retrain_elapsed_total += ae_retrain_elapsed
-#         @info "AE retraining complete" elapsed_min=ae_retrain_elapsed checkpoint=AE_path
+        ae_retrain_bundle, AE_retrain_path = train_AE(ae_retrain_args; return_path=true)
+        retrain_normalizer = load_normalizer(AE_retrain_path)
+        ae_retrain_elapsed = round((time() - ae_retrain_start) / 60; digits=1)
+        ae_retrain_elapsed_total += ae_retrain_elapsed
+        @info "AE retraining complete" elapsed_min=ae_retrain_elapsed checkpoint=AE_path
 
-#         # ================================ Step 4: Retrain NODE ================================
+        # ================================ Step 4: Retrain NODE ================================
 
-#         @info "── Step 4/4: Retraining Neural ODE ──"
-#         ae_retrain_bundle = cpu_device()(ae_retrain_bundle)
-#         GC.gc()
-#         node_retrain_start = time()
-#         node_retrain_args = NodeArgs(
-#             save_path=savedir,
-#             latent_dim = ae_args.latent_dim,
-#             η = 0.0075,              # lower LR for fine-tuning
-#             maxiters = hs.params.node_retrain_iters,          # more iterations
-#             group_size = hs.params.group_size,         # keep tighter segments
-#             continuity_term = hs.params.continuity_term_retrain,   # stronger continuity for stability
-#             downsample = hs.params.downsample,
-#             retrain = true,
-#             multiple_shooting = true,
-#             node_checkpoint = node_path,
-#         )
+        @info "── Step 4/4: Retraining Neural ODE ──"
+        ae_retrain_bundle = cpu_device()(ae_retrain_bundle)
+        GC.gc()
+        node_retrain_start = time()
+        node_retrain_args = NodeArgs(
+            save_path=savedir,
+            latent_dim = ae_args.latent_dim,
+            η = 0.0075,              # lower LR for fine-tuning
+            maxiters = hs.params.node_retrain_iters,          # more iterations
+            group_size = hs.params.group_size,         # keep tighter segments
+            continuity_term = hs.params.continuity_term_retrain,   # stronger continuity for stability
+            downsample = hs.params.downsample,
+            retrain = true,
+            multiple_shooting = true,
+            node_checkpoint = node_path,
+        )
 
-#         node_retrain, node_retrain_path = train_NODE(node_retrain_args;
-#             ae_bundle = ae_retrain_bundle,
-#             normalizer = retrain_normalizer, ae_args = ae_retrain_args,
-#         )
-#         node_retrain_elapsed = round((time() - node_retrain_start) / 60; digits=1)
-#         node_retrain_elapsed_total += node_retrain_elapsed
-#         @info "NODE retraining complete" elapsed_min=node_retrain_elapsed node_path=node_retrain_path
+        node_retrain, node_retrain_path = train_NODE(node_retrain_args;
+            ae_bundle = ae_retrain_bundle,
+            normalizer = retrain_normalizer, ae_args = ae_retrain_args,
+        )
+        node_retrain_elapsed = round((time() - node_retrain_start) / 60; digits=1)
+        node_retrain_elapsed_total += node_retrain_elapsed
+        @info "NODE retraining complete" elapsed_min=node_retrain_elapsed node_path=node_retrain_path
 
-#         push!(retrain_timings, (wl_cutoff=wl_cutoff_elapsed, ae=ae_retrain_elapsed, node=node_retrain_elapsed))
+        push!(retrain_timings, (wl_cutoff=wl_cutoff_elapsed, ae=ae_retrain_elapsed, node=node_retrain_elapsed))
 
-#         hs.aenode = AENODE(ae_retrain_bundle, node_retrain, ae_retrain_args, node_retrain_args, retrain_normalizer; verbose=true)
-#         hs.AE_path = AE_retrain_path
-#         hs.node_path = node_retrain_path
-#         hs.retrain_needed = false
-#         hs.step = 0
+        hs.aenode = AENODE(ae_retrain_bundle, node_retrain, ae_retrain_args, node_retrain_args, retrain_normalizer; verbose=true)
+        hs.AE_path = AE_retrain_path
+        hs.node_path = node_retrain_path
+        hs.retrain_needed = false
+        hs.step = 0
 
-#         push!(hs.mode_log, (t_start=sim_time(hs.sim), t_end=sim_time(hs.sim), mode="Restarted"))
-#     end
-# end
+        push!(hs.mode_log, (t_start=sim_time(hs.sim), t_end=sim_time(hs.sim), mode="Restarted"))
+    end
+end
 
 save_results(hs)
 
