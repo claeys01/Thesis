@@ -51,7 +51,7 @@ ae_args = LuxArgs(
         simdata_ram=simdata,
         input_dim = (2^9, 2^9, 4),   # flow field size with μ₀ concatenated
         output_dim = (2^9, 2^9, 2),  # size of reconstructed RHS field
-        n_conv = 8,
+        n_conv = 6,
         batch_size=4,
         n_dense= 2,
     )

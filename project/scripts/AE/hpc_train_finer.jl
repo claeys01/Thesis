@@ -66,8 +66,8 @@ ae_args = LuxArgs(
         n_conv = 8,
         n_dense= 2,
         t_training=params.t_train,
-        full_data_path=simdata_path, 
-        simdata_ram=simdata,
+        # full_data_path=simdata_path, 
+        # simdata_ram=simdata,
     )
 
 ae_bundle, AE_path = train_AE(ae_args; return_path=true)
