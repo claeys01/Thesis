@@ -116,7 +116,7 @@ while sim_time(hs.sim) < hs.params.t_accel_end
         @info "WaterLily cutoff run complete" elapsed_min=wl_cutoff_elapsed t_simulated=(sim_time(hs.sim) - t_before)
 
         sim_time(hs.sim) >  hs.params.t_accel_end && break
-        hs.params.downsample = hs.params.downsample * length(simdata.chunk_ranges) * 100
+        # hs.params.downsample = hs.params.downsample * 
         # ================================ Step 3: Retrain AE ================================
         ae_retrain_start = time()
         ae_retrain_args = LuxArgs(
@@ -124,7 +124,7 @@ while sim_time(hs.sim) < hs.params.t_accel_end
             epochs=hs.params.ae_retrain_epochs,
             batch_size=hs.params.ae_batch_size,
             t_training=simdata.time[end] * 0.85 ,
-            train_downsample=hs.params.downsample,
+            train_downsample=hs.params.downsample + (length(simdata.chunk_ranges) * 100),
             retrain=true,
             checkpoint_path=hs.AE_path,
             save_path=savedir,
@@ -151,7 +151,7 @@ while sim_time(hs.sim) < hs.params.t_accel_end
             maxiters = hs.params.node_retrain_iters,          # more iterations
             group_size = hs.params.group_size,         # keep tighter segments
             continuity_term = hs.params.continuity_term_retrain,   # stronger continuity for stability
-            downsample = hs.params.downsample,  
+            downsample = hs.params.downsample + (length(simdata.chunk_ranges) * 100),  
             retrain = true,
             multiple_shooting = true,
             node_checkpoint = node_path,

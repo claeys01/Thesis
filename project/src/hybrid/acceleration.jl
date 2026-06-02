@@ -121,20 +121,21 @@ function compute_metrics(res::AccelResults)
 end
 
 function meanflow_errors(sim_meanflow, ref_meanflow)
-    relerr(a, b) = sqrt(sum(abs2, a .- b)) / max(sqrt(sum(abs2, b)), eps(eltype(b))) * 100
+    rel_l1(a, b) = mean(abs, a .- b) / mean(abs.(b))
+    stats(a, b) = (l1 = rel_l1(a, b), ρ = cor(vec(a), vec(b)))
 
     sim_u, sim_v = sim_meanflow.U[:, :, 1], sim_meanflow.U[:, :, 2]
     ref_u, ref_v = ref_meanflow.U[:, :, 1], ref_meanflow.U[:, :, 2]
-    u_rel = relerr(sim_u, ref_u)
-    v_rel = relerr(sim_v, ref_v)
+    u  = stats(sim_u, ref_u)
+    v  = stats(sim_v, ref_v)
 
     τ     = WaterLily.uu(sim_meanflow)
     τ_ref = WaterLily.uu(ref_meanflow)
-    uu_rel = relerr(τ[:, :, 1, 1], τ_ref[:, :, 1, 1])
-    vv_rel = relerr(τ[:, :, 2, 2], τ_ref[:, :, 2, 2])
-    uv_rel = relerr(τ[:, :, 2, 1], τ_ref[:, :, 2, 1])
+    uu = stats(τ[:, :, 1, 1], τ_ref[:, :, 1, 1])
+    vv = stats(τ[:, :, 2, 2], τ_ref[:, :, 2, 2])
+    uv = stats(τ[:, :, 2, 1], τ_ref[:, :, 2, 1])
 
-    return (; u_rel, v_rel, uu_rel, vv_rel, uv_rel)
+    return (; u, v, uu, vv, uv)
 end
 
 function print_metrics(res::AccelResults; pred_label="", avg_steps_per_pred=nothing,
@@ -187,8 +188,10 @@ function print_metrics(res::AccelResults; pred_label="", avg_steps_per_pred=noth
         println("\n" * "="^60)
         println("FIELD ANALYSIS")
         println("="^60 * "\n")
-        println("Rel Err (L2) - Mean flow ⟨u⟩: $(round(fe.u_rel, digits=3)) %,  ⟨v⟩: $(round(fe.v_rel, digits=3)) %")
-        println("Rel Err (L2) - RST ⟨u'u'⟩: $(round(fe.uu_rel, digits=3)) %,  ⟨v'v'⟩: $(round(fe.vv_rel, digits=3)) %,  ⟨u'v'⟩: $(round(fe.uv_rel, digits=3)) %")
+        println("Rel Err (L1) - Mean flow ⟨u⟩: $(round(fe.u.l1, digits=3)) %,  ⟨v⟩: $(round(fe.v.l1, digits=3)) %")
+        println("Rel Err (L1) - RST ⟨u'u'⟩: $(round(fe.uu.l1, digits=3)) %,  ⟨v'v'⟩: $(round(fe.vv.l1, digits=3)) %,  ⟨u'v'⟩: $(round(fe.uv.l1, digits=3)) %")
+        println("Corr coeff   - Mean flow ⟨u⟩: $(round(fe.u.ρ, digits=4)),  ⟨v⟩: $(round(fe.v.ρ, digits=4))")
+        println("Corr coeff   - RST ⟨u'u'⟩: $(round(fe.uu.ρ, digits=4)),  ⟨v'v'⟩: $(round(fe.vv.ρ, digits=4)),  ⟨u'v'⟩: $(round(fe.uv.ρ, digits=4))")
     end
 
     println("\n" * "="^60)
@@ -288,7 +291,7 @@ end
 
 function rst_plot(rst_term, clims)
     WaterLily.flood(rst_term;
-        levels=20, color=:viridis, aspectratio=:equal,
+        levels=20, color=:magma, aspectratio=:equal,
         clims=clims, axis=nothing, colorbar=true,
         xlims=(0, size(rst_term)[1]), ylims=(0, size(rst_term)[1]),
         size=(300, 300))
