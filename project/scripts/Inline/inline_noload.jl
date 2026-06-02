@@ -124,7 +124,7 @@ while sim_time(hs.sim) < hs.params.t_accel_end
             epochs=hs.params.ae_retrain_epochs,
             batch_size=hs.params.ae_batch_size,
             t_training=simdata.time[end] * 0.85 ,
-            train_downsample=hs.params.downsample + (length(simdata.chunk_ranges) * 100),
+            train_downsample=hs.params.downsample,
             retrain=true,
             checkpoint_path=hs.AE_path,
             save_path=savedir,
@@ -151,7 +151,7 @@ while sim_time(hs.sim) < hs.params.t_accel_end
             maxiters = hs.params.node_retrain_iters,          # more iterations
             group_size = hs.params.group_size,         # keep tighter segments
             continuity_term = hs.params.continuity_term_retrain,   # stronger continuity for stability
-            downsample = hs.params.downsample + (length(simdata.chunk_ranges) * 100),  
+            downsample = hs.params.downsample,  
             retrain = true,
             multiple_shooting = true,
             node_checkpoint = node_path,
