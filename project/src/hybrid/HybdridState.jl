@@ -1,24 +1,3 @@
-# Base.@kwdef struct InlineParams
-#     t_run = 20
-#     t_train = 17.5
-#     t_accel_end = 50
-#     t_update = 10
-#     ae_epochs = 4
-#     ae_retrain_epochs = 2
-#     ae_batch_size = 8
-#     node_iters = 2
-#     continuity_term = 250
-#     node_retrain_iters = 2
-#     continuity_term_retrain = 500
-#     downsample=500
-#     group_size=20
-#     n_switch = 150
-#     pred_Δt = 0.35
-#     save_interval = 0.05
-#     sample_interval = 0.0
-#     max_retrain_flags = 3
-# end
-
 Base.@kwdef struct InlineParams
     t_run = 20
     t_train = 17.5
@@ -30,9 +9,9 @@ Base.@kwdef struct InlineParams
     node_iters = 300
     continuity_term = 200
     node_retrain_iters = 150
-    continuity_term_retrain = 500
+    continuity_term_retrain = 400
     downsample = 300
-    group_size=15
+    group_size = 15
     n_switch = 150
     pred_Δt = 0.35
     save_interval = 0.05

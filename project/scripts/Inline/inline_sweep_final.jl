@@ -41,6 +41,10 @@ configs = [
     (name="phys_div100_curl0",     ae_epochs=500, ae_batch_size=16, latent_dim=16, λdiv=100.0,  λcurl=0.0),
     (name="phys_div0_curl100",     ae_epochs=500, ae_batch_size=16, latent_dim=16, λdiv=0.0,    λcurl=100.0),
     (name="phys_div1000_curl1000", ae_epochs=500, ae_batch_size=16, latent_dim=16, λdiv=1000.0, λcurl=1000.0),
+    (name="group_10",              ae_epochs=500, ae_batch_size=16, latent_dim=16, λdiv=100.0,  λcurl=100.0, group_size=10),
+    (name="group_20",              ae_epochs=500, ae_batch_size=16, latent_dim=16, λdiv=100.0,  λcurl=100.0, group_size=20),
+    (name="continuity_100",        ae_epochs=500, ae_batch_size=16, latent_dim=16, λdiv=100.0,  λcurl=100.0, continuity_term=100, continuity_term_retrain=200),
+    (name="continuity_400",        ae_epochs=500, ae_batch_size=16, latent_dim=16, λdiv=100.0,  λcurl=100.0, continuity_term=400, continuity_term_retrain=800),
 ]
 
 function run_one(cfg, sweep_root, u₀)
@@ -48,6 +52,9 @@ function run_one(cfg, sweep_root, u₀)
         ae_epochs = cfg.ae_epochs,
         ae_batch_size = cfg.ae_batch_size,
         t_accel_end = 100,
+        group_size = get(cfg, :group_size, 15),
+        continuity_term = get(cfg, :continuity_term, 200),
+        continuity_term_retrain = get(cfg, :continuity_term_retrain, 400),
     )
 
     savedir = joinpath(sweep_root, cfg.name)
@@ -281,16 +288,17 @@ for (i, cfg) in enumerate(configs)
     clear_memory!(; verbose=true)   # double GC + CUDA.reclaim between runs
 end
 
-println("\n" * "="^72)
+println("\n" * "="^96)
 println("                        INLINE SWEEP MANIFEST")
-println("="^72)
-@printf("%-3s %-22s %-9s %-6s %-7s %-7s %-7s\n",
-    "i", "name", "ae_epochs", "batch", "latent", "λdiv", "λcurl")
-println("-"^72)
+println("="^96)
+@printf("%-3s %-22s %-9s %-6s %-7s %-7s %-7s %-6s %-6s %-7s\n",
+    "i", "name", "ae_epochs", "batch", "latent", "λdiv", "λcurl", "group", "cont", "cont_rt")
+println("-"^96)
 for (i, cfg) in enumerate(configs)
-    @printf("%-3d %-22s %-9d %-6d %-7d %-7.0f %-7.0f\n",
-        i, cfg.name, cfg.ae_epochs, cfg.ae_batch_size, cfg.latent_dim, cfg.λdiv, cfg.λcurl)
+    @printf("%-3d %-22s %-9d %-6d %-7d %-7.0f %-7.0f %-6d %-6d %-7d\n",
+        i, cfg.name, cfg.ae_epochs, cfg.ae_batch_size, cfg.latent_dim, cfg.λdiv, cfg.λcurl,
+        get(cfg, :group_size, 15), get(cfg, :continuity_term, 200), get(cfg, :continuity_term_retrain, 500))
 end
-println("-"^72)
+println("-"^96)
 println("Saved under: $(sweep_root)")
-println("="^72)
+println("="^96)
