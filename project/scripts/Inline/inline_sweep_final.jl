@@ -20,7 +20,7 @@ if is_hpc()
     @info "  Julia threads: $(Threads.nthreads())"
 end
 
-sweep_root = joinpath(root_path, "data", "inline_runs", "inline_sweep_final")
+sweep_root = joinpath(root_path, "data", "inline_runs", "inline_sweep_final_v2")
 mkpath(sweep_root)
 
 u₀ = load_u0(joinpath(root_path, "data/initial_fields/RE2500/2e8/u_0.jld2"))
@@ -30,10 +30,11 @@ u₀ = load_u0(joinpath(root_path, "data/initial_fields/RE2500/2e8/u_0.jld2"))
 # Non-swept axes stay at their reference value, so non-physics runs pass λdiv=100/λcurl=100
 # (identical to the LuxArgs defaults inline_noload.jl uses).
 configs = [
+    (name="base",                  ae_epochs=500, ae_batch_size=16, latent_dim=16, λdiv=100.0,  λcurl=100.0),
     (name="aeEpochs_250",          ae_epochs=250, ae_batch_size=16, latent_dim=16, λdiv=100.0,  λcurl=100.0),
     (name="aeEpochs_750",          ae_epochs=750, ae_batch_size=16, latent_dim=16, λdiv=100.0,  λcurl=100.0),
     (name="batch_4",               ae_epochs=500, ae_batch_size=4,  latent_dim=16, λdiv=100.0,  λcurl=100.0),
-    (name="batch_18",              ae_epochs=500, ae_batch_size=18, latent_dim=16, λdiv=100.0,  λcurl=100.0),
+    (name="batch_18",              ae_epochs=500, ae_batch_size=8, latent_dim=16, λdiv=100.0,  λcurl=100.0),
     (name="latent_8",              ae_epochs=500, ae_batch_size=16, latent_dim=8,  λdiv=100.0,  λcurl=100.0),
     (name="latent_32",             ae_epochs=500, ae_batch_size=16, latent_dim=32, λdiv=100.0,  λcurl=100.0),
     (name="phys_div0_curl0",       ae_epochs=500, ae_batch_size=16, latent_dim=16, λdiv=0.0,    λcurl=0.0),

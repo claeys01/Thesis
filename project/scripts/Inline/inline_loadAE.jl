@@ -28,8 +28,8 @@ end
 # AE_path = "data/saved_models/inline_runs_hpc/latent_epoch_sweep/ae_epochs_250_latent_16/AE_May24-0739__E250_HW256x256_C4to2_nc6_nd1_z16_C8_lr0p001_wd0p0009_bs16_NY_LL1_Tl0p0/checkpoint.jld2"
 # AE_retrain_path = "data/saved_models/inline_runs_hpc/latent_epoch_sweep/ae_epochs_250_latent_16/AE_May24-0749__E100_HW256x256_C4to2_nc6_nd1_z16_C8_lr0p0002_wd0p0009_bs16_NY_LL1_Tl0p0/checkpoint.jld2"
 
-AE_path = "data/saved_models/Thesis_definite_models/2e8/RE2500/AE_TL1/checkpoint.jld2"
-# AE_retrain_path = "data/saved_models/inline_runs_hpc/latent_epoch_sweep/ae_epochs_100_latent_16/AE_May24-0734__E100_HW256x256_C4to2_nc6_nd1_z16_C8_lr0p0002_wd0p0009_bs16_NY_LL1_Tl0p0/checkpoint.jld2"
+AE_path = "data/saved_models/inline_runs_hpc/temp/AE_Jun01-1216__E500_HW256x256_C4to2_nc5_nd1_z16_C8_lr0p001_wd0p0009_bs16_NY_LL1_Tl0p0/checkpoint.jld2"
+AE_retrain_path = "data/saved_models/inline_runs_hpc/temp/AE_Jun01-1234__E100_HW256x256_C4to2_nc5_nd1_z16_C8_lr0p0002_wd0p0009_bs16_NY_LL1_Tl0p0/checkpoint.jld2"
 
 params = InlineParams()
 
@@ -38,6 +38,8 @@ mkpath(savedir)
 simdata_path = joinpath(savedir, "U_inline.jld2")
 
 u₀ = load_u0("data/datasets/RE2500/2e8/U_128_full_u0.jld2")
+u_diff = load_u0(joinpath(root_path, "data/initial_fields/RE2500/2e8/u_0.jld2"))
+@assert u₀ == u_diff
 sim = circle_shedding_biot(; mem=Array, perturb=false)
 
 hs = HybridState(sim, nothing, params, savedir, nothing, nothing)
@@ -52,7 +54,7 @@ AE_path = joinpath(root_path, AE_path)
 
 normalizer = load_normalizer(AE_path)
 ae_bundle, ae_args = load_trained_AE(AE_path)
-ae_args.train_downsample = 500
+ae_args.train_downsample = params.downsample
 ae_args.full_data_path = simdata_path
 
 # ================================ Step 2: Train NODE ================================
@@ -63,9 +65,9 @@ node_start = time()
 node_args = NodeArgs(
         save_path=savedir,
         maxiters = params.node_iters,
-        downsample=ae_args.train_downsample,
-        group_size=15,
-        continuity_term=hs.params.continuity_term,
+        downsample = ae_args.train_downsample,
+        group_size = hs.params.group_size,
+        continuity_term = hs.params.continuity_term,
         latent_dim = ae_args.latent_dim,
     )
 
@@ -87,10 +89,10 @@ hs.aenode = aenode
 hs.AE_path = AE_path
 hs.node_path = node_path
 
-run_hybrid!(hs)
+# run_hybrid!(hs)
 
-# while sim_time(hs.sim) < hs.params.t_accel_end
-while false
+while sim_time(hs.sim) < hs.params.t_accel_end
+# while false
     run_hybrid!(hs)
     sim_time(hs.sim) >  hs.params.t_accel_end && break
 
@@ -110,7 +112,7 @@ while false
         retrain_normalizer = load_normalizer(AE_retrain_path)
         ae_retrain_bundle, ae_retrain_args = load_trained_AE(AE_retrain_path)
         ae_retrain_args.full_data_path = simdata_path
-        ae_retrain_args.train_downsample = 500
+        ae_retrain_args.train_downsample = hs.params.downsample
 
 
         # ================================ Step 4: Retrain NODE ================================
