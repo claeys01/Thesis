@@ -45,6 +45,10 @@ configs = [
     (name="group_20",              ae_epochs=500, ae_batch_size=16, latent_dim=16, λdiv=100.0,  λcurl=100.0, group_size=20),
     (name="continuity_100",        ae_epochs=500, ae_batch_size=16, latent_dim=16, λdiv=100.0,  λcurl=100.0, continuity_term=100, continuity_term_retrain=200),
     (name="continuity_400",        ae_epochs=500, ae_batch_size=16, latent_dim=16, λdiv=100.0,  λcurl=100.0, continuity_term=400, continuity_term_retrain=800),
+    (name="knn_thresh_0.9",        ae_epochs=500, ae_batch_size=16, latent_dim=16, λdiv=100.0,  λcurl=100.0, knn_q=0.9),
+    (name="knn_thresh_0.95",       ae_epochs=500, ae_batch_size=16, latent_dim=16, λdiv=100.0,  λcurl=100.0, knn_q=0.95),
+    (name="knn_neighbors_3",       ae_epochs=500, ae_batch_size=16, latent_dim=16, λdiv=100.0,  λcurl=100.0, knn_k=3),
+    (name="knn_neighbors_10",      ae_epochs=500, ae_batch_size=16, latent_dim=16, λdiv=100.0,  λcurl=100.0, knn_k=10),
 ]
 
 function run_one(cfg, sweep_root, u₀)
@@ -118,7 +122,8 @@ function run_one(cfg, sweep_root, u₀)
 
     # ae_bundle = cpu_device()(ae_bundle)
 
-    aenode = AENODE(ae_bundle, node, ae_args, node_args, normalizer; verbose=true)
+    aenode = AENODE(ae_bundle, node, ae_args, node_args, normalizer; verbose=true,
+        k=get(cfg, :knn_k, 5), q=get(cfg, :knn_q, 0.999))
 
     # hs = HybridState(sim, aenode, params, savedir, AE_path_tl1, node_path)
     hs.aenode = aenode
@@ -206,7 +211,8 @@ function run_one(cfg, sweep_root, u₀)
 
             push!(retrain_timings, (wl_cutoff=wl_cutoff_elapsed, ae=ae_retrain_elapsed, node=node_retrain_elapsed))
 
-            hs.aenode = AENODE(ae_retrain_bundle, node_retrain, ae_retrain_args, node_retrain_args, retrain_normalizer; verbose=true)
+            hs.aenode = AENODE(ae_retrain_bundle, node_retrain, ae_retrain_args, node_retrain_args, retrain_normalizer; verbose=true,
+                k=get(cfg, :knn_k, 5), q=get(cfg, :knn_q, 0.999))
             hs.AE_path = AE_retrain_path
             hs.node_path = node_retrain_path
             hs.retrain_needed = false
@@ -291,13 +297,14 @@ end
 println("\n" * "="^96)
 println("                        INLINE SWEEP MANIFEST")
 println("="^96)
-@printf("%-3s %-22s %-9s %-6s %-7s %-7s %-7s %-6s %-6s %-7s\n",
-    "i", "name", "ae_epochs", "batch", "latent", "λdiv", "λcurl", "group", "cont", "cont_rt")
+@printf("%-3s %-22s %-9s %-6s %-7s %-7s %-7s %-6s %-6s %-7s %-6s %-7s\n",
+    "i", "name", "ae_epochs", "batch", "latent", "λdiv", "λcurl", "group", "cont", "cont_rt", "knn_k", "knn_q")
 println("-"^96)
 for (i, cfg) in enumerate(configs)
-    @printf("%-3d %-22s %-9d %-6d %-7d %-7.0f %-7.0f %-6d %-6d %-7d\n",
+    @printf("%-3d %-22s %-9d %-6d %-7d %-7.0f %-7.0f %-6d %-6d %-7d %-6d %-7.3f\n",
         i, cfg.name, cfg.ae_epochs, cfg.ae_batch_size, cfg.latent_dim, cfg.λdiv, cfg.λcurl,
-        get(cfg, :group_size, 15), get(cfg, :continuity_term, 200), get(cfg, :continuity_term_retrain, 500))
+        get(cfg, :group_size, 15), get(cfg, :continuity_term, 200), get(cfg, :continuity_term_retrain, 500),
+        get(cfg, :knn_k, 5), get(cfg, :knn_q, 0.999))
 end
 println("-"^96)
 println("Saved under: $(sweep_root)")

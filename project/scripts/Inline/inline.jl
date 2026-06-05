@@ -65,8 +65,11 @@ node_elapsed = round((time() - node_start) / 60; digits=1)
 # @info "Steps 1-2 complete" elapsed_min=round((time() - total_start) / 60; digits=1)
 # ae_bundle = cpu_device()(ae_bundle)
 
-aenode = AENODE(ae_bundle, node, ae_args, node_args, normalizer; verbose=true)
+# aenode = AENODE(ae_bundle, node, ae_args, node_args, normalizer; verbose=true)
+aenode = AENODE(ae_bundle, node, ae_args, node_args, normalizer; verbose=true,
+        k=10, q=0.9)
 
+println(aenode.knn_ood)
 hs.aenode = aenode
 hs.AE_path = AE_path
 hs.node_path = node_path
