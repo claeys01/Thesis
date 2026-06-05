@@ -3,7 +3,8 @@ using JLD2
 using Statistics
 using Plots
 
-base_dir = "data/saved_models/inline_runs_hpc/base"
+# base_dir = "data/saved_models/inline_runs_hpc/base"
+base_dir = "data/inline_runs/2026-06-05_14-43"
 
 hs_path = joinpath(base_dir, "hybrid_state.jld2")
 @load hs_path res sim_meanflow ref_meanflow params mode_log n_integrs AE_path node_path savedir
@@ -20,7 +21,11 @@ ref_lift = last.(res.forces_ref)
 hyb_drag = first.(res.hybrid_forces_wat)
 hyb_lift = last.(res.hybrid_forces_wat)
 
-
+@show size(sim_meanflow.t), size(ref_meanflow.t)
+@show sim_meanflow.t/sim.L
+plt = plot(sim_meanflow.t/sim.L ,label="sim")
+plot!(plt, ref_meanflow.t/sim.L, label="ref")
+display(plt)
 # display(plot(res.hybrid_time_wat, hyb_lift))
 
 # plt_combined = plot_accel_combined(res, params.t_accel_end; mode_log=mode_log)

@@ -209,12 +209,28 @@ function update_predicted_meanflow!(meanflow::MeanFlow, sim::BiotSimulation, û
     for i in eachindex(t_meanflow)
         insert_prediction!(scratch_sim, snapshots[:, :, :, i])
         impose_biot_bc!(scratch_sim)
-        update_meanflow_snapshot!(meanflow, scratch_sim.flow.u, scratch_sim.flow.p, t_meanflow[i])
+        # t_meanflow is in sim_time (tU/L); meanflow.t stores WaterLily flow-time. Convert.
+        t_flow = t_meanflow[i] * sim.L / sim.U
+        update_meanflow_snapshot!(meanflow, scratch_sim.flow.u, scratch_sim.flow.p, t_flow)
         push!(pred_forces, get_forces(scratch_sim))
         push!(pred_times, Float32(t_meanflow[i]))
     end
 
     return pred_forces, pred_times
+end
+
+function update_reference_meanflow!(hs::HybridState, t_meanflow)
+    (isnothing(t_meanflow) || isempty(t_meanflow)) && return
+    (; res, ref_sim, ref_meanflow) = hs
+    for t in t_meanflow
+        while sim_time(ref_sim) < t
+            step_reference!(res, ref_sim)
+        end
+        # fold the reference at the same instances as the hybrid; same flow-time scaling.
+        t_flow = t * ref_sim.L / ref_sim.U
+        update_meanflow_snapshot!(ref_meanflow, ref_sim.flow.u, ref_sim.flow.p, t_flow)
+    end
+    return
 end
 
 # function run_hybrid!(hs::HybridState; simdata::Union{SimData,Nothing}=nothing, save_path=nothing, verbose=true)
@@ -246,6 +262,12 @@ function run_hybrid!(hs::HybridState; verbose=true)
 
             if n_integr != 0
                 pred_forces, pred_times = update_predicted_meanflow!(sim_meanflow, sim, û_meanflow, t_meanflow)
+                update_reference_meanflow!(hs, t_meanflow)
+                if !isnothing(t_meanflow) && !isempty(t_meanflow)
+                    # predicted snapshots already covered the mean flow up to last(t_meanflow);
+                    # advance the gate so the post-prediction WaterLily.update! doesn't burst.
+                    hs.next_save = Float32(last(t_meanflow) + params.save_interval)
+                end
                 push!(n_integrs, n_integr)
                 record_prediction!(
                     res,

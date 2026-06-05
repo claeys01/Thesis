@@ -28,8 +28,8 @@ end
 # AE_path = "data/saved_models/inline_runs_hpc/latent_epoch_sweep/ae_epochs_250_latent_16/AE_May24-0739__E250_HW256x256_C4to2_nc6_nd1_z16_C8_lr0p001_wd0p0009_bs16_NY_LL1_Tl0p0/checkpoint.jld2"
 # AE_retrain_path = "data/saved_models/inline_runs_hpc/latent_epoch_sweep/ae_epochs_250_latent_16/AE_May24-0749__E100_HW256x256_C4to2_nc6_nd1_z16_C8_lr0p0002_wd0p0009_bs16_NY_LL1_Tl0p0/checkpoint.jld2"
 
-AE_path = "data/saved_models/inline_runs_hpc/temp/AE_Jun01-1216__E500_HW256x256_C4to2_nc5_nd1_z16_C8_lr0p001_wd0p0009_bs16_NY_LL1_Tl0p0/checkpoint.jld2"
-AE_retrain_path = "data/saved_models/inline_runs_hpc/temp/AE_Jun01-1234__E100_HW256x256_C4to2_nc5_nd1_z16_C8_lr0p0002_wd0p0009_bs16_NY_LL1_Tl0p0/checkpoint.jld2"
+AE_path = "data/saved_models/inline_runs_hpc/base/AE_Jun03-2139__E500_HW256x256_C4to2_nc5_nd1_z16_C8_lr0p001_wd0p0009_bs16_NY_LL1_Tl0p0/checkpoint.jld2"
+AE_retrain_path = "data/saved_models/inline_runs_hpc/base/AE_Jun03-2139__E500_HW256x256_C4to2_nc5_nd1_z16_C8_lr0p001_wd0p0009_bs16_NY_LL1_Tl0p0/checkpoint.jld2"
 
 params = InlineParams()
 

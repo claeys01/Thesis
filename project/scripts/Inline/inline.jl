@@ -7,81 +7,117 @@ using JLD2
 using Plots
 
 
-params = InlineParams(
-        t_run = 6.03, 
-        t_train = 3.5,
-        t_accel_end = 10,
-        ae_epochs = 500,
-        ae_retrain_epochs = 500,
-        node_iters = 500,
-        node_retrain_iters = 500,
-        n_switch = 150,
-        pred_Δt = 0.35,
-        save_interval = 0.25/2, # needs to be fixed still, 
-        max_retrain_flags = 3
-    )
+root_path = ""
+if is_hpc()
+    root_path = "/scratch/mfbclaeys"
+    # Log job info
+    @info "Starting HPC AE+NODE retrain pipeline"
+    @info "  SLURM_JOB_ID: $(get(ENV, "SLURM_JOB_ID", "N/A"))"
+    @info "  SLURM_NTASKS: $(get(ENV, "SLURM_NTASKS", "N/A"))"
+    @info "  SLURM_CPUS_PER_TASK: $(get(ENV, "SLURM_CPUS_PER_TASK", "N/A"))"
+    @info "  Hostname: $(gethostname())"
+    @info "  Julia threads: $(Threads.nthreads())"
+end
 
-savedir = joinpath("data", "inline_runs", Dates.format(now(), "yyyy-mm-dd_HH-MM"))
+
+AE_path = "data/saved_models/inline_runs_hpc/base/AE_Jun03-2139__E500_HW256x256_C4to2_nc5_nd1_z16_C8_lr0p001_wd0p0009_bs16_NY_LL1_Tl0p0/checkpoint.jld2"
+AE_retrain_path = "data/saved_models/inline_runs_hpc/base/AE_Jun03-2139__E500_HW256x256_C4to2_nc5_nd1_z16_C8_lr0p001_wd0p0009_bs16_NY_LL1_Tl0p0/checkpoint.jld2"
+
+node_path = "data/saved_models/inline_runs_hpc/base/NODE_Jun03-215128/node_params.jld2"
+node_retrain_path = "data/saved_models/inline_runs_hpc/base/NODE_Jun03-215719/node_params.jld2"
+
+params = InlineParams()
+
+savedir = joinpath(root_path, "data", "inline_runs", Dates.format(now(), "yyyy-mm-dd_HH-MM"))
 mkpath(savedir)
 simdata_path = joinpath(savedir, "U_inline.jld2")
 
 u₀ = load_u0("data/datasets/RE2500/2e8/U_128_full_u0.jld2")
+u_diff = load_u0(joinpath(root_path, "data/initial_fields/RE2500/2e8/u_0.jld2"))
+@assert u₀ == u_diff
 sim = circle_shedding_biot(; mem=Array, perturb=false)
 
+hs = HybridState(sim, nothing, params, savedir, nothing, nothing)
+
+simdata = run_warmup!(hs, params.t_run; u₀=u₀, save_path=simdata_path)
+
+# ================================ Step 1: Train Autoencoder ================================
+@info "── Step 1/4: Training Autoencoder ──"
 
 root_path = is_hpc() ? "/scratch/mfbclaeys" : ""
-AE_path_tl1 = "data/saved_models/u/Lux/256h_16l/RE2500/2e8/TL1_E500_HW256x256_C4to2_nc6_nd2_z16_C8_lr0p001_wd0p0009_bs16_NY_LL1_Tl0p0/checkpoint.jld2"
-AE_path_tl1 = joinpath(root_path, AE_path_tl1)
+AE_path = joinpath(root_path, AE_path)
 
-normalizer = load_normalizer(AE_path_tl1)
-ae_bundle, ae_args = load_trained_AE(AE_path_tl1)
+normalizer = load_normalizer(AE_path)
+ae_bundle, ae_args = load_trained_AE(AE_path)
+ae_args.train_downsample = params.downsample
+ae_args.full_data_path = simdata_path
 
-node_path = "data/saved_models/NODE/16/RE2500/TL1_E500_curldiv_MS_Adam_250/node_params.jld2"
-node_path = joinpath(root_path, node_path)
+# ================================ Step 2: Train NODE ================================
+@info "── Step 2/4: Training Neural ODE ──"
+
+node_start = time()
+
 node, node_args = load_node(node_path)
+
+node_elapsed = round((time() - node_start) / 60; digits=1)
+@info "NODE training complete" elapsed_min=node_elapsed node_path=node_path
+
+# @info "Steps 1-2 complete" elapsed_min=round((time() - total_start) / 60; digits=1)
+# ae_bundle = cpu_device()(ae_bundle)
 
 aenode = AENODE(ae_bundle, node, ae_args, node_args, normalizer; verbose=true)
 
-hs = HybridState(sim, aenode, params, savedir, AE_path_tl1, node_path)
-@show size(sim.flow.σ)
-simdata = run_warmup!(hs, params.t_run; u₀=u₀, save_path=simdata_path)
+hs.aenode = aenode
+hs.AE_path = AE_path
+hs.node_path = node_path
 
-run_hybrid!(hs)
+# run_hybrid!(hs)
 
-if hs.retrain_needed
-    GC.gc()
-    @info "Retraining triggered at sim_time=$(sim_time(hs.sim)), step=$(hs.step)"
-    push!(hs.mode_log, (t_start=sim_time(hs.sim), t_end=sim_time(hs.sim), mode="Cutoff"))
-
-    println("continueing to run simulation without AENODE")
-    simdata = run_warmup!(hs, sim_time(hs.sim) + 5; simdata=simdata, save_path=simdata_path)
-
-    AE_path_tl2 = "data/saved_models/u/Lux/256h_16l/RE2500/2e8/TL2_E300_HW256x256_C4to2_nc6_nd2_z16_C8_lr0p0002_wd0p0009_bs16_NY_LL1_Tl0p0/checkpoint.jld2"
-    AE_path_tl2 = joinpath(root_path, AE_path_tl2)
-    normalizer = load_normalizer(AE_path_tl2)
-    ae_bundle, ae_args = load_trained_AE(AE_path_tl2)
-
-    node_path_tl2 = "data/saved_models/NODE/16/RE2500/TL2_E300_curldiv_MS_Adam_250/node_params.jld2"
-    node_path_tl2 = joinpath(root_path, node_path_tl2)
-
-    node, node_args = load_node(node_path_tl2)
-
-    hs.aenode = AENODE(ae_bundle, node, ae_args, node_args, normalizer; verbose=true)
-    hs.AE_path = AE_path_tl2
-    hs.node_path = node_path_tl2
-    hs.retrain_needed = false
-    hs.step = 0
-    
-    push!(hs.mode_log, (t_start=sim_time(hs.sim), t_end=sim_time(hs.sim), mode="Restarted"))
+while sim_time(hs.sim) < hs.params.t_accel_end
+# while false
     run_hybrid!(hs)
-    if sim_time(hs.sim) < params.t_accel_end
-        simdata = run_warmup!(hs, params.t_accel_end; simdata=simdata, save_path=simdata_path)
+    sim_time(hs.sim) >  hs.params.t_accel_end && break
+
+    if hs.retrain_needed
+        GC.gc()
+        @info "Retraining triggered at sim_time=$(sim_time(hs.sim)), step=$(hs.step)"
+        push!(hs.mode_log, (t_start=sim_time(hs.sim), t_end=sim_time(hs.sim), mode="Cutoff"))
+
+        println("continueing to run simulation without AENODE")
+
+        simdata = run_warmup!(hs, sim_time(hs.sim) + hs.params.t_update; simdata=simdata, save_path=simdata_path)
+        sim_time(hs.sim) >  hs.params.t_accel_end && break
+
+        # ================================ Step 3: Retrain AE ================================
+        AE_retrain_path = joinpath(root_path, AE_retrain_path)
+
+        retrain_normalizer = load_normalizer(AE_retrain_path)
+        ae_retrain_bundle, ae_retrain_args = load_trained_AE(AE_retrain_path)
+        ae_retrain_args.full_data_path = simdata_path
+        ae_retrain_args.train_downsample = hs.params.downsample
+
+
+        # ================================ Step 4: Retrain NODE ================================
+
+        @info "── Step 4/4: Retraining Neural ODE ──"
+        # ae_retrain_bundle = cpu_device()(ae_retrain_bundle)
+        GC.gc()
+        node_retrain_start = time()   
+        node_retrain, node_retrain_args = load_node(node_retrain_path)  
+        node_retrain_elapsed = round((time() - node_retrain_start) / 60; digits=1)
+        @info "NODE retraining complete" elapsed_min=node_retrain_elapsed node_path=node_retrain_path
+
+        hs.aenode = AENODE(ae_retrain_bundle, node_retrain, ae_retrain_args, node_retrain_args, retrain_normalizer; verbose=true)
+        hs.AE_path = AE_retrain_path
+        hs.node_path = node_retrain_path
+        hs.retrain_needed = false
+        hs.step = 0
+        
+        push!(hs.mode_log, (t_start=sim_time(hs.sim), t_end=sim_time(hs.sim), mode="Restarted"))
+
     end
 end
 
 save_results(hs)
-
-# simdata = run_warmup!(hs, params.t_accel_end; simdata=simdata, save_path=simdata_path)
-
-# @show size(hs.sim_meanflow.t)
-# @show size(hs.ref_meanflow.t)
+# plt, _ = Thesis.velocity_flood(sim; colorbar=true)
+# display(plt)
