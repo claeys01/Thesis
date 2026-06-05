@@ -356,23 +356,92 @@ function plot_rst_comparison(sim_meanflow, ref_meanflow)
     return plot(rst_comp_plots..., layout=(3, 1), size=(900, 1100))
 end
 
-function plot_meanflow_comparison(sim_meanflow, ref_meanflow)
+# Gray circle marking the cylinder body, in array-index coordinates.
+# WaterLily stores the field with one ghost layer (size = N+2) and maps cell I
+# to physical position I-1.5, so the body (center n/4,m/2 ; radius n/16) sits at
+# the indices below.
+function cylinder_shape(nx, ny; n_pts=120)
+    ni = nx - 2
+    r  = ni / 16
+    cx = ni / 4 + 1.5
+    cy = (ny - 2) / 2 + 1.5
+    θ  = range(0, 2π; length=n_pts)
+    Plots.Shape(cx .+ r .* cos.(θ), cy .+ r .* sin.(θ))
+end
+
+# Filled red/blue contour panel in the style of the reference vorticity figure:
+# discrete contour bands with thin black contour lines, no axes, white
+# background, and the cylinder body drawn as a solid gray disk.
+function meanflow_contour(field; clims, title="", cmap=cgrad(:RdBu, rev=true),
+                          levels=12, colorbar=true)
+    nx, ny = size(field)
+    # The geometry is defined in grid cells; map array indices to cylinder
+    # diameters (x/L, y/L) with the cylinder centre at the origin, matching the
+    # reference vorticity figure. Diameter L = ni/8 cells (radius ni/16).
+    ni = nx - 2
+    L  = ni / 8
+    cx = ni / 4 + 1.5
+    cy = (ny - 2) / 2 + 1.5
+    xc = (collect(axes(field, 1)) .- cx) ./ L
+    yc = (collect(axes(field, 2)) .- cy) ./ L
+    # Even-spaced ticks (in diameters) so 0 lands on the cylinder centre.
+    xticks = (ceil(xc[1] / 2) * 2):2:(floor(xc[end] / 2) * 2)
+    yticks = (ceil(yc[1] / 2) * 2):2:(floor(yc[end] / 2) * 2)
+    f = clamp.(field, clims[1], clims[2])
+    plt = contourf(xc, yc, f' |> Array;
+        levels=levels, color=cmap, clims=clims,
+        linewidth=0.4, linecolor=:black,
+        aspect_ratio=:equal, framestyle=:box, legend=false,
+        colorbar=colorbar, background=:white,
+        xlims=(xc[1], xc[end]), ylims=(yc[1], yc[end]),
+        xticks=xticks, yticks=yticks, tickfontsize=8, tick_direction=:iout,
+        xlabel="x/L", ylabel="y/L", guidefontsize=9,
+        title=title, titlefontsize=10)
+    θ = range(0, 2π; length=120)
+    plot!(plt, Plots.Shape(0.5 .* cos.(θ), 0.5 .* sin.(θ));
+        seriestype=:shape, fillcolor="#BFBFBF", linecolor=:black, linewidth=1.0)
+    return plt
+end
+
+# Symmetric color limits around zero so 0 maps to white in the diverging map.
+function sym_clims(arrays...)
+    m = maximum(maximum(abs, a) for a in arrays)
+    return (-m, m)
+end
+
+function plot_meanflow_comparison(sim_meanflow, ref_meanflow; savedir=nothing, fmt="pdf")
     sim_u, sim_v = sim_meanflow.U[:, :, 1], sim_meanflow.U[:, :, 2]
     ref_u, ref_v = ref_meanflow.U[:, :, 1], ref_meanflow.U[:, :, 2]
+    u_diff = abs.(sim_u .- ref_u)
+    v_diff = abs.(sim_v .- ref_v)
 
-    u_clims = (min(minimum(sim_u), minimum(ref_u)), max(maximum(sim_u), maximum(ref_u)))
-    v_clims = (min(minimum(sim_v), minimum(ref_v)), max(maximum(sim_v), maximum(ref_v)))
+    u_clims = sym_clims(sim_u, ref_u)
+    v_clims = sym_clims(sim_v, ref_v)
+    u_err_clims = (0.0, maximum(u_diff))
+    v_err_clims = (0.0, maximum(v_diff))
 
-    common = (color=:viridis, xlims=(0, 258), ylims=(0, 258), colorbar=true,
-              framestyle=:none, border=:none, xlabel="x", ylabel="y", aspectratio=:equal)
+    div = cgrad(:RdBu, rev=true)   # red = positive, blue = negative
+    seq = cgrad(:thermal)          # non-negative absolute-error fields
 
-    plt_ref_u = flood(ref_u; title="Reference ⟨u⟩", clims=u_clims, common...)
-    plt_sim_u = flood(sim_u; title="Hybrid ⟨u⟩", clims=u_clims, common...)
-    plt_ref_v = flood(ref_v; title="Reference ⟨v⟩", clims=v_clims, common...)
-    plt_sim_v = flood(sim_v; title="Hybrid ⟨v⟩", clims=v_clims, common...)
+    panels = [
+        ("meanflow_u_reference", meanflow_contour(ref_u;  clims=u_clims,     cmap=div, title="")),
+        ("meanflow_u_hybrid",    meanflow_contour(sim_u;  clims=u_clims,     cmap=div, title="")),
+        ("meanflow_u_abserror",  meanflow_contour(u_diff; clims=u_err_clims, cmap=seq, title="")),
+        ("meanflow_v_reference", meanflow_contour(ref_v;  clims=v_clims,     cmap=div, title="")),
+        ("meanflow_v_hybrid",    meanflow_contour(sim_v;  clims=v_clims,     cmap=div, title="")),
+        ("meanflow_v_abserror",  meanflow_contour(v_diff; clims=v_err_clims, cmap=seq, title="")),
+    ]
 
-    return plot(plt_ref_u, plt_sim_u, plt_ref_v, plt_sim_v;
-        layout=(2, 2), size=(900, 700), dpi=150)
+    if !isnothing(savedir)
+        isdir(savedir) || mkpath(savedir)
+        for (name, p) in panels
+            savefig(p, joinpath(savedir, "$(name).$(fmt)"))
+        end
+        println("Saved $(length(panels)) mean-flow panels to: $(savedir)")
+    end
+
+    return plot((p for (_, p) in panels)...;
+        layout=(2, 3), size=(1200, 700), dpi=400)
 end
 
 function save_velocity_frame!(gif_frames::Vector, sim, time_step)
