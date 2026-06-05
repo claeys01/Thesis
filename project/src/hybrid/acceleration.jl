@@ -23,6 +23,23 @@ function force_stats(forces::Vector{Vector{Float32}})
     return (drag_mean = drag_mean, lift_rms = lift_rms)
 end
 
+function region_force_errors(res::AccelResults, mode_log)
+    isnothing(mode_log) && return nothing
+    spans = [(log.t_start, log.t_end) for log in mode_log if log.mode == "Hybrid"]
+    isempty(spans) && return nothing
+    in_region(t) = any(s -> s[1] <= t <= s[2], spans)
+
+    hyb_forces = res.hybrid_forces_wat[findall(in_region, res.hybrid_time_wat)]
+    ref_forces = res.forces_ref[findall(in_region, res.time_ref)]
+    (isempty(hyb_forces) || isempty(ref_forces)) && return nothing
+
+    stats_hybrid = force_stats(hyb_forces)
+    stats_ref = force_stats(ref_forces)
+    abs_err = map((x, y) -> abs(x - y), stats_ref, stats_hybrid)
+    rel_err = map((x, y) -> abs((x - y) / x) * 100, stats_ref, stats_hybrid)
+    return (; stats_hybrid, stats_ref, abs_err, rel_err)
+end
+
 function record_waterlily_step!(res::AccelResults, sim, wall_time)
     sim_dt = sim.flow.Δt[end] * sim.U / sim.L
     forces = get_forces(sim)
@@ -35,8 +52,8 @@ end
 
 
 function record_prediction!(res::AccelResults, sim, wall_time, sim_dt, step;
-    pred_forces::Vector{Vector{Float32}}=Vector{Vector{Float32}}(),
-    pred_times::Vector{Float32}=Float32[])
+        pred_forces::Vector{Vector{Float32}}=Vector{Vector{Float32}}(),
+        pred_times::Vector{Float32}=Float32[])
     forces = get_forces(sim)
     push!(res.hybrid_predict_wall_times, wall_time)
     push!(res.hybrid_predict_sim_times, sim_dt)
@@ -139,7 +156,7 @@ function meanflow_errors(sim_meanflow, ref_meanflow)
 end
 
 function print_metrics(res::AccelResults; pred_label="", avg_steps_per_pred=nothing,
-    sim_meanflow=nothing, ref_meanflow=nothing)
+    sim_meanflow=nothing, ref_meanflow=nothing, mode_log=nothing)
     m = compute_metrics(res)
 
     println("\n" * "="^60)
@@ -183,6 +200,16 @@ function print_metrics(res::AccelResults; pred_label="", avg_steps_per_pred=noth
     println("Abs Err   - Drag mean:  $(round(m.abs_err.drag_mean, digits=5)),   Lift RMS: $(round(m.abs_err.lift_rms, digits=5))")
     println("Rel Err   - Drag mean:  $(round(m.rel_err.drag_mean, digits=5)) %, Lift RMS: $(round(m.rel_err.lift_rms, digits=5)) %")
 
+    region = region_force_errors(res, mode_log)
+    if !isnothing(region)
+        println("-"^60)
+        println("(Hybrid regions only)")
+        println("Reference - Drag mean: $(round(region.stats_ref.drag_mean, digits=5)),   Lift RMS: $(round(region.stats_ref.lift_rms, digits=5))")
+        println("Hybrid    - Drag mean: $(round(region.stats_hybrid.drag_mean, digits=5)),   Lift RMS: $(round(region.stats_hybrid.lift_rms, digits=5))")
+        println("Abs Err   - Drag mean:  $(round(region.abs_err.drag_mean, digits=5)),   Lift RMS: $(round(region.abs_err.lift_rms, digits=5))")
+        println("Rel Err   - Drag mean:  $(round(region.rel_err.drag_mean, digits=5)) %, Lift RMS: $(round(region.rel_err.lift_rms, digits=5)) %")
+    end
+
     if !isnothing(sim_meanflow) && !isnothing(ref_meanflow)
         fe = meanflow_errors(sim_meanflow, ref_meanflow)
         println("\n" * "="^60)
@@ -202,11 +229,18 @@ function plot_forces_comparison(res::AccelResults, t_end; t_train=nothing, t_tes
     rel_drag = round(m.rel_err.drag_mean, digits=2)
     rel_lift = round(m.rel_err.lift_rms, digits=2)
 
-    plt = plot(framestyle=:box, size=(600, 300), dpi=500,
-        titlefontsize=14,
-        guidefontsize=12, tickfontsize=8, legendfontsize=9,
+    plt = plot(framestyle=:box, size=(800, 400), dpi=500,
         xlabel="\$t^*\$", ylabel="Force coefficient",
-        bottom_margin    = 2Plots.mm,
+        titlefontsize=14,
+        guidefontsize=12, tickfontsize=8, legendfontsize=6,
+        foreground_color_axis  = :black,
+        foreground_color_text  = :black,
+        left_margin   = 3Plots.mm,
+        right_margin  = 1Plots.mm,
+        top_margin    = 1Plots.mm,
+        bottom_margin = 2Plots.mm,
+        legend=:topright,
+        background_color_legend = RGBA(1, 1, 1, 0.7),
         xlims=(0, t_end), ylims=(-3, 2))
 
     if !isnothing(mode_log)
@@ -224,24 +258,24 @@ function plot_forces_comparison(res::AccelResults, t_end; t_train=nothing, t_tes
     end
 
     ref_drag, ref_lift = first.(res.forces_ref), last.(res.forces_ref)
-    plot!(plt, res.time_ref, ref_drag, color=:red, alpha=0.5, ls=:dashdot, label="Reference")
-    plot!(plt, res.time_ref, ref_lift, color=:blue, alpha=0.5, ls=:dashdot, label="")
+    plot!(plt, res.time_ref, ref_drag, color=:red, alpha=0.5, ls=:dashdot, label="\$C_D\$ (reference)")
+    plot!(plt, res.time_ref, ref_lift, color=:blue, alpha=0.5, ls=:dashdot, label="\$C_L\$ (reference)")
 
     wat_drag, wat_lift = first.(res.hybrid_forces_wat), last.(res.hybrid_forces_wat)
-    plot!(plt, res.hybrid_time_wat, wat_drag, label="Hybrid", color=:red, linewidth=1)
-    plot!(plt, res.hybrid_time_wat, wat_lift, label="", color=:blue, linewidth=1)
+    plot!(plt, res.hybrid_time_wat, wat_drag, label="\$C_D\$ (hybrid)", color=:red, linewidth=1)
+    plot!(plt, res.hybrid_time_wat, wat_lift, label="\$C_L\$ (hybrid)", color=:blue, linewidth=1)
 
     labeled = false
     for rng in res.pred_ranges
         plot!(plt, res.hybrid_time_wat[rng], wat_lift[rng],
-            label=labeled ? "" : "Prediction",
+            label=labeled ? "" : "Rollout",
             color=:black, lw=1.5)
         plot!(plt, res.hybrid_time_wat[rng], wat_drag[rng],
             label="", color=:black, lw=1.5)
         labeled = true
     end
 
-    plot!(plt, legend=:topleft, legendcolumns=1)
+    plot!(plt, legend=:bottomleft, legendcolumns=2)
     return plt
 end
 
@@ -254,7 +288,7 @@ function plot_timing_bars(res::AccelResults)
     xs = [1.0, 2.5, 3.5, 4.5]
     plt_timing = bar(
         xs, timing_vals,
-        ylabel="Wall time (ms)", title="Cost per convective time unit",
+        ylabel="Wall time (ms)", title="Mean Cost per CTU",
         legend=false, color=[:steelblue, :darkorange, :firebrick, :seagreen],
         bar_width=1.0,
         # bar_width=bar_widths,
@@ -265,6 +299,10 @@ function plot_timing_bars(res::AccelResults)
         xticks=(xs, ["Reference", "Hybrid\n(total)", "Hybrid\n(CFD)", "Hybrid\n(rollout)"]),
         # xlim=(0.3, 5.2),
         ylim=(0, maximum(timing_vals) * 1.15 + eps()))
+
+    # The rollout bar is near-zero height, so label its value just above the baseline.
+    annotate!(plt_timing, xs[4], timing_vals[4] + 0.05 * maximum(timing_vals),
+        text("$(round(timing_vals[4], digits=1)) ms", :black, 8, :center))
 
     y_max = max(m.total_reference_wall, m.total_hybrid_wall)
     plt_total = bar(

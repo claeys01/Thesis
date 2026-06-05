@@ -49,6 +49,7 @@ configs = [
 
 function run_one(cfg, sweep_root, u₀)
     params = InlineParams(
+        save_interval=0.01,
         ae_epochs = cfg.ae_epochs,
         ae_batch_size = cfg.ae_batch_size,
         t_accel_end = 100,
