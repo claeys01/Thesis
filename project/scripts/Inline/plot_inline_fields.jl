@@ -3,7 +3,7 @@ using Plots
 using Random
 
 # Point this at the run directory that contains U_hybrid_inline.jld2 / U_ref_inline.jld2
-savedir = length(ARGS) >= 1 ? ARGS[1] : "data/inline_runs/2026-05-30_15-19"
+savedir = length(ARGS) >= 1 ? ARGS[1] : "data/inline_runs/2026-06-05_15-11"
 
 hybrid_path = joinpath(savedir, "U_hybrid_inline.jld2")
 ref_path    = joinpath(savedir, "U_ref_inline.jld2")

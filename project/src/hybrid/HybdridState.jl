@@ -198,13 +198,14 @@ end
 
 function update_predicted_meanflow!(meanflow::MeanFlow, sim::BiotSimulation, û_meanflow, t_meanflow)
     if isnothing(û_meanflow) || isnothing(t_meanflow) || isempty(t_meanflow)
-        return Vector{Vector{Float32}}(), Float32[]
+        return Vector{Vector{Float32}}(), Float32[], Vector{typeof(sim.flow.u)}()
     end
 
     scratch_sim = deepcopy(sim)
     snapshots = ndims(û_meanflow) == 3 ? reshape(û_meanflow, size(û_meanflow)..., 1) : û_meanflow
     pred_forces = Vector{Vector{Float32}}()
     pred_times = Float32[]
+    hyb_fields = Vector{typeof(sim.flow.u)}()   # decoded rollout velocity fields, per instance
 
     for i in eachindex(t_meanflow)
         insert_prediction!(scratch_sim, snapshots[:, :, :, i])
@@ -214,21 +215,24 @@ function update_predicted_meanflow!(meanflow::MeanFlow, sim::BiotSimulation, û
         update_meanflow_snapshot!(meanflow, scratch_sim.flow.u, scratch_sim.flow.p, t_flow)
         push!(pred_forces, get_forces(scratch_sim))
         push!(pred_times, Float32(t_meanflow[i]))
+        push!(hyb_fields, copy(scratch_sim.flow.u))
     end
 
-    return pred_forces, pred_times
+    return pred_forces, pred_times, hyb_fields
 end
 
-function update_reference_meanflow!(hs::HybridState, t_meanflow)
+function update_reference_meanflow!(hs::HybridState, t_meanflow, hyb_fields)
     (isnothing(t_meanflow) || isempty(t_meanflow)) && return
     (; res, ref_sim, ref_meanflow) = hs
-    for t in t_meanflow
+    for i in eachindex(t_meanflow)
+        t = t_meanflow[i]
         while sim_time(ref_sim) < t
             step_reference!(res, ref_sim)
         end
         # fold the reference at the same instances as the hybrid; same flow-time scaling.
-        t_flow = t * ref_sim.L / ref_sim.U
-        update_meanflow_snapshot!(ref_meanflow, ref_sim.flow.u, ref_sim.flow.p, t_flow)
+        update_meanflow_snapshot!(ref_meanflow, ref_sim.flow.u, ref_sim.flow.p, t * ref_sim.L / ref_sim.U)
+        # persist the rollout's velocity fields, paired hybrid/reference at this instance.
+        write_field_pair!(hs, hyb_fields[i], t, ref_sim.flow.u, sim_time(ref_sim))
     end
     return
 end
@@ -261,8 +265,8 @@ function run_hybrid!(hs::HybridState; verbose=true)
             sim_dt = sim_time(sim) - sim_time_before
 
             if n_integr != 0
-                pred_forces, pred_times = update_predicted_meanflow!(sim_meanflow, sim, û_meanflow, t_meanflow)
-                update_reference_meanflow!(hs, t_meanflow)
+                pred_forces, pred_times, hyb_fields = update_predicted_meanflow!(sim_meanflow, sim, û_meanflow, t_meanflow)
+                update_reference_meanflow!(hs, t_meanflow, hyb_fields)
                 if !isnothing(t_meanflow) && !isempty(t_meanflow)
                     # predicted snapshots already covered the mean flow up to last(t_meanflow);
                     # advance the gate so the post-prediction WaterLily.update! doesn't burst.
@@ -327,17 +331,21 @@ function run_hybrid!(hs::HybridState; verbose=true)
     return hs
 end
 
-function save_field_step!(hs::HybridState, sim, ref_sim)
+function write_field_pair!(hs::HybridState, hybrid_u, hybrid_t, ref_u, ref_t)
     hs.save_fields || return
     if hs.hybrid_field_file === nothing
         hs.hybrid_field_file = jldopen(joinpath(hs.savedir, "U_hybrid_inline.jld2"), "w")
         hs.ref_field_file    = jldopen(joinpath(hs.savedir, "U_ref_inline.jld2"), "w")
     end
     i = (hs.n_field_saved += 1)
-    hs.hybrid_field_file["u/$i"] = Array(sim.flow.u)
-    hs.hybrid_field_file["t/$i"] = Float32(sim_time(sim))
-    hs.ref_field_file["u/$i"]    = Array(ref_sim.flow.u)
-    hs.ref_field_file["t/$i"]    = Float32(sim_time(ref_sim))
+    hs.hybrid_field_file["u/$i"] = Array(hybrid_u)
+    hs.hybrid_field_file["t/$i"] = Float32(hybrid_t)
+    hs.ref_field_file["u/$i"]    = Array(ref_u)
+    hs.ref_field_file["t/$i"]    = Float32(ref_t)
+end
+
+function save_field_step!(hs::HybridState, sim, ref_sim)
+    write_field_pair!(hs, sim.flow.u, sim_time(sim), ref_sim.flow.u, sim_time(ref_sim))
 end
 
 function close_field_files!(hs::HybridState)

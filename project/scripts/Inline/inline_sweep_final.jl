@@ -20,7 +20,7 @@ if is_hpc()
     @info "  Julia threads: $(Threads.nthreads())"
 end
 
-sweep_root = joinpath(root_path, "data", "inline_runs", "inline_sweep_final_v2")
+sweep_root = joinpath(root_path, "data", "inline_runs", "inline_sweep_final_v2_actual")
 mkpath(sweep_root)
 
 u₀ = load_u0(joinpath(root_path, "data/initial_fields/RE2500/2e8/u_0.jld2"))
@@ -49,7 +49,6 @@ configs = [
 
 function run_one(cfg, sweep_root, u₀)
     params = InlineParams(
-        save_interval=0.01,
         ae_epochs = cfg.ae_epochs,
         ae_batch_size = cfg.ae_batch_size,
         t_accel_end = 100,
