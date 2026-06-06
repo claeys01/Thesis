@@ -93,7 +93,8 @@ function predict_n!(sim::BiotSimulation, aenode::AENODE, nₜ::Int64;
 end
 
 function predict_flex(aenode::AENODE, sim::BiotSimulation; 
-    Δt::Float32=0.35f0, impose_biot=false, next_save=0.25, save_interval=0.25, verbose=true)
+    Δt::Float32=0.35f0, impose_biot=false, next_save=0.25, save_interval=0.25, verbose=true,
+    t_accel_end::Float32=Inf32)
     û, n_integr, retrain_required, û_meanflow, t_meanflow, rollout_time = predict_flex(
         aenode,
         sim.flow.u,
@@ -103,7 +104,8 @@ function predict_flex(aenode::AENODE, sim::BiotSimulation;
         next_save=next_save,
         save_interval=save_interval,
         verbose=verbose,
-        L=sim.L
+        L=sim.L,
+        t_accel_end=t_accel_end
     )
     if isnothing(û)
         return sim, n_integr, retrain_required, nothing, nothing, rollout_time
@@ -113,7 +115,8 @@ function predict_flex(aenode::AENODE, sim::BiotSimulation;
 end
 
 function predict_flex(aenode::AENODE, u::AbstractArray, μ₀::AbstractArray, t₀::Float32; 
-    Δt::Float32=0.35f0, next_save=0.25, save_interval=0.25, verbose=true, L=32.0f0)
+    Δt::Float32=0.35f0, next_save=0.25, save_interval=0.25, verbose=true, L=32.0f0,
+    t_accel_end::Float32=Inf32)
     # Only the encode → rollout → final decode is timed. The intermediate flow
     # reconstructions needed to update the MeanFlow are excluded.
     rollout_time = @elapsed begin
@@ -137,6 +140,10 @@ function predict_flex(aenode::AENODE, u::AbstractArray, μ₀::AbstractArray, t�
         z̃_meanflow = Vector{typeof(z̃)}()
 
         while true
+            if tₙ ≥ t_accel_end
+                verbose && @info "Reached t_accel_end, stopping NODE integration after $n_integr steps" tₙ t_accel_end
+                break
+            end
             knn_score = KNN_score(aenode.knn_ood, z̃)
             if knn_score > aenode.knn_ood.threshold
                 verbose && @warn "NODE integration too far outside of training distances, cutting of integration after $n_integr steps" knn_score threshold=aenode.knn_ood.threshold

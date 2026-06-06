@@ -257,6 +257,7 @@ function run_hybrid!(hs::HybridState; verbose=true)
                 impose_biot=true,
                 next_save=hs.next_save,
                 save_interval=params.save_interval,
+                t_accel_end=Float32(params.t_accel_end),
             )
             if retrain_required
                 retrain_req_counter += 1

@@ -224,6 +224,38 @@ function print_metrics(res::AccelResults; pred_label="", avg_steps_per_pred=noth
     println("\n" * "="^60)
 end
 
+function print_timing_summary(base_dir::AbstractString)
+    path = isfile(base_dir) ? base_dir : joinpath(base_dir, "timing_summary.jld2")
+    t = load(path)
+
+    println("\n" * "="^60)
+    println("TIMING SUMMARY")
+    println("="^60)
+    println("  (file: $path)")
+
+    println("\n--- Initial training ---")
+    println("  AE train:            $(t["ae_elapsed_min"]) min")
+    println("  NODE train:          $(t["node_elapsed_min"]) min")
+
+    println("\n--- Retraining ($(t["n_retrains"]) retrains) ---")
+    println("  AE retrain total:    $(t["ae_retrain_elapsed_min"]) min")
+    println("  NODE retrain total:  $(t["node_retrain_elapsed_min"]) min")
+    for (i, r) in enumerate(t["retrain_timings"])
+        println("    [$i] WL cutoff: $(r.wl_cutoff) min, AE: $(r.ae) min, NODE: $(r.node) min")
+    end
+
+    println("\n--- WaterLily ---")
+    println("  Warmup:              $(t["wl_warmup_elapsed_min"]) min")
+    println("  Cutoff total:        $(t["wl_cutoff_elapsed_min"]) min")
+    println("  Tail:                $(t["wl_tail_elapsed_min"]) min")
+
+    println("\n--- Totals ---")
+    println("  ML total:            $(t["ml_total_min"]) min")
+    println("  WaterLily total:     $(t["wl_total_min"]) min")
+    println("  Grand total:         $(t["grand_total_min"]) min")
+    println("\n" * "="^60)
+end
+
 function plot_forces_comparison(res::AccelResults, t_end; t_train=nothing, t_test=nothing, mode_log=nothing)
     m = compute_metrics(res)
     rel_drag = round(m.rel_err.drag_mean, digits=2)
@@ -327,33 +359,112 @@ function plot_accel_combined(res::AccelResults, t_end; t_train=nothing, t_test=n
         layout=@layout([a{0.6h}; b c]), size=(800, 700))
 end
 
-function rst_plot(rst_term, clims)
-    WaterLily.flood(rst_term;
-        levels=20, color=:magma, aspectratio=:equal,
-        clims=clims, axis=nothing, colorbar=true,
-        xlims=(0, size(rst_term)[1]), ylims=(0, size(rst_term)[1]),
-        size=(300, 300))
+# Single RST contour panel. Geometry, axes, fonts and cylinder match
+# `meanflow_contour` so the RST and mean-flow panels look identical. Two styles:
+#   :bw     — black-and-white line contours in the style of the reference RST
+#             figure (Font García et al., fig. 11): solid lines for positive
+#             levels, dashed for negative, fixed spacing Δ = clims[2]/nlevels.
+#   :filled — coloured filled contours like the mean-flow plots, with the
+#             contour edges drawn in thin black so the bands stay clearly visible.
+function rst_plot(field; clims, nlevels=12, style=:bw,
+                  cmap=cgrad(:curl), title="", colorbar=false)
+    nx, ny = size(field)
+    ni = nx - 2
+    L  = ni / 8
+    cx = ni / 4 + 1.5
+    cy = (ny - 2) / 2 + 1.5
+    xc = (collect(axes(field, 1)) .- cx) ./ L
+    yc = (collect(axes(field, 2)) .- cy) ./ L
+    xticks = (ceil(xc[1] / 2) * 2):2:(floor(xc[end] / 2) * 2)
+    yticks = (ceil(yc[1] / 2) * 2):2:(floor(yc[end] / 2) * 2)
+
+    axis_kw = (; aspect_ratio=:equal, framestyle=:box, legend=false,
+        background=:white, xlims=(xc[1], xc[end]), ylims=(yc[1], yc[end]),
+        xticks=xticks, yticks=yticks, tickfontsize=8, tick_direction=:iout,
+        xlabel="x/L", ylabel="y/L", guidefontsize=9,
+        title=title, titlefontsize=10)
+
+    if style == :filled
+        f = clamp.(field, clims[1], clims[2])' |> Array
+        plt = contourf(xc, yc, f; levels=nlevels, color=cmap, clims=clims,
+            linewidth=0.4, linecolor=:black, colorbar=colorbar, axis_kw...)
+    else
+        plt = plot(; colorbar=colorbar, axis_kw...)
+        amax = clims[2]
+        Δ = amax / nlevels
+        lmin = Δ
+        f = field' |> Array
+        neg_levels = collect(-amax:Δ:-lmin)   # dashed
+        pos_levels = collect(lmin:Δ:amax)     # solid
+        if !isempty(neg_levels)
+            contour!(plt, xc, yc, f; levels=neg_levels, color=:black,
+                linecolor=:black, linewidth=0.6, linestyle=:dash, colorbar=false)
+        end
+        if !isempty(pos_levels)
+            contour!(plt, xc, yc, f; levels=pos_levels, color=:black,
+                linecolor=:black, linewidth=0.6, linestyle=:solid, colorbar=false)
+        end
+    end
+
+    θ = range(0, 2π; length=120)
+    plot!(plt, Plots.Shape(0.5 .* cos.(θ), 0.5 .* sin.(θ));
+        seriestype=:shape, fillcolor="#BFBFBF", linecolor=:black, linewidth=1.0)
+    return plt
 end
 
-function plot_rst_comparison(sim_meanflow, ref_meanflow)
+# style = :bw for the reference-figure line contours, :filled for coloured
+# filled contours. The filled colour maps are deliberately different from the
+# mean-flow plots (:RdBu / :thermal): sequential :viridis for the non-negative
+# normal stresses ⟨u'u'⟩, ⟨v'v'⟩ and diverging :curl for the signed ⟨u'v'⟩.
+function plot_rst_comparison(sim_meanflow, ref_meanflow; savedir=nothing, fmt="pdf",
+                             nlevels=12, style=:bw)
     τ = WaterLily.uu(sim_meanflow)
     τ_ref = WaterLily.uu(ref_meanflow)
 
-    rst_comp_plots = []
     ranges = [(1, 1), (2, 2), (2, 1)]
-    titles = ["⟨u'u'⟩", "⟨v'v'⟩", "⟨u'v'⟩"]
+    names  = ["rst_uu", "rst_vv", "rst_uv"]
+    signed = [false, false, true]
+    div = cgrad(:curl)      # signed shear stress ⟨u'v'⟩
+    # non-negative normal stresses ⟨u'u'⟩, ⟨v'v'⟩: the positive (upper) half of
+    # :curl so 0 maps to its white centre and max to its far end, directly
+    # comparable to the signed shear panel.
+    seq = cgrad([div[x] for x in range(0.5, 1.0; length=128)])
+    # non-negative absolute-error fields: linear, near-white at zero, in a cool
+    # hue clearly distinct from the warm/magenta stress colourbars.
+    err = cgrad(:amp)
+
+    
+    panels = []
     for (i, (i3, i4)) in enumerate(ranges)
         τ_comp, τ_ref_comp = τ[:, :, i3, i4], τ_ref[:, :, i3, i4]
-        clims = (min(minimum(τ_comp), minimum(τ_ref_comp)),
-                 max(maximum(τ_comp), maximum(τ_ref_comp)))
-        p_ref = rst_plot(τ_ref_comp, clims)
-        p_hybrid = plot!(rst_plot(τ_comp, clims))
-        plt = plot(p_ref, p_hybrid, layout=(1, 2),
-            plot_title="$(titles[i]) (Reference vs Hybrid)",
-            top_margin=(-10, :mm), size=(600, 300))
-        push!(rst_comp_plots, plt)
+        τ_diff = abs.(τ_comp .- τ_ref_comp)
+        # Shared limits so the reference and hybrid panels are comparable.
+        if signed[i]
+            clims = sym_clims(τ_comp, τ_ref_comp)
+            cmap = div
+        else
+            amax = max(maximum(τ_comp), maximum(τ_ref_comp))
+            clims = (0.0, amax)
+            cmap = seq
+        end
+        err_clims = (0.0, maximum(τ_diff))
+        kw     = (; clims=clims,     nlevels=nlevels, style=style, cmap=cmap, colorbar=(style == :filled))
+        err_kw = (; clims=err_clims, nlevels=nlevels, style=style, cmap=err,  colorbar=(style == :filled))
+        push!(panels, ("$(names[i])_reference", rst_plot(τ_ref_comp; kw...)))
+        push!(panels, ("$(names[i])_hybrid",    rst_plot(τ_comp;     kw...)))
+        push!(panels, ("$(names[i])_abserror",  rst_plot(τ_diff;     err_kw...)))
     end
-    return plot(rst_comp_plots..., layout=(3, 1), size=(900, 1100))
+
+    if !isnothing(savedir)
+        isdir(savedir) || mkpath(savedir)
+        for (name, p) in panels
+            savefig(p, joinpath(savedir, "$(name).$(fmt)"))
+        end
+        println("Saved $(length(panels)) RST panels to: $(savedir)")
+    end
+
+    return plot((p for (_, p) in panels)...;
+        layout=(3, 3), size=(1200, 1050), dpi=400, colorbar=(style == :filled))
 end
 
 # Gray circle marking the cylinder body, in array-index coordinates.
@@ -421,7 +532,7 @@ function plot_meanflow_comparison(sim_meanflow, ref_meanflow; savedir=nothing, f
     v_err_clims = (0.0, maximum(v_diff))
 
     div = cgrad(:RdBu, rev=true)   # red = positive, blue = negative
-    seq = cgrad(:thermal)          # non-negative absolute-error fields
+    seq = cgrad(:amp)          # non-negative absolute-error fields
 
     panels = [
         ("meanflow_u_reference", meanflow_contour(ref_u;  clims=u_clims,     cmap=div, title="")),
