@@ -16,7 +16,7 @@ Base.@kwdef struct InlineParams
     pred_Δt = 0.35
     save_interval = 0.05
     sample_interval = 0.0
-    max_retrain_flags = 5
+    max_retrain_flags = 3
 end
 
 Base.@kwdef mutable struct HybridState
@@ -95,6 +95,7 @@ function run_warmup!(hs::HybridState, t_end; simdata::Union{SimData,Nothing}=not
         if sim_time(sim) > hs.next_save
             WaterLily.update!(hs.sim_meanflow, sim.flow)
             run_ref && WaterLily.update!(hs.ref_meanflow, ref_sim.flow)
+            run_ref && save_field_step!(hs, sim, ref_sim)
             hs.next_save = sim_time(sim) + hs.params.save_interval
             save_gif && save_velocity_frame!(hs.gif_frames, sim, sim_time(sim))
             verbose && @info "  Updating MeanFlow statistics at: $(sim_time(sim))"
@@ -112,8 +113,6 @@ function run_warmup!(hs::HybridState, t_end; simdata::Union{SimData,Nothing}=not
             hs.next_sample = sim_time(sim) + hs.params.sample_interval
             verbose && @info "Updating simdata statistics at: $(sim_time(sim))"
         end
-
-        run_ref && save_field_step!(hs, sim, ref_sim)
 
         hs.step += 1
 
@@ -309,12 +308,11 @@ function run_hybrid!(hs::HybridState; verbose=true)
         if sim_time(sim) > hs.next_save
             WaterLily.update!(sim_meanflow, sim.flow)
             WaterLily.update!(ref_meanflow, ref_sim.flow)
+            save_field_step!(hs, sim, ref_sim)
             hs.next_save = sim_time(sim) + params.save_interval
             save_velocity_frame!(gif_frames, sim, sim_time(sim))
             @info "Updating MeanFlow statistics at: $(sim_time(sim))"
         end
-
-        save_field_step!(hs, sim, ref_sim)
 
         hs.step += 1
 

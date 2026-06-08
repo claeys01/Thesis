@@ -138,7 +138,7 @@ function compute_metrics(res::AccelResults)
 end
 
 function meanflow_errors(sim_meanflow, ref_meanflow)
-    rel_l1(a, b) = mean(abs, a .- b) / mean(abs.(b))
+    rel_l1(a, b) = mean(abs, a .- b)
     stats(a, b) = (l1 = rel_l1(a, b), ρ = cor(vec(a), vec(b)))
 
     sim_u, sim_v = sim_meanflow.U[:, :, 1], sim_meanflow.U[:, :, 2]
@@ -215,8 +215,8 @@ function print_metrics(res::AccelResults; pred_label="", avg_steps_per_pred=noth
         println("\n" * "="^60)
         println("FIELD ANALYSIS")
         println("="^60 * "\n")
-        println("Rel Err (L1) - Mean flow ⟨u⟩: $(round(fe.u.l1, digits=3)) %,  ⟨v⟩: $(round(fe.v.l1, digits=3)) %")
-        println("Rel Err (L1) - RST ⟨u'u'⟩: $(round(fe.uu.l1, digits=3)) %,  ⟨v'v'⟩: $(round(fe.vv.l1, digits=3)) %,  ⟨u'v'⟩: $(round(fe.uv.l1, digits=3)) %")
+        println("MAE - Mean flow ⟨u⟩: $(round(fe.u.l1, digits=3)),  ⟨v⟩: $(round(fe.v.l1, digits=3))")
+        println("MAE - RST ⟨u'u'⟩: $(round(fe.uu.l1, digits=3)),  ⟨v'v'⟩: $(round(fe.vv.l1, digits=3)),  ⟨u'v'⟩: $(round(fe.uv.l1, digits=3))")
         println("Corr coeff   - Mean flow ⟨u⟩: $(round(fe.u.ρ, digits=4)),  ⟨v⟩: $(round(fe.v.ρ, digits=4))")
         println("Corr coeff   - RST ⟨u'u'⟩: $(round(fe.uu.ρ, digits=4)),  ⟨v'v'⟩: $(round(fe.vv.ρ, digits=4)),  ⟨u'v'⟩: $(round(fe.uv.ρ, digits=4))")
     end
@@ -390,7 +390,7 @@ function rst_plot(field; clims, nlevels=12, style=:bw,
         xticks=xticks, yticks=yticks, tickfontsize=10, tick_direction=:iout,
         xlabel="x/L", ylabel="y/L", guidefontsize=16,
         title=title, titlefontsize=10, size=(panel_w, panel_h),
-        left_margin=1Plots.mm, right_margin=1Plots.mm,
+        left_margin=1Plots.mm, right_margin=3Plots.mm,
         top_margin=0Plots.mm, bottom_margin=1Plots.mm)
 
     if style == :filled
@@ -523,7 +523,7 @@ function meanflow_contour(field; clims, title="", cmap=cgrad(:RdBu, rev=true),
         xticks=xticks, yticks=yticks, tickfontsize=10, tick_direction=:iout,
         xlabel="x/L", ylabel="y/L", guidefontsize=16,
         title=title, titlefontsize=10, size=(panel_w, panel_h),
-        left_margin=1Plots.mm, right_margin=1Plots.mm,
+        left_margin=1Plots.mm, right_margin=3Plots.mm,
         top_margin=0Plots.mm, bottom_margin=1Plots.mm)
     θ = range(0, 2π; length=120)
     plot!(plt, Plots.Shape(0.5 .* cos.(θ), 0.5 .* sin.(θ));

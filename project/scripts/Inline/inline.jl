@@ -20,11 +20,11 @@ if is_hpc()
 end
 
 
-AE_path = "data/saved_models/inline_runs_hpc/base/AE_Jun03-2139__E500_HW256x256_C4to2_nc5_nd1_z16_C8_lr0p001_wd0p0009_bs16_NY_LL1_Tl0p0/checkpoint.jld2"
-AE_retrain_path = "data/saved_models/inline_runs_hpc/base/AE_Jun03-2139__E500_HW256x256_C4to2_nc5_nd1_z16_C8_lr0p001_wd0p0009_bs16_NY_LL1_Tl0p0/checkpoint.jld2"
+AE_path = "data/saved_models/inline_runs_hpc/base/AE_Jun05-1553__E500_HW256x256_C4to2_nc5_nd1_z16_C8_lr0p001_wd0p0009_bs16_NY_LL1_Tl0p0/checkpoint.jld2"
+AE_retrain_path = "data/saved_models/inline_runs_hpc/base/AE_Jun05-1610__E100_HW256x256_C4to2_nc5_nd1_z16_C8_lr0p0002_wd0p0009_bs16_NY_LL1_Tl0p0/checkpoint.jld2"
 
-node_path = "data/saved_models/inline_runs_hpc/base/NODE_Jun03-215128/node_params.jld2"
-node_retrain_path = "data/saved_models/inline_runs_hpc/base/NODE_Jun03-215719/node_params.jld2"
+node_path = "data/saved_models/inline_runs_hpc/base/NODE_Jun05-160822/node_params.jld2"
+node_retrain_path = "data/saved_models/inline_runs_hpc/base/NODE_Jun05-161406/node_params.jld2"
 
 params = InlineParams()
 

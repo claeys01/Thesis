@@ -95,7 +95,7 @@ meanplot = plot_meanflow_comparison(sim_meanflow, ref_meanflow;
     savedir=joinpath(base_dir, "meanflow_panels"))
 display(meanplot)
 
-rst_plot = plot_rst_comparison(sim_meanflow, ref_meanflow; style=:filled,
+rst_plot = plot_rst_comparison(sim_meanflow, ref_meanflow; style=:bw,
     savedir=joinpath(base_dir, "rst_panels"))
 display(rst_plot)
 
