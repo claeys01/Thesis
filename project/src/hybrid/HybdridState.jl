@@ -1,7 +1,7 @@
 Base.@kwdef struct InlineParams
     t_run = 20
     t_train = 17.5
-    t_accel_end = 50
+    t_accel_end = 100
     t_update = 10
     ae_epochs = 500
     ae_retrain_epochs = 100
@@ -16,7 +16,7 @@ Base.@kwdef struct InlineParams
     pred_Δt = 0.35
     save_interval = 0.05
     sample_interval = 0.0
-    max_retrain_flags = 3
+    max_retrain_flags = 5
 end
 
 Base.@kwdef mutable struct HybridState

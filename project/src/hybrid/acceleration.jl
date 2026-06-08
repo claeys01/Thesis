@@ -378,11 +378,20 @@ function rst_plot(field; clims, nlevels=12, style=:bw,
     xticks = (ceil(xc[1] / 2) * 2):2:(floor(xc[end] / 2) * 2)
     yticks = (ceil(yc[1] / 2) * 2):2:(floor(yc[end] / 2) * 2)
 
+    # Keep the plot width at the default 600 px (so the plotted region stays the
+    # same size) but shrink the canvas height to hug the wide-short domain
+    # instead of padding it with empty bands above/below.
+    panel_w = 500
+    panel_h = round(Int, panel_w * (yc[end] - yc[1]) / (xc[end] - xc[1])) + 70
+    colorbar && (panel_w += 90)
+
     axis_kw = (; aspect_ratio=:equal, framestyle=:box, legend=false,
         background=:white, xlims=(xc[1], xc[end]), ylims=(yc[1], yc[end]),
-        xticks=xticks, yticks=yticks, tickfontsize=8, tick_direction=:iout,
-        xlabel="x/L", ylabel="y/L", guidefontsize=9,
-        title=title, titlefontsize=10)
+        xticks=xticks, yticks=yticks, tickfontsize=10, tick_direction=:iout,
+        xlabel="x/L", ylabel="y/L", guidefontsize=16,
+        title=title, titlefontsize=10, size=(panel_w, panel_h),
+        left_margin=1Plots.mm, right_margin=1Plots.mm,
+        top_margin=0Plots.mm, bottom_margin=1Plots.mm)
 
     if style == :filled
         f = clamp.(field, clims[1], clims[2])' |> Array
@@ -498,6 +507,12 @@ function meanflow_contour(field; clims, title="", cmap=cgrad(:RdBu, rev=true),
     # Even-spaced ticks (in diameters) so 0 lands on the cylinder centre.
     xticks = (ceil(xc[1] / 2) * 2):2:(floor(xc[end] / 2) * 2)
     yticks = (ceil(yc[1] / 2) * 2):2:(floor(yc[end] / 2) * 2)
+    # Keep the plot width at the default 600 px (so the plotted region stays the
+    # same size) but shrink the canvas height to hug the wide-short domain
+    # instead of padding it with empty bands above/below.
+    panel_w = 500
+    panel_h = round(Int, panel_w * (yc[end] - yc[1]) / (xc[end] - xc[1])) + 70
+    colorbar && (panel_w += 90)
     f = clamp.(field, clims[1], clims[2])
     plt = contourf(xc, yc, f' |> Array;
         levels=levels, color=cmap, clims=clims,
@@ -505,9 +520,11 @@ function meanflow_contour(field; clims, title="", cmap=cgrad(:RdBu, rev=true),
         aspect_ratio=:equal, framestyle=:box, legend=false,
         colorbar=colorbar, background=:white,
         xlims=(xc[1], xc[end]), ylims=(yc[1], yc[end]),
-        xticks=xticks, yticks=yticks, tickfontsize=8, tick_direction=:iout,
-        xlabel="x/L", ylabel="y/L", guidefontsize=9,
-        title=title, titlefontsize=10)
+        xticks=xticks, yticks=yticks, tickfontsize=10, tick_direction=:iout,
+        xlabel="x/L", ylabel="y/L", guidefontsize=16,
+        title=title, titlefontsize=10, size=(panel_w, panel_h),
+        left_margin=1Plots.mm, right_margin=1Plots.mm,
+        top_margin=0Plots.mm, bottom_margin=1Plots.mm)
     θ = range(0, 2π; length=120)
     plot!(plt, Plots.Shape(0.5 .* cos.(θ), 0.5 .* sin.(θ));
         seriestype=:shape, fillcolor="#BFBFBF", linecolor=:black, linewidth=1.0)

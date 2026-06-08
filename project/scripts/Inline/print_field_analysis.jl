@@ -91,13 +91,13 @@ hyb_drag = first.(res.hybrid_forces_wat)
 hyb_lift = last.(res.hybrid_forces_wat)
 
 
-# meanplot = plot_meanflow_comparison(sim_meanflow, ref_meanflow;
-#     savedir=joinpath(base_dir, "meanflow_panels"))
-# display(meanplot)
+meanplot = plot_meanflow_comparison(sim_meanflow, ref_meanflow;
+    savedir=joinpath(base_dir, "meanflow_panels"))
+display(meanplot)
 
-# rst_plot = plot_rst_comparison(sim_meanflow, ref_meanflow; style=:filled,
-#     savedir=joinpath(base_dir, "rst_panels"))
-# display(rst_plot)
+rst_plot = plot_rst_comparison(sim_meanflow, ref_meanflow; style=:filled,
+    savedir=joinpath(base_dir, "rst_panels"))
+display(rst_plot)
 
 # sim_u, sim_v = sim_meanflow.U[:, :, 1], sim_meanflow.U[:, :, 2]
 # ref_u, ref_v = ref_meanflow.U[:, :, 1], ref_meanflow.U[:, :, 2]
