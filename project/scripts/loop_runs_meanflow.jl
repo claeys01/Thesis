@@ -5,7 +5,7 @@ using Plots
 using Printf
 
 # sweep_dir = "data/saved_models/inline_runs_hpc/gs_sweep_old"
-sweep_dir = "/scratch/mfbclaeys/data/inline_runs/inline_sweep_final_v2_actual"
+sweep_dir = "/scratch/mfbclaeys/data/inline_runs/inline_sweep_final_v2_actual_rest"
 fmt = "pdf"                                   # format for the saved panel figures
 csv_path = joinpath(sweep_dir, "meanflow_errors.csv")
 
