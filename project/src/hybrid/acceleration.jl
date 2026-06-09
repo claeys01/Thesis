@@ -138,8 +138,8 @@ function compute_metrics(res::AccelResults)
 end
 
 function meanflow_errors(sim_meanflow, ref_meanflow)
-    rel_l1(a, b) = mean(abs, a .- b)
-    stats(a, b) = (l1 = rel_l1(a, b), ρ = cor(vec(a), vec(b)))
+    MAE(a, b) = mean(abs, a .- b)
+    stats(a, b) = (l1 = MAE(a, b), ρ = cor(vec(a), vec(b)))
 
     sim_u, sim_v = sim_meanflow.U[:, :, 1], sim_meanflow.U[:, :, 2]
     ref_u, ref_v = ref_meanflow.U[:, :, 1], ref_meanflow.U[:, :, 2]
@@ -474,19 +474,6 @@ function plot_rst_comparison(sim_meanflow, ref_meanflow; savedir=nothing, fmt="p
 
     return plot((p for (_, p) in panels)...;
         layout=(3, 3), size=(1200, 1050), dpi=400, colorbar=(style == :filled))
-end
-
-# Gray circle marking the cylinder body, in array-index coordinates.
-# WaterLily stores the field with one ghost layer (size = N+2) and maps cell I
-# to physical position I-1.5, so the body (center n/4,m/2 ; radius n/16) sits at
-# the indices below.
-function cylinder_shape(nx, ny; n_pts=120)
-    ni = nx - 2
-    r  = ni / 16
-    cx = ni / 4 + 1.5
-    cy = (ny - 2) / 2 + 1.5
-    θ  = range(0, 2π; length=n_pts)
-    Plots.Shape(cx .+ r .* cos.(θ), cy .+ r .* sin.(θ))
 end
 
 # Filled red/blue contour panel in the style of the reference vorticity figure:
