@@ -20,7 +20,7 @@ ref_path    = joinpath(savedir, "U_ref_inline.jld2")
 # and read the cross-stream velocity (comp 2) which oscillates at the
 # vortex-shedding frequency.
 x_downstream_D = 2.0   # distance behind cylinder center, in diameters
-y_offset_D     = 0.  # offset from the centerline, in diameters
+y_offset_D     = 0.25  # offset from the centerline, in diameters
 component      = 1     # 1 = streamwise u, 2 = cross-stream v
 n_segments     = 5     # Welch: number of averaged segments (more → smoother, coarser in f)
 overlap        = 0.5   # fractional overlap between segments (0.5 is standard)
@@ -106,12 +106,27 @@ plot!(p_sig, t_hyb, v_hyb; label = "hybrid", color = hyb_color, lw = 1.6, ls = :
 savefig(p_sig, joinpath(savedir, "wake_signal.png"))
 
 # (2) Welch power spectrum
+P_all    = vcat(P_ref[2:end], P_hyb[2:end])
+ylo, yhi = minimum(filter(>(0), P_all)), maximum(P_all)
 p_psd = plot(f_ref[2:end], P_ref[2:end]; label = "reference", color = ref_color,
              lw = 1.6, xscale = :log10, yscale = :log10,
-             xlabel = "frequency  \$f\$", ylabel = "PS(\$$(comp_label)\$)",
-             legend = :bottomleft, size = (560, 460))
-plot!(p_psd, f_hyb[2:end], P_hyb[2:end]; label = "hybrid", color = hyb_color,
-      lw = 1.6, ls = :dash)
+             xlabel = "\$f D/U\$", ylabel = "PS(\$$(comp_label)\$)",
+             legend = :bottomleft, size = (600, 400), dpi = 500,
+             ylims = (ylo / 3, yhi * 2),
+             grid = true, gridalpha = 0.35, gridlinewidth = 0.6,
+             minorgrid = true, minorgridalpha = 0.12)
+plot!(p_psd, f_hyb[2:end], P_hyb[2:end]; label = "hybrid", color = hyb_color, lw = 1.6)
+
+# -5/3 inertial-subrange reference slope, spanning the full width and laid
+# along the linear (inertial) decay of the spectrum
+f_pos    = f_ref[2:end]
+f_anchor = 3.0                                # frequency in the linear falloff to seat the line
+lift     = 1.0                                # vertical shift (×); >1 lifts it off the data
+ia       = argmin(abs.(f_pos .- f_anchor))
+A53      = lift * P_ref[1 + ia] / f_pos[ia]^(-5/3)
+f53      = exp10.(range(log10(f_pos[1]), log10(f_pos[end]); length = 100))
+plot!(p_psd, f53, A53 .* f53 .^ (-5/3); label = "\$f^{-5/3}\$",
+      color = :gray40, lw = 1.4, ls = :dot)
 savefig(p_psd, joinpath(savedir, "wake_psd.png"))
 
 display(p_sig)
