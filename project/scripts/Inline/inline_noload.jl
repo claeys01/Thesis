@@ -95,9 +95,10 @@ node_retrain_elapsed_total = 0.0
 wl_cutoff_elapsed_total = 0.0
 retrain_timings = NamedTuple[]   # one entry per completed retrain cycle
 
-# run_hybrid!(hs)
+flex_warm = true
 while sim_time(hs.sim) < hs.params.t_accel_end
-    run_hybrid!(hs)
+    run_hybrid!(hs, warmup=flex_warm)
+    flex_warm = false
     global simdata, ae_retrain_elapsed_total, node_retrain_elapsed_total, wl_cutoff_elapsed_total
     sim_time(hs.sim) >  hs.params.t_accel_end && break
     if hs.retrain_needed
@@ -123,7 +124,7 @@ while sim_time(hs.sim) < hs.params.t_accel_end
             η = 2e-4,
             epochs=hs.params.ae_retrain_epochs,
             batch_size=hs.params.ae_batch_size,
-            t_training=simdata.time[end] - 3 ,
+            t_training=simdata.time[end] - 2 ,
             train_downsample=hs.params.downsample,
             retrain=true,
             checkpoint_path=hs.AE_path,

@@ -111,7 +111,7 @@ function run_warmup!(hs::HybridState, t_end; simdata::Union{SimData,Nothing}=not
             push!(time_vec, res.hybrid_time_wat[end])
             push!(Δt_vec, Float32(round(sim.flow.Δt[end], digits=3)))
             hs.next_sample = sim_time(sim) + hs.params.sample_interval
-            verbose && @info "Updating simdata statistics at: $(sim_time(sim))"
+            # verbose && @info "Updating simdata statistics at: $(sim_time(sim))"
         end
 
         hs.step += 1
@@ -237,12 +237,13 @@ function update_reference_meanflow!(hs::HybridState, t_meanflow, hyb_fields)
 end
 
 # function run_hybrid!(hs::HybridState; simdata::Union{SimData,Nothing}=nothing, save_path=nothing, verbose=true)
-function run_hybrid!(hs::HybridState; verbose=true)
+function run_hybrid!(hs::HybridState; verbose=true, warmup=false)
+    @info "Starting hybrid loop"
     (; sim, ref_sim, aenode, params, sim_meanflow, ref_meanflow,
         res, n_integrs, gif_frames, mode_log) = hs
     retrain_req_counter = 0
 
-    predict_flex(aenode, deepcopy(sim); Δt=Float32(params.pred_Δt), impose_biot=true, verbose=false) # warmup predict function 
+    warmup && predict_flex(aenode, deepcopy(sim); Δt=Float32(params.pred_Δt), impose_biot=true, verbose=false) # warmup predict function 
     t_hybrid_start = sim_time(sim)
 
     while sim_time(sim) < params.t_accel_end
