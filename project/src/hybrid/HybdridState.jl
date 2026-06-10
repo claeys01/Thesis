@@ -243,7 +243,7 @@ function run_hybrid!(hs::HybridState; verbose=true, warmup=false)
         res, n_integrs, gif_frames, mode_log) = hs
     retrain_req_counter = 0
 
-    warmup && predict_flex(aenode, deepcopy(sim); Δt=Float32(params.pred_Δt), impose_biot=true, verbose=true, t_accel_end=21) # warmup predict function 
+    warmup && predict_flex(aenode, deepcopy(sim); Δt=Float32(params.pred_Δt), impose_biot=true, verbose=false, t_accel_end=21) # warmup predict function 
     t_hybrid_start = sim_time(sim)
 
     while sim_time(sim) < params.t_accel_end

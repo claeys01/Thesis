@@ -94,7 +94,7 @@ end
 
 function predict_flex(aenode::AENODE, sim::BiotSimulation; 
     Δt::Float32=0.35f0, impose_biot=false, next_save=0.25, save_interval=0.25, verbose=true,
-    t_accel_end::Float32=Inf32)
+    t_accel_end::Float32=100f0)
     û, n_integr, retrain_required, û_meanflow, t_meanflow, rollout_time = predict_flex(
         aenode,
         sim.flow.u,
@@ -116,7 +116,7 @@ end
 
 function predict_flex(aenode::AENODE, u::AbstractArray, μ₀::AbstractArray, t₀::Float32; 
     Δt::Float32=0.35f0, next_save=0.25, save_interval=0.25, verbose=true, L=32.0f0,
-    t_accel_end::Float32=Inf32)
+    t_accel_end::Float32=100f0)
     # Only the encode → rollout → final decode is timed. The intermediate flow
     # reconstructions needed to update the MeanFlow are excluded.
     rollout_time = @elapsed begin
