@@ -95,11 +95,9 @@ node_retrain_elapsed_total = 0.0
 wl_cutoff_elapsed_total = 0.0
 retrain_timings = NamedTuple[]   # one entry per completed retrain cycle
 
-global flex_warm = true
 while sim_time(hs.sim) < hs.params.t_accel_end
-    run_hybrid!(hs, warmup=flex_warm)
-    flex_warm = false
-    global simdata, ae_retrain_elapsed_total, node_retrain_elapsed_total, wl_cutoff_elapsed_total
+    run_hybrid!(hs)
+    global  simdata, ae_retrain_elapsed_total, node_retrain_elapsed_total, wl_cutoff_elapsed_total
     sim_time(hs.sim) >  hs.params.t_accel_end && break
     if hs.retrain_needed
         GC.gc()
