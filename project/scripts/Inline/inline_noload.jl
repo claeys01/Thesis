@@ -46,6 +46,8 @@ ae_args = LuxArgs(
         train_downsample=hs.params.downsample,
         t_training=hs.params.t_train,
         batch_size=hs.params.ae_batch_size,
+        λdiv=100.0,
+        λcurl=100.0,
         full_data_path=simdata_path, 
         simdata_ram=simdata,
     )
@@ -124,6 +126,8 @@ while sim_time(hs.sim) < hs.params.t_accel_end
             batch_size=hs.params.ae_batch_size,
             t_training=simdata.time[end] * 0.85 ,
             train_downsample=hs.params.downsample,
+            λdiv=100.0,
+            λcurl=100.0,
             retrain=true,
             checkpoint_path=hs.AE_path,
             save_path=savedir,

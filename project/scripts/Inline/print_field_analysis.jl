@@ -8,6 +8,10 @@ base_dir = "data/saved_models/inline_runs_hpc/base"
 
 hs_path = joinpath(base_dir, "hybrid_state.jld2")
 @load hs_path res sim_meanflow ref_meanflow params mode_log n_integrs AE_path node_path savedir
+dump(params)
+
+base_params = InlineParams()
+
 
 # Post-processing only — mirrors save_results(hs) but writes nothing to disk.
 print_metrics(res; pred_label="(flexible OOD)",
