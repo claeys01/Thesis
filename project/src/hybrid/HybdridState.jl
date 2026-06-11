@@ -14,7 +14,7 @@ Base.@kwdef struct InlineParams
     group_size = 15
     n_switch = 150
     pred_Δt = 0.35
-    save_interval = 0.05
+    save_interval = 0.01
     sample_interval = 0.0
     max_retrain_flags = 3
 end

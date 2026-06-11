@@ -216,3 +216,16 @@ function curl_plot(u::AbstractArray{T, 3}; L=32, U=1) where {T}
     return plt
 end
 curl_plot(sim::AbstractSimulation) = curl_plot(sim.flow.u; L=sim.L, U=sim.U)
+
+# Same vorticity field as curl_plot (unchanged seismic / clims), but rendered
+# through meanflow_contour so it gets the x/L, y/L boxed axes and the gray body.
+function curl_contour(u::AbstractArray{T, 3}; L=32, U=1, clims=(-8, 8),
+                      cmap=:seismic, levels=24, colorbar=true, title="",
+                      linewidth=0.0) where {T}
+    ω = zeros(size(u)[1], size(u)[2])
+    @inside ω[I] = WaterLily.curl(3,I,u)*L/U
+    @inside ω[I] = ifelse(abs(ω[I])<0.001,0.0,ω[I])
+    return meanflow_contour(ω; clims=clims, cmap=cmap, levels=levels,
+                            colorbar=colorbar, title=title, linewidth=linewidth)
+end
+curl_contour(sim::AbstractSimulation; kwargs...) = curl_contour(sim.flow.u; L=sim.L, U=sim.U, kwargs...)

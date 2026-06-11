@@ -97,6 +97,8 @@ function plot_losses(loss_trajectory_path::AbstractString, checkpoint_path::Abst
         color = :black,
     )
 
+
+
     # validation loss
     if !isempty(val_losses)
         plot!(p, val_epochs, val_losses;
@@ -106,6 +108,14 @@ function plot_losses(loss_trajectory_path::AbstractString, checkpoint_path::Abst
             # alpha = 0.9,
         )
     end
+
+          plot!(p, 
+        train_epochs, rec_losses;
+        label="rec",
+        lw = 0.8,
+        alpha=0.9, 
+        color= :teal )
+
 
     # test losses
     if !isempty(test_losses)
@@ -118,6 +128,7 @@ function plot_losses(loss_trajectory_path::AbstractString, checkpoint_path::Abst
             )
     end
 
+  
     # optional extra loss terms if enabled
     if args.λdiv != 0 && !isempty(div_losses)
         plot!(p, train_epochs, div_losses;
@@ -131,7 +142,7 @@ function plot_losses(loss_trajectory_path::AbstractString, checkpoint_path::Abst
 
     if args.λcurl != 0 && !isempty(curl_losses)
         plot!(p, train_epochs, curl_losses;
-            label = L"\omega\ \mathrm{loss}",
+            label = L"\omega",
             lw = 0.8,
             # ls = :dot,
             color = :orange,
@@ -226,9 +237,9 @@ function plot_losses(loss_trajectory_path::AbstractString, checkpoint_path::Abst
     # 1. remove big title from top, just annotate final loss small in plot area
 
     # shrink legend boxes (border thin)
-    plot!(p; legend=:bottomleft, foreground_color_legend=:black,
+    plot!(p; legend=:bottomleft, legendcolumns=2, foreground_color_legend=:black, legendfontsize=5,
              background_color_legend=RGBA(1,1,1,0.7))
-    plot!(p2; legend=:bottomright,  foreground_color_legend=:black,
+    plot!(p2; legend=:bottomright, legendcolumns=1, foreground_color_legend=:black,
              background_color_legend=RGBA(1,1,1,0.7))
 
     

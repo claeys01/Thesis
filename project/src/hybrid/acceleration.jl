@@ -480,7 +480,7 @@ end
 # discrete contour bands with thin black contour lines, no axes, white
 # background, and the cylinder body drawn as a solid gray disk.
 function meanflow_contour(field; clims, title="", cmap=cgrad(:RdBu, rev=true),
-                          levels=12, colorbar=true)
+                          levels=12, colorbar=true, linewidth=0.25)
     nx, ny = size(field)
     # The geometry is defined in grid cells; map array indices to cylinder
     # diameters (x/L, y/L) with the cylinder centre at the origin, matching the
@@ -503,7 +503,7 @@ function meanflow_contour(field; clims, title="", cmap=cgrad(:RdBu, rev=true),
     f = clamp.(field, clims[1], clims[2])
     plt = contourf(xc, yc, f' |> Array;
         levels=levels, color=cmap, clims=clims,
-        linewidth=0.4, linecolor=:black,
+        linewidth=linewidth, linecolor=:black,
         aspect_ratio=:equal, framestyle=:box, legend=false,
         colorbar=colorbar, background=:white,
         xlims=(xc[1], xc[end]), ylims=(yc[1], yc[end]),

@@ -28,6 +28,7 @@ function visualize_reconstructions(checkpoint_path::Union{String,Nothing}=nothin
     end
 
     ids = randperm(span)[1:args.n_reconstruct]
+    # ids = randperm(span)[1]
     t = round.(simdata.time[ids], digits=2)
 
     @info "Selected $(args.n_reconstruct) snapshots with indices $ids for reconstruction"
@@ -76,6 +77,7 @@ function visualize_reconstructions(checkpoint_path::Union{String,Nothing}=nothin
             μ = mean(mat_in)
             σ = std(mat_in)
             clim = (μ - σ, μ + σ)
+            θ = range(0, 2π; length=120)
 
             img_in = flood(mat_in;
                 border=:none, colorbar=false, framestyle=:none,
@@ -84,22 +86,27 @@ function visualize_reconstructions(checkpoint_path::Union{String,Nothing}=nothin
                 title=" time: $(t[s]): Input $(dirs[ch])",
                 titlefontsize=8)
 
+            plot!(img_in, Plots.Shape(0.5 .* cos.(θ), 0.5 .* sin.(θ));
+            seriestype=:shape, fillcolor="#BFBFBF", linecolor=:black, linewidth=1.0)
+
             img_out = flood(mat_out;
                 border=:none, colorbar=false, framestyle=:none,
                 axis=nothing, ticks=false, clims=clim,
                 aspect_ratio=:equal,
                 title="Recon $(dirs[ch]) | MAE=$(round(mae; sigdigits=3)) | r=$(round(corr; digits=3))",
                 titlefontsize=8)
-
+            
+            plot!(img_out, Plots.Shape(0.5 .* cos.(θ), 0.5 .* sin.(θ));
+            seriestype=:shape, fillcolor="#BFBFBF", linecolor=:black, linewidth=1.0)
             push!(plots, img_in)
             push!(plots, img_out)
         end
     end
     
     p = plot(plots...;
-             layout=(args.n_reconstruct*2, 2),
+             layout=(length(ids)*2, 2),
              link=:none, legend=false,
-             size=(500, 750),
+             size=(500, 750/2*length(ids)),
              dpi=200, grid=false)
 
     return p
