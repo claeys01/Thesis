@@ -165,7 +165,7 @@ function run_one(cfg, sweep_root, u₀)
                 η = 2e-4,
                 epochs=hs.params.ae_retrain_epochs,
                 batch_size=hs.params.ae_batch_size,
-                t_training=simdata.time[end] * 0.85 ,
+                t_training=simdata.time[end] - 2.5 ,
                 train_downsample=hs.params.downsample,
                 λdiv=cfg.λdiv,
                 λcurl=cfg.λcurl,
