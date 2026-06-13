@@ -484,7 +484,7 @@ function get_latent_vectors(ae_bundle, normalizer::Normalizer, ae_args::LuxArgs;
     
     x_in, _, _ = build_batch(
         EpochData(get_data_in(simdata.u, simdata.μ₀; idx=train_idx)...), 
-        1:downsample; normalizer=normalizer
+        1:length(train_idx); normalizer=normalizer
     )
     
     x_in = device(x_in)
