@@ -21,7 +21,7 @@ ref_path    = joinpath(savedir, "U_ref_inline.jld2")
 # and read the cross-stream velocity (comp 2) which oscillates at the
 # vortex-shedding frequency.
 x_downstream_D = 2.0   # distance behind cylinder center, in diameters
-y_offset_D     = 0.4  # offset from the centerline, in diameters
+y_offset_D     = 0.5  # offset from the centerline, in diameters
 component      = 2     # 1 = streamwise u, 2 = cross-stream v
 n_segments     = 5     # Welch: number of averaged segments (more → smoother, coarser in f)
 overlap        = 0.5   # fractional overlap between segments (0.5 is standard)
@@ -63,7 +63,7 @@ t_hyb, v_hyb = dedupe_time(t_hyb, v_hyb)
 
 p = plot(t_ref)
 plot!(t_hyb)
-display(p)+
+# display(p)
 
 dt_ref = diff(t_ref)
 dt_hyb = diff(t_hyb)
@@ -163,12 +163,16 @@ plot!(p_psd, f_hyb[2:end], P_hyb[2:end]; label = "hybrid", color = hyb_color, lw
 # along the linear (inertial) decay of the spectrum
 f_pos    = f_ref[2:end]
 f_anchor = 2.0                                # frequency in the linear falloff to seat the line
-lift     = 1.5                                # vertical shift (×); >1 lifts it off the data
+lift     = 2.5                               # vertical shift (×); >1 lifts it off the data
 ia       = argmin(abs.(f_pos .- f_anchor))
 A53      = lift * P_ref[1 + ia] / f_pos[ia]^(-5/3)
 f53      = exp10.(range(log10(f_pos[1]), log10(f_pos[end]); length = 100))
 plot!(p_psd, f53, A53 .* f53 .^ (-5/3); label = "\$f^{-5/3}\$",
       color = :gray40, lw = 1.2, ls = :dot,)
+
+# plot!(p_psd, f53, A53 .* f53 .^ (-3); label = "\$f^{-3}\$",
+    #   color = :red, lw = 1.2, ls = :dot,)
+      
 savefig(p_psd, joinpath(savedir, "wake_psd.pdf"))
 
 display(p_sig)

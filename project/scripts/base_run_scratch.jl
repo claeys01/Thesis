@@ -32,6 +32,7 @@ span = length(simdata.time)
 id = randperm(span)[1]
 
 u_unprocessed = simdata.u[:, :, :, id]
+@show simdata.time[id]
 preprocess_data!(simdata; verbose=false)
 
 
@@ -60,13 +61,13 @@ plt_curl_in  = Thesis.curl_contour(u_unprocessed; colorbar=false)
 # Left panel keeps its y-axis; right panel drops the y-axis (shared) and carries
 # the single colorbar. Negative margins pull them together, like the meanflow plot.
 plot!(plt_curl_in; right_margin=-1Plots.mm)
-plt_curl_out = Thesis.curl_contour(û; colorbar=false)
+plt_curl_out = Thesis.curl_contour(û; colorbar=true)
 
 plot!(plt_curl_out; left_margin=-1Plots.mm, ylabel="", yformatter=_ -> "",
       title="", link=:y)
 
 curl_comp = plot(plt_curl_in, plt_curl_out;
-    layout=grid(1, 2),
+    layout=grid(1, 2; widths=[0.4425, 0.5575]),
     link=:y, legend=false, size=(700, 350), dpi=600, grid=false, bottom_margin=3Plots.mm)
 
 display(curl_comp)
