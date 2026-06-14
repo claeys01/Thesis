@@ -190,10 +190,10 @@ function plot_losses(loss_trajectory_path::AbstractString, checkpoint_path::Abst
 
         p2 = twinx()
         plot!(p2, val_epochs, cc1;
-            label = L"CC_u",
+            label = L"\rho_u",
             lw = 1,
             color = "#0F7173",   # dark teal (colorblind-safe blue-yellow axis)
-            ylabel = "CC",
+            ylabel = L"\rho",
             ylims = (0,1),
             guidefontsize = 10,
             tickfontsize  = 8,
@@ -203,7 +203,7 @@ function plot_losses(loss_trajectory_path::AbstractString, checkpoint_path::Abst
         )
 
         plot!(p2, val_epochs, cc2;
-            label = L"CC_v",
+            label = L"\rho_v",
             lw = 1,
             color = "#B8860B",   # dark goldenrod
             ylims = (0,1),
@@ -216,7 +216,7 @@ function plot_losses(loss_trajectory_path::AbstractString, checkpoint_path::Abst
 
         # p2 = twinx()
         plot!(p2, val_epochs, test_cc1;
-            label = L"\mathrm{test}\ CC_u",
+            label = L"\mathrm{test}\ \rho_u",
             lw = 0.8,
             linestyle=:dashdot,
             color = "#0F7173",   # dark teal (colorblind-safe blue-yellow axis)
@@ -224,7 +224,7 @@ function plot_losses(loss_trajectory_path::AbstractString, checkpoint_path::Abst
         )
 
         plot!(p2, val_epochs, test_cc2;
-            label = L"\mathrm{test}\ CC_v",
+            label = L"\mathrm{test}\ \rho_v",
             lw = 0.8,
             linestyle=:dashdot,
             color = "#B8860B",   # dark goldenrod

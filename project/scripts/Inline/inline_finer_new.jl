@@ -21,7 +21,7 @@ if is_hpc()
 end
 
 params = InlineParams(
-    sample_interval = 0.001,
+    sample_interval = 0.005,
     t_accel_end=100,
 )
 
