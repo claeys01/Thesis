@@ -369,8 +369,8 @@ function save_results(hs::HybridState)
 
     plt_combined = plot_accel_combined(res, params.t_accel_end; mode_log=mode_log)
     display(plt_combined)
-    rst_comp_plot = plot_rst_comparison(sim_meanflow, ref_meanflow)
-    plt_meanflow = plot_meanflow_comparison(sim_meanflow, ref_meanflow)
+    rst_comp_plot = plot_rst_comparison(sim_meanflow, ref_meanflow; style=:filled, savedir=joinpath(savedir, "rst_panels"))
+    plt_meanflow = plot_meanflow_comparison(sim_meanflow, ref_meanflow, savedir=joinpath(savedir, "meanflow_panels"))
     save_accel_plots(savedir, plt_combined, rst_comp_plot, plt_meanflow)
 
     if !isempty(gif_frames)

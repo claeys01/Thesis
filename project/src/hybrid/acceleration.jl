@@ -472,7 +472,8 @@ function plot_rst_comparison(sim_meanflow, ref_meanflow; savedir=nothing, fmt="p
         println("Saved $(length(panels)) RST panels to: $(savedir)")
     end
 
-    return plot((p for (_, p) in panels)...; layout=(3, 3), size=(1200, 1050), dpi=400, colorbar=(style == :filled)), panels
+    return plot((p for (_, p) in panels)...; 
+        layout=(3, 3), size=(1200, 1050), dpi=400, colorbar=(style == :filled))
 end
 
 # Filled red/blue contour panel in the style of the reference vorticity figure:
@@ -555,7 +556,7 @@ function plot_meanflow_comparison(sim_meanflow, ref_meanflow; savedir=nothing, f
     end
 
     return plot((p for (_, p) in panels)...;
-        layout=(2, 3), size=(1200, 700), dpi=400), panels
+        layout=(2, 3), size=(1200, 700), dpi=400)
 end
 
 function save_velocity_frame!(gif_frames::Vector, sim, time_step)
