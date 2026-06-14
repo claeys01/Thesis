@@ -6,7 +6,7 @@
 #SBATCH --error=logs/%x_%j.err
 #SBATCH --time=02:00:00
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=12
+#SBATCH --cpus-per-task=16
 #SBATCH --gpus-per-task=1
 #SBATCH --mem-per-cpu=6G
 #SBATCH --account=research-me-mtt

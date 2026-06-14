@@ -462,7 +462,9 @@ Returns `(z, t, tspan, z0)` on CPU.
 """
 function get_latent_vectors(ae_bundle, normalizer::Normalizer, ae_args::LuxArgs; downsample=300, device=cpu_device(), ae_t_train=nothing, full_data_path=nothing)
     ae, ps, st = ae_bundle.ae, ae_bundle.ps, ae_bundle.st
-    simdata = load_simdata(ae_args.full_data_path)
+    # simdata = load_simdata(ae_args.full_data_path)
+    simdata = isnothing(ae_args.simdata_ram) ? load_simdata(ae_args.full_data_path) : ae_args.simdata_ram
+
     # simdata = isnothing(full_data_path) ?  load_simdata(ae_args.full_data_path) : load_simdata(full_data_path)
 
     preprocess_data!(simdata; verbose=true)
@@ -491,7 +493,7 @@ end
 function get_latent_chunks(ae_bundle, normalizer::Normalizer, ae_args::LuxArgs;
         downsample=300, device=cpu_device(), min_chunk_size::Int=21)
     ae, ps, st = ae_bundle.ae, ae_bundle.ps, ae_bundle.st
-    simdata = load_simdata(ae_args.full_data_path)
+    simdata = isnothing(ae_args.simdata_ram) ? load_simdata(ae_args.full_data_path) : ae_args.simdata_ram
     preprocess_data!(simdata; verbose=true)
 
     chunks = simdata.chunk_ranges

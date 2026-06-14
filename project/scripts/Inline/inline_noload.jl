@@ -85,7 +85,6 @@ node_elapsed = round((time() - node_start) / 60; digits=1)
 
 aenode = AENODE(ae_bundle, node, ae_args, node_args, normalizer; verbose=true)
 
-# hs = HybridState(sim, aenode, params, savedir, AE_path_tl1, node_path)
 hs.aenode = aenode
 hs.AE_path = AE_path
 hs.node_path = node_path

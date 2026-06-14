@@ -21,7 +21,7 @@ if is_hpc()
 end
 
 params = InlineParams(
-    sample_interval = 0.005,
+    sample_interval = 0.001,
     t_accel_end=100,
 )
 
@@ -61,7 +61,6 @@ ae_bundle, AE_path = train_AE(ae_args; return_path=true)
 ae_elapsed = round((time() - ae_start) / 60; digits=1)
 @info "AE initial training complete" elapsed_min=ae_elapsed checkpoint=AE_path
 
-# ae_args.simdata_ram = nothing   # release the simdata ref
 normalizer = load_normalizer(AE_path)
 
 ae_bundle = cpu_device()(ae_bundle)
@@ -89,6 +88,7 @@ node_elapsed = round((time() - node_start) / 60; digits=1)
 # ae_bundle = cpu_device()(ae_bundle)
 
 aenode = AENODE(ae_bundle, node, ae_args, node_args, normalizer; verbose=true)
+ae_args.simdata_ram = nothing   # simdata is on disk; drop the RAM ref so aenode/checkpoint don't carry it
 
 # hs = HybridState(sim, aenode, params, savedir, AE_path_tl1, node_path)
 hs.aenode = aenode
@@ -180,6 +180,7 @@ while sim_time(hs.sim) < hs.params.t_accel_end
         push!(retrain_timings, (wl_cutoff=wl_cutoff_elapsed, ae=ae_retrain_elapsed, node=node_retrain_elapsed))
 
         hs.aenode = AENODE(ae_retrain_bundle, node_retrain, ae_retrain_args, node_retrain_args, retrain_normalizer; verbose=true)
+        ae_retrain_args.simdata_ram = nothing   # simdata is on disk; drop the RAM ref
         hs.AE_path = AE_retrain_path
         hs.node_path = node_retrain_path
         hs.retrain_needed = false
