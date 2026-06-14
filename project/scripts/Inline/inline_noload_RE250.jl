@@ -20,7 +20,9 @@ if is_hpc()
     @info "  Julia threads: $(Threads.nthreads())"
 end
 
-params = InlineParams()
+params = InlineParams(
+    max_retrain_flags = 5
+)
 
 savedir = joinpath(root_path, "data", "inline_runs","RE250", Dates.format(now(), "yyyy-mm-dd_HH-MM"))
 mkpath(savedir)
@@ -83,7 +85,7 @@ node_elapsed = round((time() - node_start) / 60; digits=1)
 
 # ae_bundle = cpu_device()(ae_bundle)
 
-aenode = AENODE(ae_bundle, node, ae_args, node_args, normalizer; verbose=true)
+aenode = AENODE(ae_bundle, node, ae_args, node_args, normalizer; verbose=true, q=1.25)
 
 # hs = HybridState(sim, aenode, params, savedir, AE_path_tl1, node_path)
 hs.aenode = aenode
@@ -172,7 +174,7 @@ while sim_time(hs.sim) < hs.params.t_accel_end
 
         push!(retrain_timings, (wl_cutoff=wl_cutoff_elapsed, ae=ae_retrain_elapsed, node=node_retrain_elapsed))
 
-        hs.aenode = AENODE(ae_retrain_bundle, node_retrain, ae_retrain_args, node_retrain_args, retrain_normalizer; verbose=true)
+        hs.aenode = AENODE(ae_retrain_bundle, node_retrain, ae_retrain_args, node_retrain_args, retrain_normalizer; verbose=true, q=1.25)
         hs.AE_path = AE_retrain_path
         hs.node_path = node_retrain_path
         hs.retrain_needed = false
