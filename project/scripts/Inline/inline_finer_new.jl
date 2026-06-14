@@ -104,6 +104,7 @@ retrain_timings = NamedTuple[]   # one entry per completed retrain cycle
 
 # run_hybrid!(hs)
 while sim_time(hs.sim) < hs.params.t_accel_end
+    GC.gc()
     run_hybrid!(hs)
     global simdata, ae_retrain_elapsed_total, node_retrain_elapsed_total, wl_cutoff_elapsed_total
     sim_time(hs.sim) >  hs.params.t_accel_end && break
@@ -188,6 +189,7 @@ while sim_time(hs.sim) < hs.params.t_accel_end
         push!(hs.mode_log, (t_start=sim_time(hs.sim), t_end=sim_time(hs.sim), mode="Restarted"))
     end
 end
+GC.gc()
 
 save_results(hs)
 
