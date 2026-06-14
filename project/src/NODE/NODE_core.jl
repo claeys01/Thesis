@@ -506,7 +506,7 @@ function get_latent_chunks(ae_bundle, normalizer::Normalizer, ae_args::LuxArgs;
     tspans = Vector{Tuple{Float32,Float32}}()
     z0s = Vector{Vector{Float32}}()
 
-    for (i, chunk_rg) in enumerate(chunks[1:3])
+    for (i, chunk_rg) in enumerate(chunks)
         local_idx_full = i == 1 ? [j for j in chunk_rg if simdata.time[j] < ae_args.t_training] : collect(chunk_rg)
         if length(local_idx_full) < min_chunk_size
             @warn "Chunk $i has $(length(local_idx_full)) points (< min_chunk_size=$min_chunk_size) — skipping"

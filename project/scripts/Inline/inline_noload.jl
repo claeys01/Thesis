@@ -124,7 +124,7 @@ while sim_time(hs.sim) < hs.params.t_accel_end
             η = 2e-4,
             epochs=hs.params.ae_retrain_epochs,
             batch_size=hs.params.ae_batch_size,
-            t_training=simdata.time[end] * 0.85 ,
+            t_training=simdata.time[end] - 2.5 ,
             train_downsample=hs.params.downsample,
             λdiv=100.0,
             λcurl=100.0,

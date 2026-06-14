@@ -41,12 +41,13 @@ wl_warmup_elapsed = round((time() - wl_warmup_start) / 60; digits=2)
 ae_start = time()
 
 ae_args = LuxArgs(
-        λdiv=Float64(0.0),
-        λcurl=Float64(0.0),
         epochs=hs.params.ae_epochs, 
         save_path=savedir,
         train_downsample=hs.params.downsample,
         t_training=hs.params.t_train,
+        batch_size=hs.params.ae_batch_size,
+        λdiv=100.0,
+        λcurl=100.0,
         full_data_path=simdata_path, 
         simdata_ram=simdata,
     )
@@ -122,12 +123,13 @@ while sim_time(hs.sim) < hs.params.t_accel_end
         # ================================ Step 3: Retrain AE ================================
         ae_retrain_start = time()
         ae_retrain_args = LuxArgs(
-            η = 2e-4,
-            λdiv=Float64(0.0),
-            λcurl=Float64(0.0),
-            epochs=hs.params.ae_retrain_epochs, 
-            t_training=simdata.time[end] * 0.85 ,
+             η = 2e-4,
+            epochs=hs.params.ae_retrain_epochs,
+            batch_size=hs.params.ae_batch_size,
+            t_training=simdata.time[end] - 2.5,
             train_downsample=hs.params.downsample,
+            λdiv=100.0,
+            λcurl=100.0,
             retrain=true,
             checkpoint_path=hs.AE_path,
             save_path=savedir,
