@@ -387,4 +387,4 @@ function save_results(hs::HybridState)
     println("AE checkpoint: $(AE_path)")
     println("NODE checkpoint: $(node_path)")
     println("Saved outputs to: $(savedir)")
-endsave_accel_plots
+end

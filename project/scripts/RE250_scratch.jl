@@ -22,14 +22,28 @@ hs_path = joinpath(basedir, "hybrid_state.jld2")
 @load hs_path res sim_meanflow ref_meanflow params mode_log n_integrs AE_path node_path savedir
 
 plt_forces = plot_forces_comparison(res, 100; mode_log = mode_log)
+plt_forces = plot!(plt_forces, ylims=(-2, 1.5))
 display(plt_forces)
 savefig(plt_forces, joinpath(basedir, "plt_forces.pdf"))
 
-meanplot = plot_meanflow_comparison(sim_meanflow, ref_meanflow;
-    savedir=joinpath(basedir, "meanflow_panels"))
-display(meanplot)
+function hybrid_reference(hyb, ref)
+    hyb = plot!(hyb, colorbar=false)
+    ref = plot(ref, ylabel="", yformatter=_ -> "")
+    plt_comb = plot(hyb, ref;
+        layout=grid(1, 2; widths=[0.4425, 0.5575]),
+        link=:y, legend=false, size=(700, 350), dpi=600, grid=false)
+    return plt_comb
+end
 
-rst_plot = plot_rst_comparison(sim_meanflow, ref_meanflow; style=:filled,
+meanplot, meanplot_panels = plot_meanflow_comparison(sim_meanflow, ref_meanflow;
+    savedir=joinpath(basedir, "meanflow_panels"))
+# display(meanplot)
+u_ref, u_hybrid, _, v_ref, v_hybrid, _ = meanplot_panels
+# u_hybrid = plot!(u_hybrid[2], colorbar=false)
+# display(u_hybrid)
+plt_comb = hybrid_reference(u_hybrid[2], u_ref[2])
+
+rst_plot, rst_panels = plot_rst_comparison(sim_meanflow, ref_meanflow; style=:filled,
     savedir=joinpath(basedir, "rst_panels"))
 display(rst_plot)
 # display(p)
