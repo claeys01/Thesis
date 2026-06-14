@@ -129,7 +129,6 @@ while sim_time(hs.sim) < hs.params.t_accel_end
         ae_retrain_args = LuxArgs(
             η = 2e-4,
             epochs=hs.params.ae_retrain_epochs,
-            batch_size=4,
             t_training=simdata.time[end] - 2.5 ,
             train_downsample=hs.params.downsample,
             retrain=true,
