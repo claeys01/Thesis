@@ -68,11 +68,11 @@ using Printf
 # println(dump(simdata))
 
 n = 2^8
-sim = circle_shedding_biot(;n=n, m=n, Re=2500, perturb=false)
+sim = circle_shedding_biot(;n=n, m=n, Re=250, perturb=false)
 
 sim_step!(sim)
-
-u₀ = load_u0("data/initial_fields/RE2500/2e8/u_0.jld2")
+# u_0_re250 = 
+u₀ = load_u0("data/initial_fields/RE250/2e8/u_0.jld2")
 sim.flow.u .= u₀
 
 
@@ -94,7 +94,7 @@ while sim_time(sim) < t_end
         plt = Thesis.curl_contour(sim.flow.u; colorbar=false)
         timestep = counter * next_delta
         display(plt)
-        savefig(plt, "figs/biot_shedding_plots/new_shedding_t$timestep.png")
+        savefig(plt, "figs/biot_shedding_plots/RE250_shedding_t$timestep.png")
         next_plot += next_delta
         counter +=1
     end

@@ -46,6 +46,12 @@ plt_comb = hybrid_reference(u_hybrid[2], u_ref[2])
 rst_plot, rst_panels = plot_rst_comparison(sim_meanflow, ref_meanflow; style=:filled,
     savedir=joinpath(basedir, "rst_panels"))
 display(rst_plot)
+
+plt_timing, plt_total = plot_timing_bars(res)
+savefig(plt_timing, joinpath(basedir, "plt_timing.pdf"))
+savefig(plt_total, joinpath(basedir, "plt_total.pdf"))
+
+
 # display(p)
 # # p_rec = Thesis.visualize_reconstructions(joinpath(model1, "checkpoint.jld2"))
 
