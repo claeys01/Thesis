@@ -265,79 +265,69 @@ function plot_multiple_shoot(node::NODE, preds::Vector{<:AbstractMatrix}, z::Abs
     return p
 end
 
-# Overlay all trajectories on a single plot so chunks visibly extend the same data.
+# One subplot per chunk, stacked in a single column (n_chunk rows).
 function plot_multiple_shoot_multi(node::NODE, predss::Vector, zs::Vector{<:AbstractMatrix};
         group_size::Int, ts::Vector, title_loss=nothing, n_reconstruct=4)
     n = length(zs)
     latent_dim = size(zs[1], 1)
     idx_samples = round.(Int, range(1, stop=latent_dim, length=n_reconstruct))
-    zlo = min(
-        minimum(minimum(view(z, idx_samples, :)) for z in zs),
-        minimum(minimum(view(pr, idx_samples, :)) for preds in predss for pr in preds),
-    )
-    zhi = max(
-        maximum(maximum(view(z, idx_samples, :)) for z in zs),
-        maximum(maximum(view(pr, idx_samples, :)) for preds in predss for pr in preds),
-    )
-    p = plot(size=(1100, 450),
-        ylims=(zlo, zhi),
-        dpi=400,
-        xlabel=L"t^*",
-        ylabel=L"\mathbf{z}", 
-        legendfontsize=7, 
-        framestyle   = :box,
-        gridalpha    = 0.20,
-        gridlinewidth = 0.5,
-        foreground_color_axis  = :black,
-        foreground_color_text  = :black,
-        left_margin   = 6Plots.mm,
-        right_margin  = 3Plots.mm,
-        top_margin    = 1Plots.mm,
-        bottom_margin = 8Plots.mm,
-        xguide_position = :bottom,   # default, but explicit
-        )
-
-
-    # if title_loss !== nothing
-    #     title!(p, "$n chunks (total loss = $(title_loss))")
-    # end
+    # y-limits from ground-truth data only, so the axis (and ticks) match the rollout plot
+    zlo = minimum(minimum(view(z, idx_samples, :)) for z in zs)
+    zhi = maximum(maximum(view(z, idx_samples, :)) for z in zs)
 
     palette = [:black, :red, :blue, :green, :purple, :orange, :yellow]
     ncolors = length(palette)
 
+    subplots = Vector{Any}(undef, n)
     for i in 1:n
         z = zs[i]
         preds = predss[i]
         t = ts[i]
         ranges = DiffEqFlux.group_ranges(size(z, 2), group_size)
 
+        sp = plot(ylims=(zlo, zhi),
+            ylabel=L"\mathbf{z}",
+            xlabel=(i == n ? L"t^*" : ""),
+            legend=(i == 1),
+            legendfontsize=7,
+            framestyle   = :box,
+            gridalpha    = 0.20,
+            gridlinewidth = 0.5,
+            foreground_color_axis  = :black,
+            foreground_color_text  = :black,
+            )
+
         for (sidx, lat_idx) in enumerate(idx_samples)
             c = palette[(sidx - 1) % ncolors + 1]
             for (j, rg) in enumerate(ranges)
-                first_chunk = (i == 1 && j == 1 && sidx == 1)
-                plot!(p, t[rg], z[lat_idx, rg];
+                first = (j == 1 && sidx == 1)
+                plot!(sp, t[rg], z[lat_idx, rg];
                       color=c, linestyle=:solid, alpha=0.9,
-                      label=first_chunk ? "z (truth)" : "")
-                plot!(p, t[rg], preds[j][lat_idx, :];
+                      label=first ? "z (truth)" : "")
+                plot!(sp, t[rg], preds[j][lat_idx, :];
                       color=c, linestyle=:dash, alpha=0.9,
-                      label=first_chunk ? "z̃ (pred)" : "")
+                      label=first ? "z̃ (pred)" : "")
 
                 t_start, t_end = t[rg][1], t[rg][end]
                 pred_start, pred_end = preds[j][lat_idx, 1], preds[j][lat_idx, end]
-                scatter!(p, [t_start, t_end], [pred_start, pred_end];
-                         color=c, marker=:vline, markersize=5, markerstrokecolor=c,
-                         markerstrokewidth=1.5, fillalpha=0.0,
-                         label=first_chunk ? "pred start/end" : nothing)
-            end
-
-            # mark chunk boundary on the time axis (once per chunk, on first latent comp)
-            if sidx == 1
-                vline!(p, [t[1]]; color=:gray, linestyle=:dot, alpha=0.4,
-                       label=(i == 1 ? "chunk start" : ""))
+                scatter!(sp, [t_start, t_end], [pred_start, pred_end];
+                         color=c, marker=:vline, markersize=6, markerstrokecolor=c,
+                         markerstrokewidth=0.5, fillalpha=0.0,
+                         label=first ? "pred start/end" : nothing)
             end
         end
+        subplots[i] = sp
     end
-    return p
+
+    return plot(subplots...;
+        layout=(n, 1),
+        size=(1100, 300 * n),
+        dpi=400,
+        left_margin   = 6Plots.mm,
+        right_margin  = 3Plots.mm,
+        top_margin    = 1Plots.mm,
+        bottom_margin = 8Plots.mm,
+        )
 end
 
 function plot_node_trajectory(node::NODE, z::AbstractMatrix, z0; p=nothing, t=nothing, n_reconstruct=4, loss=nothing, plt=nothing, labels=true)
@@ -391,6 +381,7 @@ end
 function plot_node_rollout_multi(node::NODE, zs::Vector{<:AbstractMatrix}, z0s::Vector;
         p=nothing, ts::Vector, n_reconstruct=4, loss=nothing)
     n = length(zs)
+    # n = 2
     latent_dim = size(zs[1], 1)
     idx_samples = round.(Int, range(1, stop=latent_dim, length=n_reconstruct))
 
@@ -398,53 +389,49 @@ function plot_node_rollout_multi(node::NODE, zs::Vector{<:AbstractMatrix}, z0s::
     zs_cpu  = [Array(z) for z in zs]
     ts_cpu  = [Array(t) for t in ts]
 
-    zlo = min(
-        minimum(minimum(view(z, idx_samples, :)) for z in zs_cpu),
-        minimum(minimum(view(pr, idx_samples, :)) for pr in preds),
-    )
-    zhi = max(
-        maximum(maximum(view(z, idx_samples, :)) for z in zs_cpu),
-        maximum(maximum(view(pr, idx_samples, :)) for pr in preds),
-    )
-    fig = plot(size=(1100, 450),
-        ylims=(zlo, zhi),
-        dpi=400,
-        xlabel=L"t^*",
-        ylabel=L"\mathbf{z}",
-        legendfontsize=7,
-        framestyle   = :box,
-        gridalpha    = 0.20,
-        gridlinewidth = 0.5,
-        foreground_color_axis  = :black,
-        foreground_color_text  = :black,
-        left_margin   = 6Plots.mm,
-        right_margin  = 3Plots.mm,
-        top_margin    = 1Plots.mm,
-        bottom_margin = 8Plots.mm,
-        xguide_position = :bottom,
-        )
+    # y-limits from ground-truth data only, so the axis (and ticks) match the multiple-shoot plot
+    zlo = minimum(minimum(view(z, idx_samples, :)) for z in zs_cpu)
+    zhi = maximum(maximum(view(z, idx_samples, :)) for z in zs_cpu)
 
     palette = [:black, :red, :blue, :green, :purple, :orange, :yellow]
     ncolors = length(palette)
 
+    subplots = Vector{Any}(undef, n)
     for i in 1:n
         z = zs_cpu[i]; pred = preds[i]; t = ts_cpu[i]
+        sp = plot(ylims=(zlo, zhi),
+            ylabel=L"\mathbf{z}",
+            xlabel=(i == n ? L"t^*" : ""),
+            legend=(i == 1),
+            legendfontsize=7,
+            framestyle   = :box,
+            gridalpha    = 0.20,
+            gridlinewidth = 0.5,
+            foreground_color_axis  = :black,
+            foreground_color_text  = :black,
+            )
         for (sidx, lat_idx) in enumerate(idx_samples)
             c = palette[(sidx - 1) % ncolors + 1]
-            first_chunk = (i == 1 && sidx == 1)
-            plot!(fig, t, z[lat_idx, :];
+            first = (sidx == 1)
+            plot!(sp, t, z[lat_idx, :];
                   color=c, linestyle=:solid, alpha=0.9,
-                  label=first_chunk ? "z (truth)" : "")
-            plot!(fig, t, pred[lat_idx, :];
+                  label=first ? "z (truth)" : "")
+            plot!(sp, t, pred[lat_idx, :];
                   color=c, linestyle=:dash, alpha=0.9,
-                  label=first_chunk ? "z̃ (pred)" : "")
-            if sidx == 1
-                vline!(fig, [t[1]]; color=:gray, linestyle=:dot, alpha=0.4,
-                       label=(i == 1 ? "chunk start" : ""))
-            end
+                  label=first ? "z̃ (pred)" : "")
         end
+        subplots[i] = sp
     end
-    return fig
+
+    return plot(subplots...;
+        layout=(n, 1),
+        size=(1100, 300 * n),
+        dpi=400,
+        left_margin   = 6Plots.mm,
+        right_margin  = 3Plots.mm,
+        top_margin    = 1Plots.mm,
+        bottom_margin = 8Plots.mm,
+        )
 end
 
 function save_node(path::AbstractString, node::NODE, args::NodeArgs)
@@ -519,7 +506,7 @@ function get_latent_chunks(ae_bundle, normalizer::Normalizer, ae_args::LuxArgs;
     tspans = Vector{Tuple{Float32,Float32}}()
     z0s = Vector{Vector{Float32}}()
 
-    for (i, chunk_rg) in enumerate(chunks)
+    for (i, chunk_rg) in enumerate(chunks[1:3])
         local_idx_full = i == 1 ? [j for j in chunk_rg if simdata.time[j] < ae_args.t_training] : collect(chunk_rg)
         if length(local_idx_full) < min_chunk_size
             @warn "Chunk $i has $(length(local_idx_full)) points (< min_chunk_size=$min_chunk_size) — skipping"
