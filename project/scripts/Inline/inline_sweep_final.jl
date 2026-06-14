@@ -20,7 +20,7 @@ if is_hpc()
     @info "  Julia threads: $(Threads.nthreads())"
 end
 
-sweep_root = joinpath(root_path, "data", "inline_runs", "inline_sweep_final_v2_actual_again_rest")
+sweep_root = joinpath(root_path, "data", "inline_runs", "inline_sweep_final_v2_actual_again_rest_rest")
 mkpath(sweep_root)
 
 u₀ = load_u0(joinpath(root_path, "data/initial_fields/RE2500/2e8/u_0.jld2"))
