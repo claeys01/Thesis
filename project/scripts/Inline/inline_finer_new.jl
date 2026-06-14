@@ -130,7 +130,7 @@ while sim_time(hs.sim) < hs.params.t_accel_end
             η = 2e-4,
             epochs=hs.params.ae_retrain_epochs,
             batch_size=4,
-            t_training=simdata.time[end] * 0.85 ,
+            t_training=simdata.time[end] - 2.5 ,
             train_downsample=hs.params.downsample,
             retrain=true,
             checkpoint_path=hs.AE_path,
@@ -139,8 +139,9 @@ while sim_time(hs.sim) < hs.params.t_accel_end
             simdata_ram=simdata,
             input_dim = (2^9, 2^9, 4),
             output_dim = (2^9, 2^9, 2),
-            n_conv = 8,
-            n_dense = 2,
+            batch_size=4,
+            n_conv = 5,
+            n_dense = 1,
         )
 
         ae_retrain_bundle, AE_retrain_path = train_AE(ae_retrain_args; return_path=true)
