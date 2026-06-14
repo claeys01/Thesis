@@ -50,7 +50,18 @@ function encode_flow(aenode::AENODE, u::AbstractArray, μ₀::AbstractArray)
     return vec(cpu_device()(z)), μ₀
 end
 
-function decode_flow(aenode::AENODE, z̃, μ₀)
+function decode_flow(aenode::AENODE, z̃, μ₀; chunk::Int=32)
+    z̃ = z̃ isa AbstractVector ? reshape(z̃, :, 1) : z̃
+    N = size(z̃, 2)
+    # Decode in chunks: a single huge batch overflows cuDNN's int32 tensor
+    # descriptors (CUDNN_STATUS_NOT_SUPPORTED) once N·C·H·W gets large.
+    if N > chunk
+        cols = [decode_flow(aenode, z̃[:, i:min(i + chunk - 1, N)], μ₀; chunk=chunk)
+                for i in 1:chunk:N]
+        # a trailing 1-column chunk comes back 3D (dims=4 dropped); restore it before cat
+        cols = [ndims(c) == 3 ? reshape(c, size(c)..., 1) : c for c in cols]
+        return cat(cols...; dims=4)
+    end
     dev = get_device()
     z̃_dev = dev(z̃)  # CPU → GPU for decoder
     û, _ = @timeit to "decode" aenode.decoder(z̃_dev, aenode.ae_params.decoder, aenode.ae_state.decoder)
