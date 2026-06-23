@@ -15,8 +15,8 @@ figs_dir = joinpath("figs", run_tag)
 mkpath(figs_dir)
 
 sim = circle_shedding_biot(; Re=Re, n=n, m=n, perturb=true)
-# u₀ = load_u0("data/initial_fields/u0_biot_n512_t5.jld2")
-# sim.flow.u .= u₀
+u₀ = load_u0("data/initial_fields/RE5000/2e9/u_0.jld2")
+sim.flow.u .= u₀
 
 next_plot = plot_interval
 anim = Animation()   # frames are buffered to a temp dir on disk, not RAM
