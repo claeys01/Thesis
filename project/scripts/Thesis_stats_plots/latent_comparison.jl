@@ -37,7 +37,7 @@ plot_kwargs = (
     markersize = 6,
     left_margin = 3Plots.mm,
     bottom_margin = 4Plots.mm,
-    linewidth = 2,
+    linewidth = 1,
     size = (350, 200),
     dpi = 300,
 )

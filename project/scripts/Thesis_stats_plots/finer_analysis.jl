@@ -3,14 +3,14 @@ using JLD2
 using Statistics
 using Plots
 
-base_dir = "data/saved_models/inline_runs_hpc/base"
+base_dir = "data/saved_models/inline_runs_hpc/new_finer"
 # base_dir = "data/inline_runs/2026-06-05_14-43"
 
 hs_path = joinpath(base_dir, "hybrid_state.jld2")
 @load hs_path res sim_meanflow ref_meanflow params mode_log n_integrs AE_path node_path savedir
 dump(params)
 
-base_params = InlineParams()
+# base_params = InlineParams()
 
 timing_plots = plot_timing_bars(res)
 display(timing_plots)
@@ -104,6 +104,18 @@ display(meanplot)
 rst_plot = plot_rst_comparison(sim_meanflow, ref_meanflow; style=:filled,
     savedir=joinpath(base_dir, "rst_panels"))
 display(rst_plot)
+
+
+plt_timing, plt_total = plot_timing_bars(res)
+display(plt_timing)
+display(plt_total)
+
+savefig(plt_timing, joinpath(base_dir, "plt_timing.png"))
+savefig(plt_total, joinpath(base_dir, "plt_total.png"))
+
+forces = Thesis.plot_forces_comparison(res, 100; mode_log=mode_log)
+savefig(forces, joinpath(base_dir, "forces.png"))
+
 
 # sim_u, sim_v = sim_meanflow.U[:, :, 1], sim_meanflow.U[:, :, 2]
 # ref_u, ref_v = ref_meanflow.U[:, :, 1], ref_meanflow.U[:, :, 2]
