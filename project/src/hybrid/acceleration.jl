@@ -315,9 +315,9 @@ function plot_timing_bars(res::AccelResults)
     m = compute_metrics(res)
 
     timing_vals = [m.ref_wall_per_ctu, m.hybrid_wall_per_ctu, m.hybrid_waterlily_wall_per_ctu,m.hybrid_predict_wall_per_ctu]
-    @show size(timing_vals)
-    timing_vals = [9548.4, 4018.83, 9540, m.hybrid_predict_wall_per_ctu]
-    @show size(timing_vals)
+    # @show size(timing_vals)
+    # timing_vals = [9548.4, 4018.83, 9540, m.hybrid_predict_wall_per_ctu]
+    # @show size(timing_vals)
     # Reference sits apart; the three hybrid bars are spaced 1 unit apart with
     # bar_width=1 so their edges meet (touch) while keeping a gap to Reference.
     xs = [1.0, 2.5, 3.5, 4.5]
@@ -339,12 +339,12 @@ function plot_timing_bars(res::AccelResults)
     annotate!(plt_timing, xs[4], timing_vals[4] + 0.05 * maximum(timing_vals),
         text("$(round(timing_vals[4], digits=1)) ms", :black, 8, :center))
 
-    # y_max = max(m.total_reference_wall, m.total_hybrid_wall)
-    y_max = max(954.84, 401,083)
+    y_max = max(m.total_reference_wall, m.total_hybrid_wall)
+    # y_max = max(954.84, 401,083)
     plt_total = bar(
         ["Reference", "Hybrid"],
-        # [m.total_reference_wall, m.total_hybrid_wall],
-        [954.84, 401.083],
+        [m.total_reference_wall, m.total_hybrid_wall],
+        # [954.84, 401.083],
         ylabel="Wall time (s)", title="Total Simulation Time",
         legend=false, color=[:steelblue, :darkorange],
         titlefontsize=14,

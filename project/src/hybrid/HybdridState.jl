@@ -84,9 +84,9 @@ function run_warmup!(hs::HybridState, t_end; simdata::Union{SimData,Nothing}=not
     while sim_time(sim) < t_end && sim_time(sim) < hs.params.t_accel_end
         wall_time = @elapsed begin
             sim_step!(sim)
-            # sync_device!()
+            sync_device!()
         end
-        # record_waterlily_step!(res, sim, wall_time)
+        record_waterlily_step!(res, sim, wall_time)
 
         while sim_time(ref_sim) < sim_time(sim) && run_ref
             step_reference!(res, ref_sim)
@@ -102,7 +102,7 @@ function run_warmup!(hs::HybridState, t_end; simdata::Union{SimData,Nothing}=not
         end
 
         if sim_time(sim) ≥ hs.next_sample
-            record_waterlily_step!(res, sim, wall_time)
+            # record_waterlily_step!(res, sim, wall_time)
 
             push!(u_list, copy(sim.flow.u))
             push!(p_list, copy(sim.flow.p))

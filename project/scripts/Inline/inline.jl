@@ -26,7 +26,9 @@ AE_retrain_path = "data/saved_models/inline_runs_hpc/base/AE_Jun05-1610__E100_HW
 node_path = "data/saved_models/inline_runs_hpc/base/NODE_Jun05-160822/node_params.jld2"
 node_retrain_path = "data/saved_models/inline_runs_hpc/base/NODE_Jun05-161406/node_params.jld2"
 
-params = InlineParams()
+params = InlineParams(
+    sample_interval = 0.1
+)
 
 savedir = joinpath(root_path, "data", "inline_runs", Dates.format(now(), "yyyy-mm-dd_HH-MM"))
 mkpath(savedir)
@@ -40,6 +42,9 @@ sim = circle_shedding_biot(; mem=Array, perturb=false)
 hs = HybridState(sim, nothing, params, savedir, nothing, nothing)
 
 simdata = run_warmup!(hs, params.t_run; u₀=u₀, save_path=simdata_path)
+
+@assert size(hs.res.hybrid_waterlily_wall_times) == size(hs.res.reference_wall_times)
+
 
 # ================================ Step 1: Train Autoencoder ================================
 @info "── Step 1/4: Training Autoencoder ──"
