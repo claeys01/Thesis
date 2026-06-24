@@ -12,6 +12,7 @@ Base.@kwdef struct InlineParams
     continuity_term_retrain = 400
     downsample = 300
     group_size = 15
+    latent_dim = 16
     n_switch = 150
     pred_Δt = 0.35
     save_interval = 0.01

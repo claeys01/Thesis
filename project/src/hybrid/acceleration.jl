@@ -273,7 +273,7 @@ function plot_forces_comparison(res::AccelResults, t_end; t_train=nothing, t_tes
         bottom_margin = 2Plots.mm,
         legend=:topright,
         background_color_legend = RGBA(1, 1, 1, 0.7),
-        xlims=(0, t_end), ylims=(-3, 2))
+        xlims=(0, t_end), ylims=(-3, 3))
 
     if !isnothing(mode_log)
         train_labeled = false

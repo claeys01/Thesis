@@ -23,6 +23,7 @@ end
 params = InlineParams(
     sample_interval = 0.01,
     t_accel_end=100,
+    latent_dim = 32
 )
 
 savedir = joinpath(root_path, "data", "inline_runs", "RE5000_" * Dates.format(now(), "yyyy-mm-dd_HH-MM"))
@@ -44,6 +45,7 @@ wl_warmup_elapsed = round((time() - wl_warmup_start) / 60; digits=2)
 ae_start = time()
 
 ae_args = LuxArgs(
+        latent_dim = params.latent_dim,
         epochs=hs.params.ae_epochs,
         save_path=savedir,
         train_downsample=hs.params.downsample,
@@ -140,6 +142,7 @@ while sim_time(hs.sim) < hs.params.t_accel_end
             input_dim = (2^9, 2^9, 4),
             output_dim = (2^9, 2^9, 2),
             batch_size=4,
+            latent_dim=params.latent_dim,
             n_conv = 5,
             n_dense = 1,
         )
